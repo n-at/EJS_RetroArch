@@ -57,18 +57,71 @@ void cmd_savefiles(void)
 
 void cmd_save_state(void)
 {
-   command_event(CMD_EVENT_SAVE_STATE, NULL);
+   command_event(CMD_EVENT_SAVE_STATE, NULL);//done
 }
 
 void cmd_load_state(void)
 {
-   command_event(CMD_EVENT_LOAD_STATE, NULL);
+   command_event(CMD_EVENT_LOAD_STATE, NULL);//done
 }
 
 void cmd_take_screenshot(void)
 {
-   command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);
+   command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);//done
 }
+
+void load_state(void)
+{
+    command_event(CMD_EVENT_LOAD_STATE, NULL);//done
+}
+
+void set_volume(float volume)
+{
+    printf("%d\n", volume);
+    command_event(CMD_EVENT_MIXER_VOLUME_UP, volume);
+    printf("set volume called\n");
+}
+
+void set_variable(void)
+{
+    printf("set variable called\n");
+}
+
+void simulate_input(void)
+{
+    printf("simulate input called\n");
+}
+
+void shader_enable(void)
+{
+    printf("shader_enable called\n");
+}
+
+void get_state_info(void)
+{
+    printf("get_state_info called\n");
+}
+
+void set_cheat(void)
+{
+    printf("set_cheat called\n");
+}
+
+void system_restart(void)
+{
+    command_event(CMD_EVENT_RESET, NULL);//done
+}
+
+void get_current_frame_count(void)
+{
+    printf("get_current_frame_count called\n");
+}
+
+void get_core_options(void)
+{
+    printf("get_core_options called\n");
+}
+
 
 static void frontend_emscripten_get_env(int *argc, char *argv[],
       void *args, void *params_data)
@@ -162,8 +215,7 @@ int main(int argc, char *argv[])
 {
    dummyErrnoCodes();
 
-   emscripten_set_canvas_element_size("#canvas", 800, 600);
-   emscripten_set_element_css_size("#canvas", 800.0, 600.0);
+   printf("Official emulatorjs build\ndownload a copy from https://github.com/ethanaobrien/emulatorjs\n\nView the licence here https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
    emscripten_set_main_loop(emscripten_mainloop, 0, 0);
    rarch_main(argc, argv, NULL);
 

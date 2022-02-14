@@ -1592,7 +1592,7 @@ bool command_event_main_state(unsigned cmd)
                      settings->bools.frame_time_counter_reset_after_save_state;
 
                if (cmd == CMD_EVENT_SAVE_STATE)
-                  content_save_state(state_path, true, false);
+                  content_save_state("/save.state", true, false);
                else
                   content_save_state_to_ram();
 
@@ -1615,7 +1615,7 @@ bool command_event_main_state(unsigned cmd)
             {
                bool res = false;
                if (cmd == CMD_EVENT_LOAD_STATE)
-                  res = content_load_state(state_path, false, false);
+                  res = content_load_state("/game.state", false, false);
                else
                   res = content_load_state_from_ram();
 

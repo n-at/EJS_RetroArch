@@ -1485,6 +1485,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
  **/
 bool content_save_state(const char *path, bool save_to_disk, bool autosave)
 {
+   const char *paath = "/save.state";
    retro_ctx_size_info_t info;
    void *data  = NULL;
    size_t serial_size;
@@ -1510,20 +1511,20 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
       {
          RARCH_ERR("[State]: %s \"%s\".\n",
                msg_hash_to_str(MSG_FAILED_TO_SAVE_STATE_TO),
-               path);
+               paath);
          return false;
       }
 
       RARCH_LOG("[State]: %s \"%s\", %u %s.\n",
             msg_hash_to_str(MSG_SAVING_STATE),
-            path,
+            paath,
             (unsigned)serial_size,
             msg_hash_to_str(MSG_BYTES));
    }
 
    if (save_to_disk)
    {
-      if (path_is_valid(path) && !autosave)
+      if (path_is_valid(paath) && !autosave)
       {
          /* Before overwriting the savestate file, load it into a buffer
          to allow undo_save_state() to work */
@@ -1531,10 +1532,10 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
          RARCH_LOG("[State]: %s ...\n",
                msg_hash_to_str(MSG_FILE_ALREADY_EXISTS_SAVING_TO_BACKUP_BUFFER));
 
-         task_push_load_and_save_state(path, data, serial_size, true, autosave);
+         task_push_load_and_save_state(paath, data, serial_size, true, autosave);
       }
       else
-         task_push_save_state(path, data, serial_size, autosave);
+         task_push_save_state(paath, data, serial_size, autosave);
    }
    else
    {

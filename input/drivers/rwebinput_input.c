@@ -1,4 +1,4 @@
-/*  RetroArch - A frontend for libretro.
+"#canvas"/*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2018 - Michael Lelli
  *  Copyright (C) 2011-2017 - Daniel De Matteis
  *
@@ -327,7 +327,7 @@ static void *rwebinput_input_init(const char *joypad_driver)
          "[EMSCRIPTEN/INPUT] failed to create keypress callback: %d\n", r);
    }
 
-   r = emscripten_set_mousedown_callback("#canvas", rwebinput, false,
+   r = emscripten_set_mousedown_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
          rwebinput_mouse_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)
    {
@@ -335,7 +335,7 @@ static void *rwebinput_input_init(const char *joypad_driver)
          "[EMSCRIPTEN/INPUT] failed to create mousedown callback: %d\n", r);
    }
 
-   r = emscripten_set_mouseup_callback("#canvas", rwebinput, false,
+   r = emscripten_set_mouseup_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
          rwebinput_mouse_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)
    {
@@ -343,7 +343,7 @@ static void *rwebinput_input_init(const char *joypad_driver)
          "[EMSCRIPTEN/INPUT] failed to create mouseup callback: %d\n", r);
    }
 
-   r = emscripten_set_mousemove_callback("#canvas", rwebinput, false,
+   r = emscripten_set_mousemove_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
          rwebinput_mouse_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)
    {
@@ -658,14 +658,6 @@ static void rwebinput_input_poll(void *data)
    rwebinput->mouse.pending_scroll_y = 0;
 }
 
-static void rwebinput_grab_mouse(void *data, bool state)
-{
-   if (state)
-      emscripten_request_pointerlock("#canvas", EM_TRUE);
-   else
-      emscripten_exit_pointerlock();
-}
-
 static uint64_t rwebinput_get_capabilities(void *data)
 {
    uint64_t caps = 0;
@@ -688,6 +680,6 @@ input_driver_t input_rwebinput = {
    NULL,
    rwebinput_get_capabilities,
    "rwebinput",
-   rwebinput_grab_mouse,
+   NULL,
    NULL
 };

@@ -70,22 +70,14 @@ static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
 
    if (!is_fullscreen)
    {
-      r = emscripten_get_canvas_element_size("#canvas", width, height);
-
-      if (r != EMSCRIPTEN_RESULT_SUCCESS)
-      {
-         RARCH_ERR("[EMSCRIPTEN/EGL]: Could not get screen dimensions: %d\n",
-            r);
-         *width = 800;
-         *height = 600;
-      }
+     *width = 800;
+     *height = 600;
    }
 }
 
 static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
       bool *resize, unsigned *width, unsigned *height)
 {
-   EMSCRIPTEN_RESULT r;
    int input_width;
    int input_height;
    emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
@@ -103,24 +95,6 @@ static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
    *height     = (unsigned)input_height;
    *resize     = false;
 
-   if (input_width != emscripten->fb_width ||
-      input_height != emscripten->fb_height)
-   {
-      r = emscripten_set_canvas_element_size("#canvas",
-         input_width, input_height);
-
-      if (r != EMSCRIPTEN_RESULT_SUCCESS)
-         RARCH_ERR("[EMSCRIPTEN/EGL]: error resizing canvas: %d\n", r);
-
-      /* fix Module.requestFullscreen messing with the canvas size */
-      r = emscripten_set_element_css_size("#canvas",
-         (double)input_width, (double)input_height);
-
-      if (r != EMSCRIPTEN_RESULT_SUCCESS)
-         RARCH_ERR("[EMSCRIPTEN/EGL]: error resizing canvas css: %d\n", r);
-
-      *resize  = true;
-   }
 
    emscripten->fb_width  = (unsigned)input_width;
    emscripten->fb_height = (unsigned)input_height;
@@ -198,9 +172,10 @@ static void *gfx_ctx_emscripten_init(void *video_driver)
     * be grabbed? */
    if (  emscripten->initial_width  == 0 || 
          emscripten->initial_height == 0)
-      emscripten_get_canvas_element_size("#canvas",
-         &emscripten->initial_width,
-         &emscripten->initial_height);
++         emscripten->initial_height == 0) {
++         emscripten->initial_height = 600;
++         emscripten->initial_width = 800;
++     }
 
 #ifdef HAVE_EGL
    if (g_egl_inited)
