@@ -1866,9 +1866,10 @@ bool command_event(enum event_command cmd, void *data)
 #ifdef HAVE_SCREENSHOTS
          {
             const char *dir_screenshot = "/";
+            char name = "screenshot.png";
             if (!take_screenshot(dir_screenshot,
-+                     "screenshot.png", false,
-+                     video_driver_cached_frame_has_valid_framebuffer(), true, false))
+                     name, false,
+                     video_driver_cached_frame_has_valid_framebuffer(), true, false))
                return false;
          }
 #endif

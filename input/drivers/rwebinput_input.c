@@ -1,4 +1,4 @@
-"#canvas"/*  RetroArch - A frontend for libretro.
+/*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2018 - Michael Lelli
  *  Copyright (C) 2011-2017 - Daniel De Matteis
  *

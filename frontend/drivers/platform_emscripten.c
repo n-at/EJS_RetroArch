@@ -77,8 +77,7 @@ void load_state(void)
 
 void set_volume(float volume)
 {
-    printf("%d\n", volume);
-    command_event(CMD_EVENT_MIXER_VOLUME_UP, volume);
+    //printf("%f\n", volume);
     printf("set volume called\n");
 }
 

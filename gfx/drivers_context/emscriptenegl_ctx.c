@@ -171,11 +171,10 @@ static void *gfx_ctx_emscripten_init(void *video_driver)
    /* TODO/FIXME - why is this conditional here - shouldn't these always
     * be grabbed? */
    if (  emscripten->initial_width  == 0 || 
-         emscripten->initial_height == 0)
-+         emscripten->initial_height == 0) {
-+         emscripten->initial_height = 600;
-+         emscripten->initial_width = 800;
-+     }
+         emscripten->initial_height == 0) {
+         emscripten->initial_height = 600;
+         emscripten->initial_width = 800;
+     }
 
 #ifdef HAVE_EGL
    if (g_egl_inited)
