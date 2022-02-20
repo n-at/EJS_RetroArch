@@ -70,11 +70,6 @@ void cmd_take_screenshot(void)
    command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);//done
 }
 
-void load_state(void)
-{
-    command_event(CMD_EVENT_LOAD_STATE, NULL);//done
-}
-
 void set_volume(float volume)
 {
     //printf("%f\n", volume);
@@ -96,11 +91,6 @@ void shader_enable(void)
     printf("shader_enable called\n");
 }
 
-void get_state_info(void)
-{
-    printf("get_state_info called\n");
-}
-
 void set_cheat(void)
 {
     printf("set_cheat called\n");
@@ -109,11 +99,6 @@ void set_cheat(void)
 void system_restart(void)
 {
     command_event(CMD_EVENT_RESET, NULL);//done
-}
-
-void get_current_frame_count(void)
-{
-    printf("get_current_frame_count called\n");
 }
 
 void get_core_options(void)
@@ -214,7 +199,7 @@ int main(int argc, char *argv[])
 {
    dummyErrnoCodes();
 
-   printf("Official emulatorjs build\ndownload a copy from https://github.com/ethanaobrien/emulatorjs\n\nView the licence here https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
+   printf("Official emulatorjs build\ndownload a copy from https://github.com/ethanaobrien/emulatorjs\n\nView the licence here: https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
    emscripten_set_main_loop(emscripten_mainloop, 0, 0);
    rarch_main(argc, argv, NULL);
 

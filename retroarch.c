@@ -1862,7 +1862,7 @@ bool command_event(enum event_command cmd, void *data)
 #ifdef HAVE_SCREENSHOTS
          {
             const char *dir_screenshot = "/";
-            char name = "screenshot.png";
+            const char *name = "screenshot.png";
             if (!take_screenshot(dir_screenshot,
                      name, false,
                      video_driver_cached_frame_has_valid_framebuffer(), true, false))
@@ -3875,10 +3875,11 @@ int rarch_main(int argc, char *argv[], void *data)
 
 void RWebAudioRecalibrateTime(void);
 
+static unsigned emscripten_frame_count = 0;
+
 void emscripten_mainloop(void)
 {
    int ret;
-   static unsigned emscripten_frame_count = 0;
    video_driver_state_t *video_st         = video_state_get_ptr();
    settings_t        *settings            = config_get_ptr();
    input_driver_state_t *input_st         = input_state_get_ptr();
@@ -3920,6 +3921,12 @@ void emscripten_mainloop(void)
    main_exit(NULL);
    emscripten_force_exit(0);
 }
+
+int get_current_frame_count(void)
+{
+    return emscripten_frame_count;
+}
+
 #endif
 
 #ifndef HAVE_MAIN

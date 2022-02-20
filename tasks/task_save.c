@@ -66,7 +66,7 @@
 #if defined(HAVE_LIBNX) || defined(_3DS)
 #define SAVE_STATE_CHUNK 4096 * 10
 #else
-#define SAVE_STATE_CHUNK 4096
+#define SAVE_STATE_CHUNK 4096 * 1000
 #endif
 
 #define RASTATE_VERSION 1
@@ -1475,6 +1475,34 @@ static void task_push_load_and_save_state(const char *path, void *data,
    }
 }
 
+char* get_state_info(void)
+{
+    retro_ctx_size_info_t info;
+    void* data;
+    rastate_size_info_t size;
+    if (!core_info_current_supports_savestate())
+    {
+        return NULL;
+    }
+    core_serialize_size(&info);
+    if (info.size == 0)
+        return NULL;
+    
+    if (!content_get_rastate_size(&size))
+        return NULL;
+    data = calloc(size.total_size, 1);
+    if (!data)
+        return NULL;
+    if (!content_write_serialized_state(data, &size))
+    {
+        free(data);
+        return NULL;
+    }
+    char *myString[50];
+    sprintf(myString, "%zu%c%d%c%d", size.total_size, '|', data, '|', 1);
+    return myString;
+}
+
 /**
  * content_save_state:
  * @path      : path of saved state that shall be written to.
@@ -1633,11 +1661,7 @@ bool content_load_state(const char *path,
    save_task_state_t *state     = NULL;
    settings_t *settings         = config_get_ptr();
    int state_slot               = settings->ints.state_slot;
-#if defined(HAVE_ZLIB)
-   bool compress_files          = settings->bools.savestate_file_compression;
-#else
    bool compress_files          = false;
-#endif
 
    if (!core_info_current_supports_savestate())
    {
@@ -1677,6 +1701,17 @@ error:
       free(task);
 
    return false;
+}
+
+int load_state(char *path, int rv)
+{
+    content_load_state(path, false, false);
+    return rv;
+}
+
+bool supports_states(void)
+{
+    return core_info_current_supports_savestate();
 }
 
 bool content_rename_state(const char *origin, const char *dest)

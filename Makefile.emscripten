@@ -64,8 +64,8 @@ OBJDIR := obj-emscripten
 #if you compile with SDL2 flag add this Emscripten flag "-s USE_SDL=2" to LDFLAGS:
 
 LIBS    := -s USE_ZLIB=1
-LDFLAGS := -L. --no-heap-copy -s $(LIBS) -s TOTAL_MEMORY=$(MEMORY) -s NO_EXIT_RUNTIME=0 -s FULL_ES2=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['callMain', 'cwrap']" \
-           -s EXPORTED_FUNCTIONS=_main,_malloc,_load_state,_set_volume,_set_variable,_simulate_input,_shader_enable,_get_state_info,_set_cheat,_cmd_take_screenshot,_system_restart,_get_current_frame_count,_cmd_savefiles,_get_core_options,_cmd_save_state \
+LDFLAGS := -L. --no-heap-copy -s $(LIBS) -s TOTAL_MEMORY=$(MEMORY) -s NO_EXIT_RUNTIME=0 -s FULL_ES2=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['callMain', 'cwrap', 'getValue']" \
+           -s EXPORTED_FUNCTIONS=_main,_malloc,_load_state,_set_volume,_set_variable,_simulate_input,_shader_enable,_get_state_info,_set_cheat,_cmd_take_screenshot,_system_restart,_get_current_frame_count,_cmd_savefiles,_get_core_options,_cmd_save_state,_supports_states \
            -lidbfs.js \
            -s ALLOW_MEMORY_GROWTH=1 \
            --js-library emscripten/library_rwebaudio.js \
