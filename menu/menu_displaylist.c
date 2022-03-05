@@ -133,7 +133,7 @@
 #define BYTES_TO_GB(bytes) (((bytes) / 1024) / 1024 / 1024)
 
 #ifdef HAVE_NETWORKING
-#if !defined(HAVE_SOCKET_LEGACY) && (!defined(SWITCH) || defined(SWITCH) && defined(HAVE_LIBNX))
+#if !defined(HAVE_SOCKET_LEGACY) && (!defined(SWITCH) || defined(SWITCH) && defined(HAVE_LIBNX)) || defined(GEKKO)
 #include <net/net_ifinfo.h>
 #endif
 #endif
@@ -503,6 +503,10 @@ static int menu_displaylist_parse_core_info(menu_displaylist_info_t *info,
    }
 
    {
+      struct retro_system_info *system  = &runloop_state_get_ptr()->system.info;
+      const char *core_version          = (system && system->library_version)
+            ? system->library_version
+            : "";
       unsigned i;
       typedef struct menu_features_info
       {
@@ -513,13 +517,15 @@ static int menu_displaylist_parse_core_info(menu_displaylist_info_t *info,
       menu_features_info_t info_list[] = {
          {NULL, MENU_ENUM_LABEL_VALUE_CORE_INFO_CORE_NAME},
          {NULL, MENU_ENUM_LABEL_VALUE_CORE_INFO_CORE_LABEL},
+         {NULL, MENU_ENUM_LABEL_VALUE_CORE_INFO_CORE_VERSION},
          {NULL, MENU_ENUM_LABEL_VALUE_CORE_INFO_SYSTEM_NAME},
          {NULL, MENU_ENUM_LABEL_VALUE_CORE_INFO_SYSTEM_MANUFACTURER},
       };
       info_list[0].name = core_info->core_name;
       info_list[1].name = core_info->display_name;
-      info_list[2].name = core_info->systemname;
-      info_list[3].name = core_info->system_manufacturer;
+      info_list[2].name = !string_is_empty(core_version) ? core_version : core_info->display_version;
+      info_list[3].name = core_info->systemname;
+      info_list[4].name = core_info->system_manufacturer;
 
       for (i = 0; i < ARRAY_SIZE(info_list); i++)
       {
@@ -3478,7 +3484,7 @@ static unsigned menu_displaylist_parse_information_list(file_list_t *info_list)
 #endif
 
 #ifdef HAVE_NETWORKING
-#ifndef HAVE_SOCKET_LEGACY
+#if !defined (HAVE_SOCKET_LEGACY) || defined(GEKKO)
    if (menu_entries_append_enum(info_list,
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NETWORK_INFORMATION),
          msg_hash_to_str(MENU_ENUM_LABEL_NETWORK_INFORMATION),
@@ -3584,6 +3590,17 @@ static unsigned menu_displaylist_parse_playlists(
                   msg_hash_to_str(MENU_ENUM_LABEL_GOTO_EXPLORE),
                   MENU_ENUM_LABEL_GOTO_EXPLORE,
                   MENU_EXPLORE_TAB, 0, 0))
+            count++;
+#endif
+
+#if defined(HAVE_DYNAMIC)
+      if (settings->uints.menu_content_show_contentless_cores !=
+            MENU_CONTENTLESS_CORES_DISPLAY_NONE)
+         if (menu_entries_append_enum(info->list,
+                  msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GOTO_CONTENTLESS_CORES),
+                  msg_hash_to_str(MENU_ENUM_LABEL_GOTO_CONTENTLESS_CORES),
+                  MENU_ENUM_LABEL_GOTO_CONTENTLESS_CORES,
+                  MENU_CONTENTLESS_CORES_TAB, 0, 0))
             count++;
 #endif
       if (settings->bools.menu_content_show_favorites)
@@ -4175,26 +4192,53 @@ static unsigned menu_displaylist_parse_content_information(
    const char *content_path            = NULL;
    const char *core_path               = NULL;
    const char *db_name                 = NULL;
+   bool playlist_origin                = true;
    bool playlist_valid                 = false;
+   const char *origin_label            = NULL;
+   struct menu_state *menu_st          = menu_state_get_ptr();
+   file_list_t *list                   = NULL;
    unsigned count                      = 0;
    bool content_loaded                 = !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL)
+      && !string_is_empty(loaded_content_path)
       && string_is_equal(menu->deferred_path, loaded_content_path);
+   bool core_supports_no_game          = false;
 
    core_name[0]                        = '\0';
 
-   /* If content is currently running, have to make sure
-    * we have a valid playlist to work with
-    * (if content is not running, then playlist will always
-    * be valid provided that playlist_get_cached() does not
-    * return NULL) */
-   if (content_loaded)
+   /* Check the origin menu from which the information
+    * entry was selected
+    * > Can only assume a valid playlist if the origin
+    *   was an actual playlist - i.e. cached playlist is
+    *   dubious if information was selected from
+    *   'Main Menu > Quick Menu' or 'Standalone Cores >
+    *   Quick Menu' */
+   if (menu_st->entries.list)
+      list  = MENU_LIST_GET(menu_st->entries.list, 0);
+   if (list && (list->size > 2))
    {
-      if (!string_is_empty(loaded_content_path) && !string_is_empty(loaded_core_path))
+      file_list_get_at_offset(list, list->size - 3, NULL,
+            &origin_label, NULL, NULL);
+
+      if (string_is_equal(origin_label, msg_hash_to_str(MENU_ENUM_LABEL_MAIN_MENU)) ||
+          string_is_equal(origin_label, msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB)) ||
+          string_is_equal(origin_label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_CONTENTLESS_CORES_LIST)))
+         playlist_origin = false;
+   }
+
+   /* If origin menu was a playlist, may rely on
+    * return value from playlist_get_cached() */
+   if (playlist_origin)
+      playlist_valid = !!playlist;
+   else
+   {
+      /* If origin menu was not a playlist, then
+       * check currently loaded content against
+       * last cached playlist */
+      if (content_loaded &&
+          !string_is_empty(loaded_core_path))
          playlist_valid = playlist_index_is_valid(
                playlist, idx, loaded_content_path, loaded_core_path);
    }
-   else if (playlist)
-      playlist_valid = true;
 
    if (playlist_valid)
    {
@@ -4225,39 +4269,48 @@ static unsigned menu_displaylist_parse_content_information(
       core_path      = loaded_core_path;
 
       if (core_info_find(core_path, &core_info))
+      {
+         core_supports_no_game = core_info->supports_no_game;
+
          if (!string_is_empty(core_info->display_name))
             strlcpy(core_name, core_info->display_name, sizeof(core_name));
+      }
    }
 
-   /* Content label */
-   tmp[0]   = '\0';
-   snprintf(tmp, sizeof(tmp),
-         "%s: %s",
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_INFO_LABEL),
-         !string_is_empty(content_label)
-               ? content_label
-               : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
-         );
-   if (menu_entries_append_enum(info->list, tmp,
-         msg_hash_to_str(MENU_ENUM_LABEL_CONTENT_INFO_LABEL),
-         MENU_ENUM_LABEL_CONTENT_INFO_LABEL,
-         0, 0, 0))
-      count++;
+   /* If content path is empty and core supports
+    * contentless operation, skip label/path entries */
+   if (!(core_supports_no_game && string_is_empty(content_path)))
+   {
+      /* Content label */
+      tmp[0]   = '\0';
+      snprintf(tmp, sizeof(tmp),
+            "%s: %s",
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_INFO_LABEL),
+            !string_is_empty(content_label)
+                  ? content_label
+                  : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
+            );
+      if (menu_entries_append_enum(info->list, tmp,
+            msg_hash_to_str(MENU_ENUM_LABEL_CONTENT_INFO_LABEL),
+            MENU_ENUM_LABEL_CONTENT_INFO_LABEL,
+            0, 0, 0))
+         count++;
 
-   /* Content path */
-   tmp[0]   = '\0';
-   snprintf(tmp, sizeof(tmp),
-         "%s: %s",
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_INFO_PATH),
-         !string_is_empty(content_path)
-               ? content_path
-               : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
-         );
-   if (menu_entries_append_enum(info->list, tmp,
-         msg_hash_to_str(MENU_ENUM_LABEL_CONTENT_INFO_PATH),
-         MENU_ENUM_LABEL_CONTENT_INFO_PATH,
-         0, 0, 0))
-      count++;
+      /* Content path */
+      tmp[0]   = '\0';
+      snprintf(tmp, sizeof(tmp),
+            "%s: %s",
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_INFO_PATH),
+            !string_is_empty(content_path)
+                  ? content_path
+                  : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
+            );
+      if (menu_entries_append_enum(info->list, tmp,
+            msg_hash_to_str(MENU_ENUM_LABEL_CONTENT_INFO_PATH),
+            MENU_ENUM_LABEL_CONTENT_INFO_PATH,
+            0, 0, 0))
+         count++;
+   }
 
    /* Core name */
    if (!string_is_empty(core_name) &&
@@ -5754,6 +5807,8 @@ unsigned menu_displaylist_build_list(
       case DISPLAYLIST_SHADER_PRESET_SAVE:
          {
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
+            bool has_content = !string_is_empty(path_get(RARCH_PATH_CONTENT));
+
             if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
                      MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_REFERENCE,
                      PARSE_ONLY_BOOL, false) == 0)
@@ -5776,13 +5831,13 @@ unsigned menu_displaylist_build_list(
                      MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_CORE,
                      MENU_SETTING_ACTION, 0, 0))
                count++;
-            if (menu_entries_append_enum(list,
+            if (has_content && menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET_SAVE_PARENT),
                      msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_PARENT),
                      MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_PARENT,
                      MENU_SETTING_ACTION, 0, 0))
                count++;
-            if (menu_entries_append_enum(list,
+            if (has_content && menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET_SAVE_GAME),
                      msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_GAME),
                      MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_GAME,
@@ -6224,9 +6279,11 @@ unsigned menu_displaylist_build_list(
       case DISPLAYLIST_OPTIONS_REMAPPINGS:
          {
             unsigned p;
-            unsigned max_users          = settings->uints.input_max_users;
+            unsigned max_users = settings->uints.input_max_users;
 
 #ifdef HAVE_CONFIGFILE
+            bool has_content   = !string_is_empty(path_get(RARCH_PATH_CONTENT));
+
             if (menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REMAP_FILE_LOAD),
                      msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_LOAD),
@@ -6239,13 +6296,13 @@ unsigned menu_displaylist_build_list(
                      MENU_ENUM_LABEL_REMAP_FILE_SAVE_CORE,
                      MENU_SETTING_ACTION, 0, 0))
                count++;
-            if (menu_entries_append_enum(list,
+            if (has_content && menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REMAP_FILE_SAVE_CONTENT_DIR),
                      msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_SAVE_CONTENT_DIR),
                      MENU_ENUM_LABEL_REMAP_FILE_SAVE_CONTENT_DIR,
                      MENU_SETTING_ACTION, 0, 0))
                count++;
-            if (menu_entries_append_enum(list,
+            if (has_content && menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REMAP_FILE_SAVE_GAME),
                      msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_SAVE_GAME),
                      MENU_ENUM_LABEL_REMAP_FILE_SAVE_GAME,
@@ -6260,7 +6317,7 @@ unsigned menu_displaylist_build_list(
                         MENU_SETTING_ACTION, 0, 0))
                   count++;
 
-            if (retroarch_ctl(RARCH_CTL_IS_REMAPS_GAME_ACTIVE, NULL))
+            if (has_content && retroarch_ctl(RARCH_CTL_IS_REMAPS_GAME_ACTIVE, NULL))
                if (menu_entries_append_enum(list,
                         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REMAP_FILE_REMOVE_GAME),
                         msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_REMOVE_GAME),
@@ -6268,7 +6325,7 @@ unsigned menu_displaylist_build_list(
                         MENU_SETTING_ACTION, 0, 0))
                   count++;
 
-            if (retroarch_ctl(RARCH_CTL_IS_REMAPS_CONTENT_DIR_ACTIVE, NULL))
+            if (has_content && retroarch_ctl(RARCH_CTL_IS_REMAPS_CONTENT_DIR_ACTIVE, NULL))
                if (menu_entries_append_enum(list,
                         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REMAP_FILE_REMOVE_CONTENT_DIR),
                         msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_REMOVE_CONTENT_DIR),
@@ -6276,7 +6333,6 @@ unsigned menu_displaylist_build_list(
                         MENU_SETTING_ACTION, 0, 0))
                   count++;
 #endif
-
             if (menu_entries_append_enum(list,
                      msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_TURBO_FIRE_SETTINGS),
                      msg_hash_to_str(MENU_ENUM_LABEL_INPUT_TURBO_FIRE_SETTINGS),
@@ -6321,6 +6377,17 @@ unsigned menu_displaylist_build_list(
                         MENU_EXPLORE_TAB, 0, 0))
                   count++;
 #endif
+
+#if defined(HAVE_DYNAMIC)
+            if (settings->uints.menu_content_show_contentless_cores !=
+                  MENU_CONTENTLESS_CORES_DISPLAY_NONE)
+               if (menu_entries_append_enum(list,
+                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GOTO_CONTENTLESS_CORES),
+                        msg_hash_to_str(MENU_ENUM_LABEL_GOTO_CONTENTLESS_CORES),
+                        MENU_ENUM_LABEL_GOTO_CONTENTLESS_CORES,
+                        MENU_CONTENTLESS_CORES_TAB, 0, 0))
+                  count++;
+#endif
             if (menu_content_show_favorites)
                if (menu_entries_append_enum(list,
                         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_GOTO_FAVORITES),
@@ -6359,7 +6426,7 @@ unsigned menu_displaylist_build_list(
          {
             core_info_list_t *info_list        = NULL;
             core_info_get_list(&info_list);
-            if (info_list->info_count > 0)
+            if (info_list && info_list->info_count > 0)
             {
                if (menu_entries_append_enum(list,
                         msg_hash_to_str(
@@ -6671,7 +6738,7 @@ unsigned menu_displaylist_build_list(
             count++;
          break;
       case DISPLAYLIST_NETWORK_INFO:
-#if defined(HAVE_NETWORKING) && !defined(HAVE_SOCKET_LEGACY) && (!defined(SWITCH) || defined(SWITCH) && defined(HAVE_LIBNX))
+#if defined(HAVE_NETWORKING) && (!defined(HAVE_SOCKET_LEGACY) && (!defined(SWITCH) || defined(SWITCH) && defined(HAVE_LIBNX)) || defined(GEKKO))
          network_init();
          {
             net_ifinfo_t      netlist;
@@ -8268,6 +8335,9 @@ unsigned menu_displaylist_build_list(
                {MENU_ENUM_LABEL_CONTENT_SHOW_SETTINGS,                                 PARSE_ONLY_BOOL, true  },
                {MENU_ENUM_LABEL_CONTENT_SHOW_SETTINGS_PASSWORD,                        PARSE_ONLY_STRING, true},
                {MENU_ENUM_LABEL_CONTENT_SHOW_EXPLORE,                                  PARSE_ONLY_BOOL, true  },
+#if defined(HAVE_DYNAMIC)
+               {MENU_ENUM_LABEL_CONTENT_SHOW_CONTENTLESS_CORES,                        PARSE_ONLY_UINT, true },
+#endif
                {MENU_ENUM_LABEL_CONTENT_SHOW_FAVORITES,                                PARSE_ONLY_BOOL, true  },
                {MENU_ENUM_LABEL_CONTENT_SHOW_IMAGES,                                   PARSE_ONLY_BOOL, true  },
                {MENU_ENUM_LABEL_CONTENT_SHOW_MUSIC,                                    PARSE_ONLY_BOOL, true  },
@@ -8288,6 +8358,9 @@ unsigned menu_displaylist_build_list(
 
             for (i = 0; i < ARRAY_SIZE(build_list); i++)
             {
+               if (!build_list[i].checked && !include_everything)
+                  continue;
+
                if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
                         build_list[i].enum_idx,  build_list[i].parse_type,
                         false) == 0)
@@ -11687,6 +11760,30 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             info->need_push = true;
          }
          break;
+      case DISPLAYLIST_CONTENTLESS_CORES:
+         {
+            size_t contentless_core_ptr =
+                  menu_state_get_ptr()->contentless_core_ptr;
+
+            menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
+            count = menu_displaylist_contentless_cores(info->list, settings);
+
+            /* TODO/FIXME: Selecting an entry in the
+             * contentless cores list will cause the
+             * quick menu to be pushed on the subsequent
+             * frame via the RARCH_MENU_CTL_SET_PENDING_QUICK_MENU
+             * command. The way this is implemented 'breaks' the
+             * menu stack record, so when leaving the quick
+             * menu via a 'cancel' operation, the last selected
+             * menu index is lost. We therefore have to apply
+             * a cached index value after rebuilding the list... */
+            if (contentless_core_ptr < count)
+               menu_navigation_set_selection(contentless_core_ptr);
+
+            info->need_sort = false;
+            info->need_push = true;
+         }
+         break;
       case DISPLAYLIST_CORE_OPTIONS:
          {
             /* Number of displayed options is dynamic. If user opens
@@ -12387,40 +12484,44 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          break;
       case DISPLAYLIST_OPTIONS_OVERRIDES:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-
-         if (settings->bools.quick_menu_show_save_core_overrides
-               && !settings->bools.kiosk_mode_enable)
          {
-            if (menu_entries_append_enum(info->list,
-                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_CORE),
-                     msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE),
-                     MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE,
-                     MENU_SETTING_ACTION, 0, 0))
-               count++;
-         }
+            bool has_content = !string_is_empty(path_get(RARCH_PATH_CONTENT));
 
-         if (settings->bools.quick_menu_show_save_content_dir_overrides
-               && !settings->bools.kiosk_mode_enable)
-         {
-            if (menu_entries_append_enum(info->list,
-                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR),
-                     msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR),
-                     MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR,
-                     MENU_SETTING_ACTION, 0, 0))
-               count++;
-         }
+            if (settings->bools.quick_menu_show_save_core_overrides
+                  && !settings->bools.kiosk_mode_enable)
+            {
+               if (menu_entries_append_enum(info->list,
+                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_CORE),
+                        msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE),
+                        MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE,
+                        MENU_SETTING_ACTION, 0, 0))
+                  count++;
+            }
 
-         if (settings->bools.quick_menu_show_save_game_overrides
-               && !settings->bools.kiosk_mode_enable)
-         {
-            if (menu_entries_append_enum(info->list,
-                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_GAME),
-                     msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME),
-                     MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME,
-                     MENU_SETTING_ACTION, 0, 0))
-               count++;
-         }
+            if (has_content
+                  && settings->bools.quick_menu_show_save_content_dir_overrides
+                  && !settings->bools.kiosk_mode_enable)
+            {
+               if (menu_entries_append_enum(info->list,
+                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR),
+                        msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR),
+                        MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR,
+                        MENU_SETTING_ACTION, 0, 0))
+                  count++;
+            }
 
+            if (has_content
+                  && settings->bools.quick_menu_show_save_game_overrides
+                  && !settings->bools.kiosk_mode_enable)
+            {
+               if (menu_entries_append_enum(info->list,
+                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SAVE_CURRENT_CONFIG_OVERRIDE_GAME),
+                        msg_hash_to_str(MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME),
+                        MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME,
+                        MENU_SETTING_ACTION, 0, 0))
+                  count++;
+            }
+         }
 
          if (count == 0)
             menu_entries_append_enum(info->list,

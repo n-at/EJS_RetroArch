@@ -62,7 +62,7 @@
 /* Required for the Wii build, since we have
  * to query the hardware for the actual display
  * aspect ratio... */
-#include "../../wii/libogc/include/ogc/conf.h"
+#include <ogc/conf.h>
 #endif
 
 #if defined(GEKKO)
@@ -5506,7 +5506,10 @@ static bool rgui_set_aspect_ratio(rgui_t *rgui,
    unsigned aspect_ratio        = settings->uints.menu_rgui_aspect_ratio;
    unsigned aspect_ratio_lock   = settings->uints.menu_rgui_aspect_ratio_lock;
 #endif
-   
+#ifdef DJGPP
+   const char *driver_ident    = video_driver_get_ident();
+#endif
+
    rgui_framebuffer_free(&rgui->frame_buf);
    rgui_framebuffer_free(&rgui->background_buf);
    rgui_thumbnail_free(&rgui->fs_thumbnail);
@@ -5639,6 +5642,13 @@ static bool rgui_set_aspect_ratio(rgui_t *rgui,
          base_term_width = rgui->frame_buf.width;
          break;
    }
+
+#ifdef DJGPP
+   if (string_is_equal(driver_ident, "vga")) {
+      rgui->frame_buf.width = 320;
+      rgui->frame_buf.height = 200;
+   }
+#endif
    
    /* Ensure frame buffer/terminal width is sane
     * - Must be less than max_frame_buf_width
@@ -5951,14 +5961,17 @@ static void *rgui_init(void **userdata, bool video_is_threaded)
    return menu;
 
 error:
-   rgui_fonts_free(rgui);
+   if (rgui)
+   {
+      rgui_fonts_free(rgui);
 
-   rgui_framebuffer_free(&rgui->frame_buf);
-   rgui_framebuffer_free(&rgui->background_buf);
+      rgui_framebuffer_free(&rgui->frame_buf);
+      rgui_framebuffer_free(&rgui->background_buf);
 
-   rgui_thumbnail_free(&rgui->fs_thumbnail);
-   rgui_thumbnail_free(&rgui->mini_thumbnail);
-   rgui_thumbnail_free(&rgui->mini_left_thumbnail);
+      rgui_thumbnail_free(&rgui->fs_thumbnail);
+      rgui_thumbnail_free(&rgui->mini_thumbnail);
+      rgui_thumbnail_free(&rgui->mini_left_thumbnail);
+   }
 
    if (menu)
       free(menu);
@@ -5977,17 +5990,17 @@ static void rgui_free(void *data)
 #endif
       if (rgui->thumbnail_path_data)
          free(rgui->thumbnail_path_data);
+
+      rgui_fonts_free(rgui);
+
+      rgui_framebuffer_free(&rgui->frame_buf);
+      rgui_framebuffer_free(&rgui->background_buf);
+      rgui_framebuffer_free(&rgui->upscale_buf);
+
+      rgui_thumbnail_free(&rgui->fs_thumbnail);
+      rgui_thumbnail_free(&rgui->mini_thumbnail);
+      rgui_thumbnail_free(&rgui->mini_left_thumbnail);
    }
-
-   rgui_fonts_free(rgui);
-
-   rgui_framebuffer_free(&rgui->frame_buf);
-   rgui_framebuffer_free(&rgui->background_buf);
-   rgui_framebuffer_free(&rgui->upscale_buf);
-
-   rgui_thumbnail_free(&rgui->fs_thumbnail);
-   rgui_thumbnail_free(&rgui->mini_thumbnail);
-   rgui_thumbnail_free(&rgui->mini_left_thumbnail);
 }
 
 static void rgui_set_texture(void *data)
