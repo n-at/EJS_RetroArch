@@ -1336,6 +1336,8 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_MONITOR_INDEX,
    "Ένδειξη Οθόνης"
    )
+#if defined (WIIU)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
    "Περιστροφή"
@@ -2213,7 +2215,15 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_MANAGER_LIST,
    "Διαχείριση Πυρήνων"
    )
+#ifdef HAVE_MIST
 
+
+
+
+
+
+
+#endif
 /* Settings > Configuration */
 
 MSG_HASH(

@@ -1484,6 +1484,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
    "Selecione qual a tela será usada."
    )
+#if defined (WIIU)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
    "Rotação de vídeo"
@@ -3105,7 +3107,15 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_MANAGER_LIST,
    "Executa tarefas de manutenção offline nos núcleos instalados (cópia de segurança, restauração, exclusão etc.) e visualiza as informações principais."
    )
+#ifdef HAVE_MIST
 
+
+
+
+
+
+
+#endif
 /* Settings > Configuration */
 
 MSG_HASH(

@@ -1516,6 +1516,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
    "사용할 디스플레이를 선택합니다."
    )
+#if defined (WIIU)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
    "화면 회전"
@@ -3161,7 +3163,15 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_MANAGER_LIST,
    "설치된 코어의 오프라인 관리 작업(백업, 복원, 삭제 등) 을 수행하고 코어 정보를 확인합니다."
    )
+#ifdef HAVE_MIST
 
+
+
+
+
+
+
+#endif
 /* Settings > Configuration */
 
 MSG_HASH(

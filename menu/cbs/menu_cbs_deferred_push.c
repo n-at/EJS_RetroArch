@@ -271,6 +271,11 @@ GENERIC_DEFERRED_PUSH(deferred_push_core_delete_backup_list,        DISPLAYLIST_
 
 GENERIC_DEFERRED_PUSH(deferred_push_core_manager_list,              DISPLAYLIST_CORE_MANAGER_LIST)
 
+#ifdef HAVE_MIST
+GENERIC_DEFERRED_PUSH(deferred_push_core_manager_steam_list,        DISPLAYLIST_CORE_MANAGER_STEAM_LIST)
+GENERIC_DEFERRED_PUSH(deferred_push_core_information_steam_list,    DISPLAYLIST_CORE_INFORMATION_STEAM_LIST)
+#endif
+
 GENERIC_DEFERRED_PUSH(deferred_push_file_browser_select_sideload_core, DISPLAYLIST_FILE_BROWSER_SELECT_SIDELOAD_CORE)
 
 static int deferred_push_cursor_manager_list_deferred(
@@ -464,30 +469,27 @@ static int general_push(menu_displaylist_info_t *info,
          break;
       case PUSH_DEFAULT:
          {
-            bool new_exts_allocated               = false;
-            char *new_exts                        = NULL;
+            const char *valid_extensions     = NULL;
+            struct retro_system_info *system = NULL;
 
             if (menu_setting_get_browser_selection_type(info->setting) 
-                  == ST_DIR) { }
-            else
+                  != ST_DIR)
             {
-               struct retro_system_info *system = 
-                  &runloop_state_get_ptr()->system.info;
+               system = &runloop_state_get_ptr()->system.info;
+
                if (system && !string_is_empty(system->valid_extensions))
-               {
-                  new_exts           = strdup(system->valid_extensions);
-                  new_exts_allocated = true;
-               }
+                  valid_extensions = system->valid_extensions;
             }
 
-            if (!new_exts)
-               new_exts = info->exts;
+            if (!valid_extensions)
+               valid_extensions = info->exts;
 
-            if (!string_is_empty(new_exts))
+            if (!string_is_empty(valid_extensions))
             {
-               struct string_list str_list3   = {0};
+               struct string_list str_list3 = {0};
+
                string_list_initialize(&str_list3);
-               string_split_noalloc(&str_list3, new_exts, "|");
+               string_split_noalloc(&str_list3, valid_extensions, "|");
 
 #ifdef HAVE_IBXM
                {
@@ -501,14 +503,6 @@ static int general_push(menu_displaylist_info_t *info,
                string_list_join_concat(newstring2, sizeof(newstring2),
                      &str_list3, "|");
                string_list_deinitialize(&str_list3);
-            }
-
-            if (new_exts_allocated)
-            {
-               free(new_exts);
-
-               if (new_exts == info->exts)
-                  info->exts = NULL;
             }
          }
          break;
@@ -629,7 +623,7 @@ static int general_push(menu_displaylist_info_t *info,
 
    if (!string_is_empty(newstring2))
    {
-      if (!string_is_empty(info->exts))
+      if (info->exts)
          free(info->exts);
       info->exts = strdup(newstring2);
    }
@@ -891,6 +885,10 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_CORE_RESTORE_BACKUP_LIST, deferred_push_core_restore_backup_list},
       {MENU_ENUM_LABEL_DEFERRED_CORE_DELETE_BACKUP_LIST, deferred_push_core_delete_backup_list},
       {MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_LIST, deferred_push_core_manager_list},
+#ifdef HAVE_MIST
+      {MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_STEAM_LIST, deferred_push_core_manager_steam_list},
+      {MENU_ENUM_LABEL_DEFERRED_CORE_INFORMATION_STEAM_LIST, deferred_push_core_information_steam_list},
+#endif
       {MENU_ENUM_LABEL_SIDELOAD_CORE_LIST, deferred_push_file_browser_select_sideload_core},
       {MENU_ENUM_LABEL_DEFERRED_ARCHIVE_ACTION_DETECT_CORE, deferred_archive_action_detect_core},
       {MENU_ENUM_LABEL_DEFERRED_ARCHIVE_ACTION, deferred_archive_action},
@@ -1318,6 +1316,11 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
          case MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_core_manager_list);
             break;
+#ifdef HAVE_MIST
+         case MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_STEAM_LIST:
+            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_core_manager_steam_list);
+            break;
+#endif
          case MENU_ENUM_LABEL_SIDELOAD_CORE_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_file_browser_select_sideload_core);
             break;

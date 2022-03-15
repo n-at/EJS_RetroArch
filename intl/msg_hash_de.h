@@ -1452,6 +1452,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
    "Den Wiedergabebildschirm auswählen."
    )
+#if defined (WIIU)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
    "Bildrotation"
@@ -3065,7 +3067,15 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_MANAGER_LIST,
    "Informationen zu installierten Cores anzeigen und Offline-Wartungsarbeiten ausführen (Sichern, Wiederherstellen, Löschen usw.)."
    )
+#ifdef HAVE_MIST
 
+
+
+
+
+
+
+#endif
 /* Settings > Configuration */
 
 MSG_HASH(

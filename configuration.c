@@ -308,6 +308,7 @@ const struct input_bind_map input_config_bind_map[RARCH_BIND_LIST_END_NULL] = {
    DECLARE_META_BIND(2, hold_fast_forward,     RARCH_FAST_FORWARD_HOLD_KEY,  MENU_ENUM_LABEL_VALUE_INPUT_META_FAST_FORWARD_HOLD_KEY),
    DECLARE_META_BIND(1, toggle_slowmotion,     RARCH_SLOWMOTION_KEY,         MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION_KEY),
    DECLARE_META_BIND(2, hold_slowmotion,       RARCH_SLOWMOTION_HOLD_KEY,    MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION_HOLD_KEY),
+   DECLARE_META_BIND(2, toggle_vrr_runloop,    RARCH_VRR_RUNLOOP_TOGGLE,     MENU_ENUM_LABEL_VALUE_INPUT_META_VRR_RUNLOOP_TOGGLE),
    DECLARE_META_BIND(1, load_state,            RARCH_LOAD_STATE_KEY,         MENU_ENUM_LABEL_VALUE_INPUT_META_LOAD_STATE_KEY),
    DECLARE_META_BIND(1, save_state,            RARCH_SAVE_STATE_KEY,         MENU_ENUM_LABEL_VALUE_INPUT_META_SAVE_STATE_KEY),
    DECLARE_META_BIND(2, toggle_fullscreen,     RARCH_FULLSCREEN_TOGGLE_KEY,  MENU_ENUM_LABEL_VALUE_INPUT_META_FULLSCREEN_TOGGLE_KEY),
@@ -1862,6 +1863,9 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("menu_show_online_updater",      &settings->bools.menu_show_online_updater, true, menu_show_online_updater, false);
    SETTING_BOOL("menu_show_core_updater",        &settings->bools.menu_show_core_updater, true, menu_show_core_updater, false);
    SETTING_BOOL("menu_show_legacy_thumbnail_updater", &settings->bools.menu_show_legacy_thumbnail_updater, true, menu_show_legacy_thumbnail_updater, false);
+#ifdef HAVE_MIST
+   SETTING_BOOL("menu_show_core_manager_steam",  &settings->bools.menu_show_core_manager_steam, true, menu_show_core_manager_steam, false);
+#endif
    SETTING_BOOL("filter_by_current_core",        &settings->bools.filter_by_current_core, true, DEFAULT_FILTER_BY_CURRENT_CORE, false);
    SETTING_BOOL("rgui_show_start_screen",        &settings->bools.menu_show_start_screen, false, false /* TODO */, false);
    SETTING_BOOL("menu_navigation_wraparound_enable", &settings->bools.menu_navigation_wraparound_enable, true, true, false);
@@ -1977,7 +1981,12 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("sustained_performance_mode",    &settings->bools.sustained_performance_mode, true, sustained_performance_mode, false);
 
 #ifdef _3DS
+   SETTING_BOOL("new3ds_speedup_enable",         &settings->bools.new3ds_speedup_enable, true, new3ds_speedup_enable, false);
    SETTING_BOOL("video_3ds_lcd_bottom",          &settings->bools.video_3ds_lcd_bottom, true, video_3ds_lcd_bottom, false);
+#endif
+
+#ifdef WIIU
+   SETTING_BOOL("video_wiiu_prefer_drc",         &settings->bools.video_wiiu_prefer_drc, true, DEFAULT_WIIU_PREFER_DRC, false);
 #endif
 
    SETTING_BOOL("playlist_use_old_format",       &settings->bools.playlist_use_old_format, true, DEFAULT_PLAYLIST_USE_OLD_FORMAT, false);
@@ -2061,6 +2070,9 @@ static struct config_float_setting *populate_settings_float(
    SETTING_FLOAT("rgui_particle_effect_speed", &settings->floats.menu_rgui_particle_effect_speed, true, DEFAULT_RGUI_PARTICLE_EFFECT_SPEED, false);
 #if defined(HAVE_MATERIALUI) || defined(HAVE_XMB) || defined(HAVE_OZONE)
    SETTING_FLOAT("menu_screensaver_animation_speed", &settings->floats.menu_screensaver_animation_speed, true, DEFAULT_MENU_SCREENSAVER_ANIMATION_SPEED, false);
+#endif
+#ifdef HAVE_OZONE
+   SETTING_FLOAT("ozone_thumbnail_scale_factor", &settings->floats.ozone_thumbnail_scale_factor, true, DEFAULT_OZONE_THUMBNAIL_SCALE_FACTOR, false);
 #endif
 #endif
    SETTING_FLOAT("video_message_pos_x",      &settings->floats.video_msg_pos_x,      true, message_pos_offset_x, false);
@@ -3410,9 +3422,6 @@ static bool config_load_file(global_t *global,
 
       snprintf(buf, sizeof(buf), "input_player%u_mouse_index", i + 1);
       CONFIG_GET_INT_BASE(conf, settings, uints.input_mouse_index[i], buf);
-
-      snprintf(buf, sizeof(buf), "input_libretro_device_p%u", i + 1);
-      CONFIG_GET_INT_BASE(conf, settings, uints.input_libretro_device[i], buf);
    }
 
    /* LED map for use by the led driver */
@@ -4692,8 +4701,6 @@ bool config_save_file(const char *path)
       config_set_int(conf, cfg, settings->uints.input_device[i]);
       snprintf(cfg, sizeof(cfg), "input_player%u_joypad_index", i + 1);
       config_set_int(conf, cfg, settings->uints.input_joypad_index[i]);
-      snprintf(cfg, sizeof(cfg), "input_libretro_device_p%u", i + 1);
-      config_set_int(conf, cfg, input_config_get_device(i));
       snprintf(cfg, sizeof(cfg), "input_player%u_analog_dpad_mode", i + 1);
       config_set_int(conf, cfg, settings->uints.input_analog_dpad_mode[i]);
       snprintf(cfg, sizeof(cfg), "input_player%u_mouse_index", i + 1);

@@ -104,6 +104,10 @@
 #include "../../switch_performance_profiles.h"
 #endif
 
+#ifdef HAVE_MIST
+#include "../../steam/steam.h"
+#endif
+
 enum
 {
    ACTION_OK_LOAD_PRESET = 0,
@@ -320,6 +324,10 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
          return MENU_ENUM_LABEL_DEFERRED_CORE_SETTINGS_LIST;
       case ACTION_OK_DL_CORE_INFORMATION_LIST:
          return MENU_ENUM_LABEL_DEFERRED_CORE_INFORMATION_LIST;
+#ifdef HAVE_MIST
+      case ACTION_OK_DL_CORE_INFORMATION_STEAM_LIST:
+         return MENU_ENUM_LABEL_DEFERRED_CORE_INFORMATION_STEAM_LIST;
+#endif
       case ACTION_OK_DL_CORE_RESTORE_BACKUP_LIST:
          return MENU_ENUM_LABEL_DEFERRED_CORE_RESTORE_BACKUP_LIST;
       case ACTION_OK_DL_CORE_DELETE_BACKUP_LIST:
@@ -480,6 +488,10 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
          return MENU_ENUM_LABEL_DEFERRED_MANUAL_CONTENT_SCAN_LIST;
       case ACTION_OK_DL_CORE_MANAGER_LIST:
          return MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_LIST;
+#ifdef HAVE_MIST
+      case ACTION_OK_DL_CORE_MANAGER_STEAM_LIST:
+         return MENU_ENUM_LABEL_DEFERRED_CORE_MANAGER_STEAM_LIST;
+#endif
       case ACTION_OK_DL_CORE_OPTION_OVERRIDE_LIST:
          return MENU_ENUM_LABEL_DEFERRED_CORE_OPTION_OVERRIDE_LIST;
       default:
@@ -1487,6 +1499,9 @@ int generic_action_ok_displaylist_push(const char *path,
       case ACTION_OK_DL_DRIVER_SETTINGS_LIST:
       case ACTION_OK_DL_CORE_SETTINGS_LIST:
       case ACTION_OK_DL_CORE_INFORMATION_LIST:
+#ifdef HAVE_MIST
+      case ACTION_OK_DL_CORE_INFORMATION_STEAM_LIST:
+#endif
       case ACTION_OK_DL_VIDEO_SETTINGS_LIST:
       case ACTION_OK_DL_VIDEO_HDR_SETTINGS_LIST:
       case ACTION_OK_DL_VIDEO_SYNCHRONIZATION_SETTINGS_LIST:
@@ -1565,6 +1580,9 @@ int generic_action_ok_displaylist_push(const char *path,
       case ACTION_OK_DL_CDROM_INFO_LIST:
       case ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST:
       case ACTION_OK_DL_CORE_MANAGER_LIST:
+#ifdef HAVE_MIST
+      case ACTION_OK_DL_CORE_MANAGER_STEAM_LIST:
+#endif
       case ACTION_OK_DL_CORE_OPTION_OVERRIDE_LIST:
          ACTION_OK_DL_LBL(action_ok_dl_to_enum(action_type), DISPLAYLIST_GENERIC);
          break;
@@ -5747,6 +5765,9 @@ DEFAULT_ACTION_OK_FUNC(action_ok_push_video_output_settings_list, ACTION_OK_DL_V
 DEFAULT_ACTION_OK_FUNC(action_ok_push_configuration_settings_list, ACTION_OK_DL_CONFIGURATION_SETTINGS_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_settings_list, ACTION_OK_DL_CORE_SETTINGS_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_information_list, ACTION_OK_DL_CORE_INFORMATION_LIST)
+#ifdef HAVE_MIST
+DEFAULT_ACTION_OK_FUNC(action_ok_push_core_information_steam_list, ACTION_OK_DL_CORE_INFORMATION_STEAM_LIST)
+#endif
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_restore_backup_list, ACTION_OK_DL_CORE_RESTORE_BACKUP_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_delete_backup_list, ACTION_OK_DL_CORE_DELETE_BACKUP_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_settings_list, ACTION_OK_DL_AUDIO_SETTINGS_LIST)
@@ -5784,6 +5805,9 @@ DEFAULT_ACTION_OK_FUNC(action_ok_pl_thumbnails_updater_list, ACTION_OK_DL_PL_THU
 DEFAULT_ACTION_OK_FUNC(action_ok_push_manual_content_scan_list, ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_manual_content_scan_dat_file, ACTION_OK_DL_MANUAL_CONTENT_SCAN_DAT_FILE)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_list, ACTION_OK_DL_CORE_MANAGER_LIST)
+#ifdef HAVE_MIST
+DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_steam_list, ACTION_OK_DL_CORE_MANAGER_STEAM_LIST)
+#endif
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_option_override_list, ACTION_OK_DL_CORE_OPTION_OVERRIDE_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_options_list, ACTION_OK_DL_CORE_OPTIONS_LIST)
 
@@ -7382,6 +7406,64 @@ int action_ok_core_lock(const char *path,
    return ret;
 }
 
+/* Do not declare this static - it is also used
+ * in menu_cbs_left.c and menu_cbs_right.c */
+int action_ok_core_set_standalone_exempt(const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   const char *core_path = path;
+   bool exempt           = false;
+   int ret               = 0;
+
+   if (string_is_empty(core_path))
+      return -1;
+
+   /* Simply toggle current 'exempt' status */
+   exempt = !core_info_get_core_standalone_exempt(core_path);
+
+   if (!core_info_set_core_standalone_exempt(core_path, exempt))
+   {
+      const char *core_name = NULL;
+      core_info_t *core_info = NULL;
+      char msg[PATH_MAX_LENGTH];
+
+      msg[0] = '\0';
+
+      /* Need to fetch core name for error message */
+
+      /* If core is found, use display name */
+      if (core_info_find(core_path, &core_info) &&
+          core_info->display_name)
+         core_name = core_info->display_name;
+      /* If not, use core file name */
+      else
+         core_name = path_basename_nocompression(core_path);
+
+      /* Build error message */
+      strlcpy(
+            msg,
+            msg_hash_to_str(exempt ?
+                  MSG_CORE_SET_STANDALONE_EXEMPT_FAILED :
+                  MSG_CORE_UNSET_STANDALONE_EXEMPT_FAILED),
+            sizeof(msg));
+
+      if (!string_is_empty(core_name))
+         strlcat(msg, core_name, sizeof(msg));
+
+      /* Generate log + notification */
+      RARCH_ERR("%s\n", msg);
+
+      runloop_msg_queue_push(
+         msg,
+         1, 100, true,
+         NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+
+      ret = -1;
+   }
+
+   return ret;
+}
+
 static int action_ok_core_delete(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
 {
@@ -7718,6 +7800,42 @@ static int action_ok_playlist_refresh(const char *path,
    return 0;
 }
 
+#ifdef HAVE_MIST
+static int action_ok_core_steam_install(
+      const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   steam_core_dlc_list_t *core_dlc_list = NULL;
+   steam_core_dlc_t *core_dlc = NULL;
+
+   if (MIST_IS_ERROR(steam_get_core_dlcs(&core_dlc_list, true))) return 0;
+
+   core_dlc = steam_get_core_dlc_by_name(core_dlc_list, label);
+   if (core_dlc == NULL) return 0;
+
+   steam_install_core_dlc(core_dlc);
+
+   return 0;
+}
+
+static int action_ok_core_steam_uninstall(
+      const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   steam_core_dlc_list_t *core_dlc_list = NULL;
+   steam_core_dlc_t *core_dlc = NULL;
+
+   if (MIST_IS_ERROR(steam_get_core_dlcs(&core_dlc_list, true))) return 0;
+
+   core_dlc = steam_get_core_dlc_by_name(core_dlc_list, label);
+   if (core_dlc == NULL) return 0;
+
+   steam_uninstall_core_dlc(core_dlc);
+
+   return 0;
+}
+#endif
+
 static int is_rdb_entry(enum msg_hash_enums enum_idx)
 {
    switch (enum_idx)
@@ -7994,6 +8112,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_CORE_SETTINGS,                       action_ok_push_core_settings_list},
          {MENU_ENUM_LABEL_CORE_INFORMATION,                    action_ok_push_core_information_list},
          {MENU_ENUM_LABEL_CORE_MANAGER_ENTRY,                  action_ok_push_core_information_list},
+#ifdef HAVE_MIST
+         {MENU_ENUM_LABEL_CORE_MANAGER_STEAM_ENTRY,            action_ok_push_core_information_steam_list},
+#endif
          {MENU_ENUM_LABEL_CORE_RESTORE_BACKUP_LIST,            action_ok_push_core_restore_backup_list},
          {MENU_ENUM_LABEL_CORE_DELETE_BACKUP_LIST,             action_ok_push_core_delete_backup_list},
          {MENU_ENUM_LABEL_CONFIGURATION_SETTINGS,              action_ok_push_configuration_settings_list},
@@ -8114,6 +8235,11 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_SCREEN_RESOLUTION,                   action_ok_video_resolution},
          {MENU_ENUM_LABEL_PLAYLIST_MANAGER_DEFAULT_CORE,       action_ok_playlist_default_core},
          {MENU_ENUM_LABEL_CORE_MANAGER_LIST,                   action_ok_push_core_manager_list},
+#ifdef HAVE_MIST
+         {MENU_ENUM_LABEL_CORE_MANAGER_STEAM_LIST,             action_ok_push_core_manager_steam_list},
+         {MENU_ENUM_LABEL_CORE_STEAM_INSTALL,                  action_ok_core_steam_install},
+         {MENU_ENUM_LABEL_CORE_STEAM_UNINSTALL,                action_ok_core_steam_uninstall},
+#endif
          {MENU_ENUM_LABEL_EXPLORE_TAB,                         action_ok_push_default},
          {MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB,               action_ok_push_default},
       };
@@ -8741,6 +8867,9 @@ static int menu_cbs_init_bind_ok_compare_type(menu_file_list_cbs_t *cbs,
             break;
          case MENU_SETTING_ACTION_CORE_LOCK:
             BIND_ACTION_OK(cbs, action_ok_core_lock);
+            break;
+         case MENU_SETTING_ACTION_CORE_SET_STANDALONE_EXEMPT:
+            BIND_ACTION_OK(cbs, action_ok_core_set_standalone_exempt);
             break;
          case MENU_SETTING_ACTION_VIDEO_FILTER_REMOVE:
             BIND_ACTION_OK(cbs, action_ok_video_filter_remove);

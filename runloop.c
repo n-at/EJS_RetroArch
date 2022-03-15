@@ -7129,6 +7129,7 @@ static enum runloop_state_enum runloop_check_state(
 
          rewinding      = state_manager_check_rewind(
                &runloop_st->rewind_st,
+               &runloop_st->current_core,
                BIT256_GET(current_bits, RARCH_REWIND),
                settings->uints.rewind_granularity,
                runloop_st->paused,
@@ -7190,6 +7191,8 @@ static enum runloop_state_enum runloop_check_state(
          old_slowmotion_hold_button_state             = new_slowmotion_hold_button_state;
       }
    }
+
+   HOTKEY_CHECK(RARCH_VRR_RUNLOOP_TOGGLE, CMD_EVENT_VRR_RUNLOOP_TOGGLE, true, NULL);
 
    /* Check movie record toggle */
    HOTKEY_CHECK(RARCH_BSV_RECORD_TOGGLE, CMD_EVENT_BSV_RECORDING_TOGGLE, true, NULL);
@@ -7910,33 +7913,6 @@ bool core_set_default_callbacks(void *data)
 
    return true;
 }
-
-#ifdef HAVE_REWIND
-/**
- * core_set_rewind_callbacks:
- *
- * Sets the audio sampling callbacks based on whether or not
- * rewinding is currently activated.
- **/
-bool core_set_rewind_callbacks(void)
-{
-   runloop_state_t *runloop_st  = &runloop_state;
-   struct state_manager_rewind_state
-      *rewind_st                = &runloop_st->rewind_st;
-
-   if (rewind_st->frame_is_reversed)
-   {
-      runloop_st->current_core.retro_set_audio_sample(audio_driver_sample_rewind);
-      runloop_st->current_core.retro_set_audio_sample_batch(audio_driver_sample_batch_rewind);
-   }
-   else
-   {
-      runloop_st->current_core.retro_set_audio_sample(audio_driver_sample);
-      runloop_st->current_core.retro_set_audio_sample_batch(audio_driver_sample_batch);
-   }
-   return true;
-}
-#endif
 
 #ifdef HAVE_NETWORKING
 /**

@@ -1476,6 +1476,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
    "Wybierz, którego ekranu chcesz użyć."
    )
+#if defined (WIIU)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
    "Obrót wideo"
@@ -3045,7 +3047,15 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_MANAGER_LIST,
    "Wykonuj zadania konserwacyjne offline na zainstalowanych rdzeniach (tworzenie kopii zapasowych, przywracanie, usuwanie itp.) I przeglądaj podstawowe informacje."
    )
+#ifdef HAVE_MIST
 
+
+
+
+
+
+
+#endif
 /* Settings > Configuration */
 
 MSG_HASH(

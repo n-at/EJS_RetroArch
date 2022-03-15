@@ -2806,6 +2806,7 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_CORE_OPTIONS_FLUSH:
          return xmb->textures.list[XMB_TEXTURE_FILE];
       case MENU_ENUM_LABEL_CORE_LOCK:
+      case MENU_ENUM_LABEL_CORE_SET_STANDALONE_EXEMPT:
          return xmb->textures.list[XMB_TEXTURE_CORE];
       case MENU_ENUM_LABEL_ONSCREEN_DISPLAY_SETTINGS:
          return xmb->textures.list[XMB_TEXTURE_OSD];
@@ -3393,19 +3394,20 @@ static int xmb_draw_item(
 
    if (menu_xmb_vertical_fade_factor)
    {
-      float factor     = menu_xmb_vertical_fade_factor / 100.0f / 0.004f;
       float min_alpha  = 0.1f;
       float max_alpha  = (i == current) ? xmb->items_active_alpha : xmb->items_passive_alpha;
       float new_alpha  = node->alpha;
-      float top_margin = xmb->margins_screen_top;
       float icon_space = xmb->icon_spacing_vertical;
+      float icon_ratio = icon_space / height / icon_space * 4;
+      float scr_margin = xmb->margins_screen_top + (icon_space / icon_ratio / 400);
+      float factor     = menu_xmb_vertical_fade_factor / 100.0f / icon_ratio;
 
       /* Top */
-      if (node->y < 0)
-         new_alpha = (node->y + top_margin + (icon_space / 4)) / factor;
+      if (i < current)
+         new_alpha = (node->y + scr_margin) / factor;
       /* Bottom */
-      else if (node->y > (height - (top_margin * 2)) && node->y < (height - top_margin + icon_space))
-         new_alpha = (height - node->y - top_margin + (icon_space / 4)) / factor;
+      else if (i > current)
+         new_alpha = (height - node->y - scr_margin + icon_space) / factor;
       /* Rest need to reset after vertical wrap-around */
       else if (node->x == 0 && node->alpha > 0 && node->alpha != max_alpha)
          new_alpha = max_alpha;
@@ -7037,6 +7039,9 @@ static int xmb_list_push(void *data, void *userdata,
 #if defined(HAVE_NETWORKING) && defined(HAVE_ONLINE_UPDATER)
    bool menu_show_online_updater   = settings->bools.menu_show_online_updater;
 #endif
+#if defined(HAVE_MIST)
+   bool menu_show_core_manager_steam = settings->bools.menu_show_core_manager_steam;
+#endif
    bool menu_content_show_settings = settings->bools.menu_content_show_settings;
    const char *menu_content_show_settings_password =
       settings->paths.menu_content_show_settings_password;
@@ -7200,6 +7205,16 @@ static int xmb_list_push(void *data, void *userdata,
                      false);
             }
 #endif
+#endif
+#ifdef HAVE_MIST
+            if (menu_show_core_manager_steam && !kiosk_mode_enable)
+            {
+               MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(
+                  info->list,
+                  MENU_ENUM_LABEL_CORE_MANAGER_STEAM_LIST,
+                  PARSE_ACTION,
+                  false);
+            }
 #endif
             if (  !menu_content_show_settings &&
                   !string_is_empty(menu_content_show_settings_password))
