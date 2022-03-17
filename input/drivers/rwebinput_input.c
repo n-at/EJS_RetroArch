@@ -318,15 +318,6 @@ static void *rwebinput_input_init(const char *joypad_driver)
          "[EMSCRIPTEN/INPUT] failed to create keyup callback: %d\n", r);
    }
 
-   r = emscripten_set_keypress_callback(
-         EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
-         rwebinput_keyboard_cb);
-   if (r != EMSCRIPTEN_RESULT_SUCCESS)
-   {
-      RARCH_ERR(
-         "[EMSCRIPTEN/INPUT] failed to create keypress callback: %d\n", r);
-   }
-
    r = emscripten_set_mousedown_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
          rwebinput_mouse_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)

@@ -70,12 +70,6 @@ void cmd_take_screenshot(void)
    command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);//done
 }
 
-void set_volume(float volume)
-{
-    //printf("%f\n", volume);
-    printf("set volume called\n");
-}
-
 void set_variable(void)
 {
     printf("set variable called\n");
@@ -91,9 +85,14 @@ void shader_enable(void)
     printf("shader_enable called\n");
 }
 
-void set_cheat(void)
+void set_cheat(unsigned index, bool enabled, const char *code)
 {
-    printf("set_cheat called\n");
+    retro_cheat_set(index, enabled, code);//done
+}
+
+void reset_cheat(void)
+{
+    retro_cheat_reset();//done
 }
 
 void system_restart(void)
