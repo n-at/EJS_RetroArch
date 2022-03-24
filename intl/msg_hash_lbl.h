@@ -2785,6 +2785,18 @@ MSG_HASH(
    "record_use_output_directory"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_REMAP_FILE_MANAGER_LIST,
+   "deferred_remap_file_manager_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_REMAP_FILE_MANAGER_LIST,
+   "remap_file_manager_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_REMAP_FILE_INFO,
+   "remap_file_info"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_REMAP_FILE_LOAD,
    "remap_file_load"
    )
@@ -2811,6 +2823,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_REMAP_FILE_REMOVE_GAME,
    "remap_file_remove_game"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_REMAP_FILE_RESET,
+   "remap_file_reset"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_RESTART_CONTENT,
@@ -3199,6 +3215,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_MENU_XMB_VERTICAL_FADE_FACTOR,
    "menu_xmb_vertical_fade_factor"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN,
+   "menu_xmb_title_margin"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_MENU_THUMBNAIL_UPSCALE_THRESHOLD,

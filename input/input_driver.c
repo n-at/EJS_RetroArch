@@ -5254,11 +5254,16 @@ void input_remapping_update_port_map(void)
    }
 }
 
-void input_remapping_deinit(void)
+void input_remapping_deinit(bool save_remap)
 {
    runloop_state_t *runloop_st             = runloop_state_get_ptr();
    if (runloop_st->name.remapfile)
+   {
+      if (save_remap)
+         input_remapping_save_file(runloop_st->name.remapfile);
+
       free(runloop_st->name.remapfile);
+   }
    runloop_st->name.remapfile              = NULL;
    runloop_st->remaps_core_active          = false;
    runloop_st->remaps_content_dir_active   = false;
@@ -5323,7 +5328,8 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
 #endif
 #ifdef HAVE_MENU
    bool display_kb                     = menu_input_dialog_get_display_kb();
-   bool menu_input_active              = menu_state_get_ptr()->alive &&
+   bool menu_is_alive                  = menu_state_get_ptr()->alive;
+   bool menu_input_active              = menu_is_alive &&
          !(settings->bools.menu_unified_controls && !display_kb);
 #endif
    input_driver_t *current_input       = input_st->current_driver;
@@ -5353,7 +5359,7 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
       }
 
 #ifdef HAVE_MENU
-      if (menu_input_active)
+      if (menu_is_alive)
       {
          unsigned k;
          unsigned x_plus  = RARCH_ANALOG_LEFT_X_PLUS;
@@ -5402,7 +5408,7 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
             &joypad_info);
 
 #ifdef HAVE_MENU
-      if (menu_input_active)
+      if (menu_is_alive)
       {
          unsigned j;
 

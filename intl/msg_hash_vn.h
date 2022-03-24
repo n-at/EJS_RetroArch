@@ -689,6 +689,14 @@ MSG_HASH(
    "Miêu tả"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RDB_ENTRY_ACHIEVEMENTS,
+   "Kích hoạt"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RDB_ENTRY_CONTROLS,
+   "Điều khiển"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RDB_ENTRY_ENHANCEMENT_HW,
    "Phần cứng nâng cao"
    )
@@ -1419,6 +1427,10 @@ MSG_HASH(
    "Trình đơn chính"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SHOW_CONTENTLESS_CORES_CUSTOM,
+   "Tùy chỉnh"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_ENABLE,
    "Hiển thị tên của core"
    )
@@ -1719,12 +1731,15 @@ MSG_HASH(
 
 /* Quick Menu > Controls */
 
+
+/* Quick Menu > Controls > Manage Remap Files */
+
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_REMAP_FILE_LOAD,
    "Tải Remap File"
    )
 
-/* Quick Menu > Controls > Load Remap File */
+/* Quick Menu > Controls > Manage Remap Files > Load Remap File */
 
 
 /* Quick Menu > Cheats */

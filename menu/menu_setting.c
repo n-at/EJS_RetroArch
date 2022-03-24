@@ -3929,6 +3929,18 @@ static void setting_get_string_representation_uint_rgui_menu_color_theme(
                   MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_DYNAMIC),
                len);
          break;
+      case RGUI_THEME_GRAY_DARK:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_GRAY_DARK),
+               len);
+         break;
+      case RGUI_THEME_GRAY_LIGHT:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_GRAY_LIGHT),
+               len);
+         break;
    }
 }
 
@@ -4611,6 +4623,16 @@ static void setting_get_string_representation_uint_materialui_menu_color_theme(
                msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_HACKING_THE_KERNEL), len);
          break;
+      case MATERIALUI_THEME_GRAY_DARK:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_GRAY_DARK), len);
+         break;
+      case MATERIALUI_THEME_GRAY_LIGHT:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_GRAY_LIGHT), len);
+         break;
       default:
          break;
    }
@@ -4807,6 +4829,16 @@ static void setting_get_string_representation_uint_ozone_menu_color_theme(
          strlcpy(s,
                msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_OZONE_COLOR_THEME_SOLARIZED_LIGHT), len);
+         break;
+      case OZONE_COLOR_THEME_GRAY_DARK:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_OZONE_COLOR_THEME_GRAY_DARK), len);
+         break;
+      case OZONE_COLOR_THEME_GRAY_LIGHT:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_OZONE_COLOR_THEME_GRAY_LIGHT), len);
          break;
       case OZONE_COLOR_THEME_BASIC_WHITE:
       default:
@@ -9527,7 +9559,6 @@ static bool setting_append_list(
                &group_info,
                &subgroup_info,
                parent_group);
-         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
 
          CONFIG_ACTION(
                list, list_info,
@@ -10040,8 +10071,6 @@ static bool setting_append_list(
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_SETTINGS), parent_group);
             MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_IDX_PTR(list, list_info, MENU_ENUM_LABEL_CORE_SETTINGS);
 
-            SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
-
             parent_group = msg_hash_to_str(MENU_ENUM_LABEL_SETTINGS);
 
             START_SUB_GROUP(list, list_info, "State", &group_info, &subgroup_info,
@@ -10100,7 +10129,7 @@ static bool setting_append_list(
             bool_entries[listing].name_enum_idx  = MENU_ENUM_LABEL_CORE_INFO_CACHE_ENABLE;
             bool_entries[listing].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_CORE_INFO_CACHE_ENABLE;
             bool_entries[listing].default_value  = DEFAULT_CORE_INFO_CACHE_ENABLE;
-            bool_entries[listing].flags          = SD_FLAG_NONE;
+            bool_entries[listing].flags          = SD_FLAG_ADVANCED;
             listing++;
 
 #ifndef HAVE_DYNAMIC
@@ -16174,6 +16203,20 @@ static bool setting_append_list(
             (*list)[list_info->index - 1].action_right = &setting_uint_action_right_with_refresh;
             menu_settings_list_current_add_range(list, list_info, 0, 500, 1, true, true);
             SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+
+            CONFIG_UINT(
+                  list, list_info,
+                  &settings->uints.menu_xmb_title_margin,
+                  MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN,
+                  MENU_ENUM_LABEL_VALUE_MENU_XMB_TITLE_MARGIN,
+                  DEFAULT_XMB_TITLE_MARGIN,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler);
+            (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+            menu_settings_list_current_add_range(list, list_info, 0, 12, 1, true, true);
 
             CONFIG_PATH(
                   list, list_info,
