@@ -1137,6 +1137,9 @@ MSG_HASH(
    "Ändra standardmappar."
    )
 
+#ifdef HAVE_MIST
+#endif
+
 /* Settings > Drivers */
 
 MSG_HASH(
@@ -1656,14 +1659,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ASPECT_RATIO_INDEX,
    "Bildförhållande"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_VIDEO_ASPECT_RATIO,
-   "Anpassat Bildförhållande"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_ASPECT_RATIO,
-   "Flytande punktvärde för video bildförhållande (bredd / höjd), används om 'Aspect Ratio' är satt till 'Config'."
    )
 #if defined(DINGUX)
 MSG_HASH(
@@ -2301,6 +2296,7 @@ MSG_HASH(
    "Visa 'Spellistor'"
    )
 
+
 /* Settings > User Interface > Appearance */
 
 
@@ -2466,6 +2462,17 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVEFILE_DIRECTORY,
    "Spara filer"
    )
+
+#ifdef HAVE_MIST
+/* Settings > Steam */
+
+
+
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_STEAM_RICH_PRESENCE_FORMAT_CONTENT,
+   "Innehåll"
+   )
+#endif
 
 /* Music */
 
@@ -3052,10 +3059,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_FONT,
    "Menyteckensnitt"
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_XMB_SHADOWS_ENABLE,
-   "Ikonskuggor"
    )
 
 /* XMB: Settings Options */

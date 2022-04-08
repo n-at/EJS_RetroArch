@@ -106,6 +106,9 @@
 #include "play_feature_delivery/play_feature_delivery.h"
 #endif
 
+#ifdef HAVE_PRESENCE
+#include "network/presence.h"
+#endif
 #ifdef HAVE_DISCORD
 #include "network/discord.h"
 #endif
@@ -957,6 +960,7 @@ static bool mmap_preprocess_descriptors(
    size_t                      top_addr = 1;
    rarch_memory_descriptor_t *desc      = NULL;
    const rarch_memory_descriptor_t *end = first + count;
+   size_t             highest_reachable = 0;
 
    for (desc = first; desc < end; desc++)
    {
@@ -989,17 +993,14 @@ static bool mmap_preprocess_descriptors(
       if (desc->core.start & ~desc->core.select)
          return false;
 
-      while (mmap_reduce(top_addr & ~desc->core.select, desc->core.disconnect) >> 1 > desc->core.len - 1)
+      highest_reachable = mmap_inflate(desc->core.len - 1, desc->core.disconnect);
+
+      /* Disconnect unselected bits that are too high to ever
+       * index into the core's buffer. Higher addresses will
+       * repeat / mirror the buffer as long as they match select */
+      while (mmap_highest_bit(top_addr & ~desc->core.select & ~desc->core.disconnect) >
+                mmap_highest_bit(highest_reachable))
          desc->core.disconnect |= mmap_highest_bit(top_addr & ~desc->core.select & ~desc->core.disconnect);
-
-      desc->disconnect_mask = mmap_add_bits_down(desc->core.len - 1);
-      desc->core.disconnect &= desc->disconnect_mask;
-
-      while ((~desc->disconnect_mask) >> 1 & desc->core.disconnect)
-      {
-         desc->disconnect_mask >>= 1;
-         desc->core.disconnect &= desc->disconnect_mask;
-      }
    }
 
    return true;
@@ -5459,8 +5460,8 @@ void runloop_runahead_clear_variables(runloop_state_t *runloop_st)
 
 void runloop_pause_checks(void)
 {
-#ifdef HAVE_DISCORD
-   discord_userdata_t userdata;
+#ifdef HAVE_PRESENCE
+   presence_userdata_t userdata;
 #endif
    runloop_state_t *runloop_st    = &runloop_state;
    bool is_paused                 = runloop_st->paused;
@@ -5485,9 +5486,9 @@ void runloop_pause_checks(void)
       if (!is_idle)
          video_driver_cached_frame();
 
-#ifdef HAVE_DISCORD
-      userdata.status = DISCORD_PRESENCE_GAME_PAUSED;
-      command_event(CMD_EVENT_DISCORD_UPDATE, &userdata);
+#ifdef HAVE_PRESENCE
+      userdata.status = PRESENCE_GAME_PAUSED;
+      command_event(CMD_EVENT_PRESENCE_UPDATE, &userdata);
 #endif
 
 #ifndef HAVE_LAKKA_SWITCH
@@ -6106,11 +6107,11 @@ static bool display_menu_libretro(
 
    if (runloop_idle)
    {
-#ifdef HAVE_DISCORD
-      discord_userdata_t userdata;
-      userdata.status = DISCORD_PRESENCE_GAME_PAUSED;
+#ifdef HAVE_PRESENCE
+      presence_userdata_t userdata;
+      userdata.status = PRESENCE_GAME_PAUSED;
 
-      command_event(CMD_EVENT_DISCORD_UPDATE, &userdata);
+      command_event(CMD_EVENT_PRESENCE_UPDATE, &userdata);
 #endif
       return false;
    }
@@ -7636,9 +7637,8 @@ int runloop_iterate(void)
 #ifdef HAVE_CHEATS
    cheat_manager_apply_retro_cheats();
 #endif
-#ifdef HAVE_DISCORD
-   if (discord_st->inited && discord_st->ready)
-      discord_update(DISCORD_PRESENCE_GAME);
+#ifdef HAVE_PRESENCE
+   presence_update(PRESENCE_GAME);
 #endif
 
    /* Restores analog D-pad binds temporarily overridden. */

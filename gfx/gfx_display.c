@@ -120,6 +120,9 @@ static gfx_display_ctx_driver_t *gfx_display_ctx_drivers[] = {
 #ifdef WIIU
    &gfx_display_ctx_wiiu,
 #endif
+#ifdef __PSL1GHT__
+   &gfx_display_ctx_rsx,
+#endif
 #if defined(_WIN32) && !defined(_XBOX) && !defined(__WINRT__)
 #ifdef HAVE_GDI
    &gfx_display_ctx_gdi,
@@ -222,6 +225,10 @@ static bool gfx_display_check_compatibility(
          break;
       case GFX_VIDEO_DRIVER_SWITCH:
          if (string_is_equal(video_driver, "switch"))
+            return true;
+         break;
+      case GFX_VIDEO_DRIVER_RSX:
+         if (string_is_equal(video_driver, "rsx"))
             return true;
          break;
    }
@@ -567,7 +574,7 @@ void gfx_display_draw_text(
    {
       params.drop_x      = shadow_offset;
       params.drop_y      = -shadow_offset;
-      params.drop_alpha  = 0.35f;
+      params.drop_alpha  = GFX_SHADOW_ALPHA;
    }
 
    if (video_st->poke && video_st->poke->set_osd_msg)
