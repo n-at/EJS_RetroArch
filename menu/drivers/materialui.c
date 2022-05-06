@@ -9493,14 +9493,6 @@ static int materialui_list_push(void *data, void *userdata,
                      false);
             }
 
-            if (settings->bools.menu_show_help)
-            {
-               MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(
-                     info->list,
-                     MENU_ENUM_LABEL_HELP_LIST,
-                     PARSE_ACTION,
-                     false);
-            }
 #if !defined(IOS)
 
             if (settings->bools.menu_show_restart_retroarch)
@@ -10321,6 +10313,7 @@ static void materialui_list_insert(
             node->icon_type          = MUI_ICON_TYPE_INTERNAL;
             break;
          case MENU_SETTING_ACTION_CORE_OPTIONS_FLUSH:
+         case MENU_SETTING_ACTION_REMAP_FILE_FLUSH:
             node->icon_texture_index = MUI_TEXTURE_FILE;
             node->icon_type          = MUI_ICON_TYPE_INTERNAL;
             break;

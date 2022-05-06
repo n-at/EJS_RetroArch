@@ -461,6 +461,10 @@ MSG_HASH(
    "config_save_on_exit"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_REMAP_SAVE_ON_EXIT,
+   "remap_save_on_exit"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_CONNECT_WIFI,
    "connect_wifi"
    )
@@ -769,6 +773,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION_KBD,
    "deferred_dropdown_box_list_input_description_kbd"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_NETPLAY_MITM_SERVER,
+   "deferred_dropdown_box_list_netplay_mitm_server"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_CONFIGURATIONS_LIST,
@@ -2843,6 +2851,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_REMAP_FILE_RESET,
    "remap_file_reset"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_REMAP_FILE_FLUSH,
+   "remap_file_flush"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_RESTART_CONTENT,

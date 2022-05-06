@@ -93,10 +93,6 @@
 #define HAVE_INET6 1
 #endif
 
-#ifdef GEKKO
-#define setsockopt net_setsockopt
-#endif
-
 #ifdef TCP_NODELAY
 #define SET_TCP_NODELAY(fd) \
    { \
@@ -358,7 +354,8 @@ static bool netplay_lan_ad_client_response(void)
          &addr_size) == sizeof(net_st->ad_packet_buffer))
       {
          char address[256];
-         struct netplay_host *host = NULL;
+         struct netplay_host *host        = NULL;
+         uint32_t            has_password = 0;
 
          /* Make sure it's a valid response */
          if (ntohl(net_st->ad_packet_buffer.header) !=
@@ -425,8 +422,8 @@ static bool netplay_lan_ad_client_response(void)
          host = &net_st->discovered_hosts.hosts[net_st->discovered_hosts.size++];
 
          /* Copy in the response */
-         host->content_crc = ntohl(net_st->ad_packet_buffer.content_crc);
-         host->port        = ntohl(net_st->ad_packet_buffer.port);
+         host->content_crc = (int)ntohl(net_st->ad_packet_buffer.content_crc);
+         host->port        = (int)ntohl(net_st->ad_packet_buffer.port);
          strlcpy(host->address,
             address,
             sizeof(host->address));
@@ -451,14 +448,9 @@ static bool netplay_lan_ad_client_response(void)
          strlcpy(host->subsystem_name,
             net_st->ad_packet_buffer.subsystem_name,
             sizeof(host->subsystem_name));
-         if (net_st->ad_packet_buffer.has_password & 1)
-            host->has_password = true;
-         else
-            host->has_password = false;
-         if (net_st->ad_packet_buffer.has_password & 2)
-            host->has_spectate_password = true;
-         else
-            host->has_spectate_password = false;
+         has_password = ntohl(net_st->ad_packet_buffer.has_password);
+         host->has_password          = (has_password & 1) ? true : false;
+         host->has_spectate_password = (has_password & 2) ? true : false;
       }
    }
 
@@ -574,6 +566,7 @@ static bool netplay_lan_ad_server(netplay_t *netplay)
       const frontend_ctx_driver_t *frontend_drv;
       char frontend_architecture_tmp[24];
       uint32_t content_crc             = 0;
+      uint32_t has_password            = 0;
       struct retro_system_info *system = &runloop_state_get_ptr()->system.info;
       struct string_list *subsystem    = path_get_subsystem_list();
       settings_t *settings             = config_get_ptr();
@@ -602,7 +595,7 @@ static bool netplay_lan_ad_server(netplay_t *netplay)
 
       net_st->ad_packet_buffer.header = htonl(DISCOVERY_RESPONSE_MAGIC);
 
-      net_st->ad_packet_buffer.port = htonl((int) netplay->tcp_port);
+      net_st->ad_packet_buffer.port = (int32_t)htonl((uint32_t)netplay->tcp_port);
 
       strlcpy(net_st->ad_packet_buffer.nick, netplay->nick,
          sizeof(net_st->ad_packet_buffer.nick));
@@ -666,13 +659,13 @@ static bool netplay_lan_ad_server(netplay_t *netplay)
          content_crc = content_get_crc();
       }
 
-      net_st->ad_packet_buffer.content_crc = htonl(content_crc);
+      net_st->ad_packet_buffer.content_crc = (int32_t)htonl(content_crc);
 
-      net_st->ad_packet_buffer.has_password = 0;
       if (!string_is_empty(settings->paths.netplay_password))
-         net_st->ad_packet_buffer.has_password |= 1;
+         has_password |= 1;
       if (!string_is_empty(settings->paths.netplay_spectate_password))
-         net_st->ad_packet_buffer.has_password |= 2;
+         has_password |= 2;
+      net_st->ad_packet_buffer.has_password = htonl(has_password);
 
       /* Send our response */
       sendto(net_st->lan_ad_server_fd,
@@ -6809,6 +6802,8 @@ netplay_t *netplay_new(const char *server, const char *mitm, uint16_t port,
          memcpy(netplay->mitm_session_id.unique, buf, flen);
          free(buf);
       }
+
+      netplay->allow_pausing = true;
    }
 
    strlcpy(netplay->nick, !string_is_empty(nick)
@@ -7809,13 +7804,13 @@ static void netplay_announce_cb(retro_task_t *task,
          if (!string_is_empty(key) && !string_is_empty(value))
          {
             if (string_is_equal(key, "id"))
-               sscanf(value, "%i", &host_room->id);
+               host_room->id = (int)strtol(value, NULL, 10);
             else if (string_is_equal(key, "username"))
                strlcpy(host_room->nickname, value, sizeof(host_room->nickname));
             else if (string_is_equal(key, "ip"))
                strlcpy(host_room->address, value, sizeof(host_room->address));
             else if (string_is_equal(key, "port"))
-               sscanf(value, "%i", &host_room->port);
+               host_room->port = (int)strtol(value, NULL, 10);
             else if (string_is_equal(key, "core_name"))
                strlcpy(host_room->corename, value, sizeof(host_room->corename));
             else if (string_is_equal(key, "frontend"))
@@ -7825,9 +7820,9 @@ static void netplay_announce_cb(retro_task_t *task,
             else if (string_is_equal(key, "game_name"))
                strlcpy(host_room->gamename, value, sizeof(host_room->gamename));
             else if (string_is_equal(key, "game_crc"))
-               sscanf(value, "%08d", &host_room->gamecrc);
+               host_room->gamecrc = (int)strtoul(value, NULL, 16);
             else if (string_is_equal(key, "host_method"))
-               sscanf(value, "%i", &host_room->host_method);
+               host_room->host_method = (int)strtol(value, NULL, 10);
             else if (string_is_equal(key, "has_password"))
                host_room->has_password = string_is_equal_noncase(value, "true") ||
                   string_is_equal(value, "1");
@@ -8054,7 +8049,7 @@ static void netplay_mitm_query_cb(retro_task_t *task, void *task_data,
                strlcpy(host_room->mitm_address, value,
                   sizeof(host_room->mitm_address));
             else if (string_is_equal(key, "tunnel_port"))
-               sscanf(value, "%i", &host_room->mitm_port);
+               host_room->mitm_port = (int)strtol(value, NULL, 10);
          }
       }
 
@@ -8282,20 +8277,29 @@ bool init_netplay(const char *server, unsigned port, const char *mitm_session)
    if (!net_st->netplay_enabled)
       return false;
 
+#ifdef HAVE_NETPLAYDISCOVERY
+   net_st->lan_ad_server_fd = -1;
+#endif
+
+   serialization_quirks = core_serialization_quirks();
+
+   if (!core_info_current_supports_netplay() ||
+         serialization_quirks & ~((uint64_t) NETPLAY_QUIRK_MAP_UNDERSTOOD) ||
+         serialization_quirks & NETPLAY_QUIRK_MAP_NO_SAVESTATES ||
+         serialization_quirks & NETPLAY_QUIRK_MAP_NO_TRANSMISSION)
+   {
+      RARCH_ERR("[Netplay] %s\n", msg_hash_to_str(MSG_NETPLAY_UNSUPPORTED));
+      runloop_msg_queue_push(
+         msg_hash_to_str(MSG_NETPLAY_UNSUPPORTED), 0, 180, false, NULL,
+         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+      goto failure;
+   }
+
    core_set_default_callbacks(&cbs);
    if (!core_set_netplay_callbacks())
       goto failure;
 
    /* Map the core's quirks to our quirks */
-   serialization_quirks = core_serialization_quirks();
-
-   /* Quirks we don't support! Just disable everything. */
-   if (serialization_quirks & ~((uint64_t) NETPLAY_QUIRK_MAP_UNDERSTOOD))
-      quirks |= NETPLAY_QUIRK_NO_SAVESTATES;
-   if (serialization_quirks & NETPLAY_QUIRK_MAP_NO_SAVESTATES)
-      quirks |= NETPLAY_QUIRK_NO_SAVESTATES;
-   if (serialization_quirks & NETPLAY_QUIRK_MAP_NO_TRANSMISSION)
-      quirks |= NETPLAY_QUIRK_NO_TRANSMISSION;
    if (serialization_quirks & NETPLAY_QUIRK_MAP_INITIALIZATION)
       quirks |= NETPLAY_QUIRK_INITIALIZATION;
    if (serialization_quirks & NETPLAY_QUIRK_MAP_ENDIAN_DEPENDENT)
@@ -8348,10 +8352,6 @@ bool init_netplay(const char *server, unsigned port, const char *mitm_session)
 
    net_st->netplay_client_deferred = false;
 
-#ifdef HAVE_NETPLAYDISCOVERY
-   net_st->lan_ad_server_fd = -1;
-#endif
-
    net_st->chat             = (struct netplay_chat*)calloc(1, sizeof(*net_st->chat));
    if (!net_st->chat)
       goto failure;
@@ -8359,7 +8359,8 @@ bool init_netplay(const char *server, unsigned port, const char *mitm_session)
 
    net_st->data = netplay_new(
          server, mitm, port, mitm_session,
-         settings->bools.netplay_stateless_mode,
+         /*settings->bools.netplay_stateless_mode,*/
+         false,
          settings->ints.netplay_check_frames,
          &cbs,
          settings->bools.netplay_nat_traversal,

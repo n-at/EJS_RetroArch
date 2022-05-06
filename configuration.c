@@ -88,7 +88,8 @@ enum video_driver_enum
    VIDEO_CTR,
    VIDEO_SWITCH,
    VIDEO_D3D8,
-   VIDEO_D3D9,
+   VIDEO_D3D9_CG,
+   VIDEO_D3D9_HLSL,
    VIDEO_D3D10,
    VIDEO_D3D11,
    VIDEO_D3D12,
@@ -960,8 +961,10 @@ const char *config_get_default_video(void)
          return "xenon360";
       case VIDEO_D3D8:
          return "d3d8";
-      case VIDEO_D3D9:
-         return "d3d9";
+      case VIDEO_D3D9_CG:
+         return "d3d9_cg";
+      case VIDEO_D3D9_HLSL:
+         return "d3d9_hlsl";
       case VIDEO_D3D10:
          return "d3d10";
       case VIDEO_D3D11:
@@ -1960,6 +1963,7 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("sort_savestates_by_content_enable", &settings->bools.sort_savestates_by_content_enable, true, default_sort_savestates_by_content_enable, false);
    SETTING_BOOL("sort_screenshots_by_content_enable", &settings->bools.sort_screenshots_by_content_enable, true, default_sort_screenshots_by_content_enable, false);
    SETTING_BOOL("config_save_on_exit",          &settings->bools.config_save_on_exit, true, DEFAULT_CONFIG_SAVE_ON_EXIT, false);
+   SETTING_BOOL("remap_save_on_exit",           &settings->bools.remap_save_on_exit, true, DEFAULT_REMAP_SAVE_ON_EXIT, false);
    SETTING_BOOL("show_hidden_files",            &settings->bools.show_hidden_files, true, DEFAULT_SHOW_HIDDEN_FILES, false);
    SETTING_BOOL("use_last_start_directory",     &settings->bools.use_last_start_directory, true, DEFAULT_USE_LAST_START_DIRECTORY, false);
    SETTING_BOOL("input_autodetect_enable",      &settings->bools.input_autodetect_enable, true, input_autodetect_enable, false);
@@ -2991,9 +2995,10 @@ static bool check_menu_driver_compatibility(settings_t *settings)
    /* TODO/FIXME - maintenance hazard */
    if (string_starts_with_size(video_driver, "d3d", STRLEN_CONST("d3d")))
       if (
-            string_is_equal(video_driver, "d3d9")   ||
-            string_is_equal(video_driver, "d3d10")  ||
-            string_is_equal(video_driver, "d3d11")  ||
+            string_is_equal(video_driver, "d3d9_hlsl") ||
+            string_is_equal(video_driver, "d3d9_cg")   ||
+            string_is_equal(video_driver, "d3d10")     ||
+            string_is_equal(video_driver, "d3d11")     ||
             string_is_equal(video_driver, "d3d12")
          )
       return true;

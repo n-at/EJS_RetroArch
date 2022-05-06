@@ -5858,6 +5858,22 @@ static int setting_string_action_left_driver(
 }
 
 #ifdef HAVE_NETWORKING
+static int setting_string_action_ok_netplay_mitm_server(
+      rarch_setting_t *setting, size_t idx, bool wraparound)
+{
+    char enum_idx[16];
+    if (!setting)
+       return -1;
+
+    snprintf(enum_idx, sizeof(enum_idx), "%d", setting->enum_idx);
+
+    generic_action_ok_displaylist_push(
+          enum_idx, /* we will pass the enumeration index of the string as a path */
+          NULL, NULL, 0, idx, 0,
+          ACTION_OK_DL_DROPDOWN_BOX_LIST_NETPLAY_MITM_SERVER);
+    return 0;
+}
+
 static int setting_string_action_left_netplay_mitm_server(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
@@ -6746,7 +6762,8 @@ static void setting_get_string_representation_uint_user_language(
    modes[RETRO_LANGUAGE_SWEDISH]                = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_SWEDISH);
    modes[RETRO_LANGUAGE_UKRAINIAN]              = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_UKRAINIAN);
    modes[RETRO_LANGUAGE_CZECH]                  = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CZECH);
-   modes[RETRO_LANGUAGE_VALENCIAN]              = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_VALENCIAN);
+   modes[RETRO_LANGUAGE_CATALAN_VALENCIA]       = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CATALAN_VALENCIA);
+   modes[RETRO_LANGUAGE_CATALAN]                = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CATALAN);
    strlcpy(s, modes[*msg_hash_get_uint(MSG_HASH_USER_LANGUAGE)], len);
 }
 #endif
@@ -10225,7 +10242,7 @@ static bool setting_append_list(
       case SETTINGS_LIST_CONFIGURATION:
          {
             uint8_t i;
-            struct bool_entry bool_entries[7];
+            struct bool_entry bool_entries[8];
             START_GROUP(list, list_info, &group_info,
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONFIGURATION_SETTINGS), parent_group);
 
@@ -10275,6 +10292,12 @@ static bool setting_append_list(
             bool_entries[6].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_GLOBAL_CORE_OPTIONS;
             bool_entries[6].default_value  = default_global_core_options;
             bool_entries[6].flags          = SD_FLAG_NONE;
+
+            bool_entries[7].target         = &settings->bools.remap_save_on_exit;
+            bool_entries[7].name_enum_idx  = MENU_ENUM_LABEL_REMAP_SAVE_ON_EXIT;
+            bool_entries[7].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_REMAP_SAVE_ON_EXIT;
+            bool_entries[7].default_value  = DEFAULT_REMAP_SAVE_ON_EXIT;
+            bool_entries[7].flags          = SD_FLAG_NONE;
 
             for (i = 0; i < ARRAY_SIZE(bool_entries); i++)
             {
@@ -18782,6 +18805,7 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].offset_by     = 1;
          menu_settings_list_current_add_range(list, list_info, 1, 999, 1, true, true);
 
+#if defined(HAVE_QT) || defined(HAVE_COCOA)
          CONFIG_BOOL(
                list, list_info,
                &settings->bools.ui_companion_enable,
@@ -18812,8 +18836,6 @@ static bool setting_append_list(
                general_read_handler,
                SD_FLAG_ADVANCED);
 
-
-#ifdef HAVE_QT
          CONFIG_BOOL(
                list, list_info,
                &settings->bools.desktop_menu_enable,
@@ -19579,6 +19601,7 @@ static bool setting_append_list(
                   general_write_handler,
                   general_read_handler);
          (*list)[list_info->index - 1].action_start = setting_generic_action_start_default;
+         (*list)[list_info->index - 1].action_ok    = setting_string_action_ok_netplay_mitm_server;
          (*list)[list_info->index - 1].action_left  = setting_string_action_left_netplay_mitm_server;
          (*list)[list_info->index - 1].action_right = setting_string_action_right_netplay_mitm_server;
          (*list)[list_info->index - 1].get_string_representation =

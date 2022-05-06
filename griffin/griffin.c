@@ -419,16 +419,16 @@ VIDEO DRIVER
 #endif
 
 #if defined(HAVE_D3D9)
-#include "../gfx/drivers/d3d9.c"
 #include "../gfx/common/d3d9_common.c"
-#include "../gfx/drivers_display/gfx_display_d3d9.c"
 
 #ifdef HAVE_HLSL
-#include "../gfx/drivers_renderchain/d3d9_hlsl_renderchain.c"
+#include "../gfx/drivers/d3d9hlsl.c"
+#include "../gfx/drivers_display/gfx_display_d3d9hlsl.c"
 #endif
 
 #ifdef HAVE_CG
-#include "../gfx/drivers_renderchain/d3d9_cg_renderchain.c"
+#include "../gfx/drivers/d3d9cg.c"
+#include "../gfx/drivers_display/gfx_display_d3d9cg.c"
 #endif
 
 #endif
@@ -1271,6 +1271,7 @@ RETROARCH
 #include "../intl/msg_hash_uk.c"
 #include "../intl/msg_hash_cs.c"
 #include "../intl/msg_hash_val.c"
+#include "../intl/msg_hash_ca.c"
 #endif
 
 #include "../intl/msg_hash_us.c"

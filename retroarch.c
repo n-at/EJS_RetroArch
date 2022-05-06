@@ -1913,7 +1913,7 @@ bool command_event(enum event_command cmd, void *data)
                   || !string_is_empty(runloop_st->name.remapfile)
                )
             {
-               input_remapping_deinit(true);
+               input_remapping_deinit(settings->bools.remap_save_on_exit);
                input_remapping_set_defaults(true);
             }
             else
@@ -4250,8 +4250,8 @@ static void retroarch_print_help(const char *arg0)
          "Port used to netplay. Default is 55435.\n", sizeof(buf));
    strlcat(buf, "      --nick=NICK                "
          "Picks a username (for use with netplay). Not mandatory.\n", sizeof(buf));
-   strlcat(buf, "      --stateless                "
-         "Use \"stateless\" mode for netplay (requires a very fast network).\n", sizeof(buf));
+   /*strlcat(buf, "      --stateless                "
+         "Use \"stateless\" mode for netplay (requires a very fast network).\n", sizeof(buf));*/
    strlcat(buf, "      --check-frames=NUMBER      "
          "Check frames when using netplay.\n", sizeof(buf));
 #ifdef HAVE_NETWORK_CMD
@@ -6061,7 +6061,7 @@ bool retroarch_main_quit(void)
             || !string_is_empty(runloop_st->name.remapfile)
          )
       {
-         input_remapping_deinit(true);
+         input_remapping_deinit(settings->bools.remap_save_on_exit);
          input_remapping_set_defaults(true);
       }
       else
@@ -6133,7 +6133,8 @@ enum retro_language rarch_get_language_from_iso(const char *iso639)
       {"sv", RETRO_LANGUAGE_SWEDISH},
       {"uk", RETRO_LANGUAGE_UKRAINIAN},
       {"cs", RETRO_LANGUAGE_CZECH},
-      {"val", RETRO_LANGUAGE_VALENCIAN},
+      {"val", RETRO_LANGUAGE_CATALAN_VALENCIA},
+      {"ca", RETRO_LANGUAGE_CATALAN},
    };
 
    if (string_is_empty(iso639))

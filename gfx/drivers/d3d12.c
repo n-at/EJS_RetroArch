@@ -106,8 +106,8 @@ d3d12_overlay_vertex_geom(void* data, unsigned index, float x, float y, float w,
    sprites[index].pos.w = w;
    sprites[index].pos.h = h;
 
-   range.Begin = index * sizeof(*sprites);
-   range.End   = range.Begin + sizeof(*sprites);
+   range.Begin          = index * sizeof(*sprites);
+   range.End            = range.Begin + sizeof(*sprites);
    D3D12Unmap(d3d12->overlays.vbo, 0, &range);
 }
 
@@ -127,8 +127,8 @@ static void d3d12_overlay_tex_geom(void* data, unsigned index, float u, float v,
    sprites[index].coords.w = w;
    sprites[index].coords.h = h;
 
-   range.Begin = index * sizeof(*sprites);
-   range.End   = range.Begin + sizeof(*sprites);
+   range.Begin             = index * sizeof(*sprites);
+   range.End               = range.Begin + sizeof(*sprites);
    D3D12Unmap(d3d12->overlays.vbo, 0, &range);
 }
 
@@ -148,8 +148,8 @@ static void d3d12_overlay_set_alpha(void* data, unsigned index, float mod)
    sprites[index].colors[2] = sprites[index].colors[0];
    sprites[index].colors[3] = sprites[index].colors[0];
 
-   range.Begin = index * sizeof(*sprites);
-   range.End   = range.Begin + sizeof(*sprites);
+   range.Begin              = index * sizeof(*sprites);
+   range.End                = range.Begin + sizeof(*sprites);
    D3D12Unmap(d3d12->overlays.vbo, 0, &range);
 }
 
@@ -244,13 +244,9 @@ static void d3d12_get_overlay_interface(void* data, const video_overlay_interfac
    *iface = &overlay_interface;
 }
 
-static void d3d12_render_overlay(void* data)
+static void d3d12_render_overlay(d3d12_video_t *d3d12)
 {
    unsigned       i;
-   d3d12_video_t* d3d12 = (d3d12_video_t*)data;
-
-   if (!d3d12)
-      return;
 
    if (d3d12->overlays.fullscreen)
    {
@@ -414,10 +410,8 @@ static void d3d12_gfx_set_rotation(void* data, unsigned rotation)
    D3D12Unmap(d3d12->frame.ubo, 0, NULL);
 }
 
-static void d3d12_update_viewport(void* data, bool force_full)
+static void d3d12_update_viewport(d3d12_video_t *d3d12, bool force_full)
 {
-   d3d12_video_t* d3d12 = (d3d12_video_t*)data;
-
    video_driver_update_viewport(&d3d12->vp, force_full, d3d12->keep_aspect);
 
    d3d12->frame.viewport.TopLeftX = d3d12->vp.x;
@@ -579,11 +573,6 @@ static bool d3d12_gfx_set_shader(void* data, enum rarch_shader_type type, const 
             { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(d3d12_vertex_t, texcoord),
               D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
          };
-#ifdef DEBUG
-         bool save_hlsl = true;
-#else
-         bool save_hlsl = false;
-#endif
          static const char vs_ext[] = ".vs.hlsl";
          static const char ps_ext[] = ".ps.hlsl";
          char              vs_path[PATH_MAX_LENGTH] = {0};
@@ -597,10 +586,8 @@ static bool d3d12_gfx_set_shader(void* data, enum rarch_shader_type type, const 
          strlcat(vs_path, vs_ext, sizeof(vs_path));
          strlcat(ps_path, ps_ext, sizeof(ps_path));
 
-         if (!d3d_compile(vs_src, 0, vs_path, "main", "vs_5_0", &vs_code))
-            save_hlsl = true;
-         if (!d3d_compile(ps_src, 0, ps_path, "main", "ps_5_0", &ps_code))
-            save_hlsl = true;
+         if (!d3d_compile(vs_src, 0, vs_path,"main","vs_5_0", &vs_code)){ }
+         if (!d3d_compile(ps_src, 0, ps_path,"main","ps_5_0", &ps_code)){ }
 
          desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
          if (i == d3d12->shader_preset->passes - 1)
@@ -613,19 +600,7 @@ static bool d3d12_gfx_set_shader(void* data, enum rarch_shader_type type, const 
          desc.InputLayout.NumElements        = countof(inputElementDesc);
 
          if (!d3d12_init_pipeline(
-                   d3d12->device, vs_code, ps_code, NULL, &desc, &d3d12->pass[i].pipe))
-            save_hlsl = true;
-
-         if (save_hlsl)
-         {
-            FILE* fp = fopen(vs_path, "w");
-            fwrite(vs_src, 1, strlen(vs_src), fp);
-            fclose(fp);
-
-            fp = fopen(ps_path, "w");
-            fwrite(ps_src, 1, strlen(ps_src), fp);
-            fclose(fp);
-         }
+                   d3d12->device, vs_code, ps_code, NULL, &desc, &d3d12->pass[i].pipe)) { }
 
          free(d3d12->shader_preset->pass[i].source.string.vertex);
          free(d3d12->shader_preset->pass[i].source.string.fragment);

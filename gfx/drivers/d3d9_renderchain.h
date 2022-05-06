@@ -74,14 +74,6 @@ struct shader_pass
 #undef VECTOR_LIST_TYPE
 #undef VECTOR_LIST_NAME
 
-struct D3D9Vertex
-{
-   float x, y, z;
-   float u, v;
-   float lut_u, lut_v;
-   float r, g, b, a;
-};
-
 typedef struct d3d9_renderchain
 {
    unsigned pixel_size;
@@ -101,74 +93,6 @@ typedef struct d3d9_renderchain
    struct unsigned_vector_list *bound_vert;
    struct lut_info_vector_list *luts;
 } d3d9_renderchain_t;
-
-static INLINE void d3d9_renderchain_set_vertices_on_change(
-      d3d9_renderchain_t *chain,
-      struct shader_pass *pass,
-      unsigned width, unsigned height,
-      unsigned out_width, unsigned out_height,
-      unsigned vp_width, unsigned vp_height,
-      unsigned rotation
-      )
-{
-   struct Vertex vert[4];
-   void *verts       = NULL;
-   const struct
-      LinkInfo *info = (const struct LinkInfo*)&pass->info;
-   float _u          = (float)(width)  / info->tex_w;
-   float _v          = (float)(height) / info->tex_h;
-
-   pass->last_width  = width;
-   pass->last_height = height;
-
-   /* Copied from d3d8 driver */
-   vert[0].x        =  0.0f;
-   vert[0].y        =  1.0f;
-   vert[0].z        =  1.0f;
-
-   vert[1].x        =  1.0f;
-   vert[1].y        =  1.0f;
-   vert[1].z        =  1.0f;
-
-   vert[2].x        =  0.0f;
-   vert[2].y        =  0.0f;
-   vert[2].z        =  1.0f;
-
-   vert[3].x        =  1.0f;
-   vert[3].y        =  0.0f;
-   vert[3].z        =  1.0f;
-
-   vert[0].u        = 0.0f;
-   vert[0].v        = 0.0f;
-   vert[1].v        = 0.0f;
-   vert[2].u        = 0.0f;
-   vert[1].u        = _u;
-   vert[2].v        = _v;
-   vert[3].u        = _u;
-   vert[3].v        = _v;
-
-   vert[0].color    = 0xFFFFFFFF;
-   vert[1].color    = 0xFFFFFFFF;
-   vert[2].color    = 0xFFFFFFFF;
-   vert[3].color    = 0xFFFFFFFF;
-
-   /* Align texels and vertices.
-    *
-    * Fixes infamous 'half-texel offset' issue of D3D9
-    *	http://msdn.microsoft.com/en-us/library/bb219690%28VS.85%29.aspx.
-    */
-   /* Maybe we do need something like this left out for now
-   for (i = 0; i < 4; i++)
-   {
-      vert[i].x     -= 0.5f;
-      vert[i].y     += 0.5f;
-   }
-   */
-
-   verts             = d3d9_vertex_buffer_lock(pass->vertex_buf);
-   memcpy(verts, vert, sizeof(vert));
-   d3d9_vertex_buffer_unlock(pass->vertex_buf);
-}
 
 static INLINE bool d3d9_renderchain_add_pass(d3d9_renderchain_t *chain,
       struct shader_pass *pass,
@@ -202,10 +126,10 @@ static INLINE bool d3d9_renderchain_add_pass(d3d9_renderchain_t *chain,
 
    pass->tex        = tex;
 
-   d3d9_set_texture(chain->dev, 0, pass->tex);
-   d3d9_set_sampler_address_u(chain->dev, 0, D3DTADDRESS_BORDER);
-   d3d9_set_sampler_address_v(chain->dev, 0, D3DTADDRESS_BORDER);
-   d3d9_set_texture(chain->dev, 0, NULL);
+   IDirect3DDevice9_SetTexture(chain->dev, 0, (IDirect3DBaseTexture9*)pass->tex);
+   IDirect3DDevice9_SetSamplerState(chain->dev, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+   IDirect3DDevice9_SetSamplerState(chain->dev, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+   IDirect3DDevice9_SetTexture(chain->dev, 0, (IDirect3DBaseTexture9*)NULL);
 
    shader_pass_vector_list_append(chain->passes, *pass);
 
@@ -242,10 +166,10 @@ static INLINE bool d3d9_renderchain_add_lut(d3d9_renderchain_t *chain,
    if (!lut)
       return false;
 
-   d3d9_set_texture(chain->dev, 0, lut);
-   d3d9_set_sampler_address_u(chain->dev, 0, D3DTADDRESS_BORDER);
-   d3d9_set_sampler_address_v(chain->dev, 0, D3DTADDRESS_BORDER);
-   d3d9_set_texture(chain->dev, 0, NULL);
+   IDirect3DDevice9_SetTexture(chain->dev, 0, (IDirect3DBaseTexture9*)lut);
+   IDirect3DDevice9_SetSamplerState(chain->dev, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+   IDirect3DDevice9_SetSamplerState(chain->dev, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+   IDirect3DDevice9_SetTexture(chain->dev, 0, (IDirect3DBaseTexture9*)NULL);
 
    lut_info_vector_list_append(chain->luts, info);
 
@@ -283,13 +207,13 @@ static INLINE void d3d9_renderchain_add_lut_internal(
       d3d9_renderchain_t *chain,
       unsigned index, unsigned i)
 {
-   d3d9_set_texture(chain->dev, index, chain->luts->data[i].tex);
-   d3d9_set_sampler_magfilter(chain->dev, index,
-         d3d_translate_filter(chain->luts->data[i].smooth ? RARCH_FILTER_LINEAR : RARCH_FILTER_NEAREST));
-   d3d9_set_sampler_minfilter(chain->dev, index,
-         d3d_translate_filter(chain->luts->data[i].smooth ? RARCH_FILTER_LINEAR : RARCH_FILTER_NEAREST));
-   d3d9_set_sampler_address_u(chain->dev, index, D3DTADDRESS_BORDER);
-   d3d9_set_sampler_address_v(chain->dev, index, D3DTADDRESS_BORDER);
+   /* 2 = D3D_TEXTURE_FILTER_LINEAR, 1 = D3D_TEXTURE_FILTER_POINT */
+   int32_t filter = chain->luts->data[i].smooth ? 2 : 1;
+   IDirect3DDevice9_SetTexture(chain->dev, index, (IDirect3DBaseTexture9*)chain->luts->data[i].tex);
+   IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_MAGFILTER, filter);
+   IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_MINFILTER, filter);
+   IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+   IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
    unsigned_vector_list_append(chain->bound_tex, index);
 }
 
@@ -321,17 +245,16 @@ static INLINE void d3d9_renderchain_unbind_all(d3d9_renderchain_t *chain)
     */
    for (i = 0; i < chain->bound_tex->count; i++)
    {
-      d3d9_set_sampler_minfilter(chain->dev,
-            chain->bound_tex->data[i], D3DTEXF_POINT);
-      d3d9_set_sampler_magfilter(chain->dev,
-            chain->bound_tex->data[i], D3DTEXF_POINT);
-      d3d9_set_texture(chain->dev,
-            chain->bound_tex->data[i], NULL);
+      IDirect3DDevice9_SetSamplerState(chain->dev,
+            chain->bound_tex->data[i], D3DSAMP_MINFILTER, D3DTEXF_POINT);
+      IDirect3DDevice9_SetSamplerState(chain->dev,
+            chain->bound_tex->data[i], D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+      IDirect3DDevice9_SetTexture(chain->dev,
+            chain->bound_tex->data[i], (IDirect3DBaseTexture9*)NULL);
    }
 
    for (i = 0; i < chain->bound_vert->count; i++)
-      d3d9_set_stream_source(chain->dev,
-            chain->bound_vert->data[i], 0, 0, 0);
+      IDirect3DDevice9_SetStreamSource(chain->dev, chain->bound_vert->data[i], 0, 0, 0);
 
    if (chain->bound_tex)
    {
@@ -354,7 +277,7 @@ static INLINE bool d3d9_renderchain_set_pass_size(
 {
    if (width != pass->info.tex_w || height != pass->info.tex_h)
    {
-      d3d9_texture_free(pass->tex);
+      IDirect3DTexture9_Release(pass->tex);
 
       pass->info.tex_w = width;
       pass->info.tex_h = height;
@@ -371,10 +294,10 @@ static INLINE bool d3d9_renderchain_set_pass_size(
       if (!pass->tex)
          return false;
 
-      d3d9_set_texture(dev, 0, pass->tex);
-      d3d9_set_sampler_address_u(dev, 0, D3DTADDRESS_BORDER);
-      d3d9_set_sampler_address_v(dev, 0, D3DTADDRESS_BORDER);
-      d3d9_set_texture(dev, 0, NULL);
+      IDirect3DDevice9_SetTexture(dev, 0, (IDirect3DBaseTexture9*)pass->tex);
+      IDirect3DDevice9_SetSamplerState(dev, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+      IDirect3DDevice9_SetSamplerState(dev, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+      IDirect3DDevice9_SetTexture(dev, 0, (IDirect3DBaseTexture9*)NULL);
    }
 
    return true;
@@ -441,34 +364,6 @@ static INLINE void d3d9_init_renderchain(d3d9_renderchain_t *chain)
    chain->luts       = lut_info_vector_list_new();
    chain->bound_tex  = unsigned_vector_list_new();
    chain->bound_vert = unsigned_vector_list_new();
-}
-
-static INLINE void d3d9_renderchain_blit_to_texture(
-      LPDIRECT3DTEXTURE9 tex,
-      const void *frame,
-      unsigned tex_width,  unsigned tex_height,
-      unsigned width,      unsigned height,
-      unsigned last_width, unsigned last_height,
-      unsigned pitch, unsigned pixel_size)
-{
-   D3DLOCKED_RECT d3dlr    = {0, NULL};
-
-   if (
-         (last_width != width || last_height != height)
-      )
-   {
-      d3d9_lock_rectangle(tex, 0, &d3dlr,
-            NULL, tex_height, D3DLOCK_NOSYSLOCK);
-      d3d9_lock_rectangle_clear(tex, 0, &d3dlr,
-            NULL, tex_height, D3DLOCK_NOSYSLOCK);
-   }
-
-   if (d3d9_lock_rectangle(tex, 0, &d3dlr, NULL, 0, 0))
-   {
-      d3d9_texture_blit(pixel_size, tex,
-            &d3dlr, frame, width, height, pitch);
-      d3d9_unlock_rectangle(tex);
-   }
 }
 
 RETRO_END_DECLS

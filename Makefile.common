@@ -475,7 +475,8 @@ ifeq ($(HAVE_LANGEXTRA), 1)
           intl/msg_hash_sv.o \
           intl/msg_hash_uk.o \
           intl/msg_hash_cs.o \
-          intl/msg_hash_val.o 
+          intl/msg_hash_val.o \
+          intl/msg_hash_ca.o
 endif
 
 ifneq ($(HAVE_GETOPT_LONG), 1)
@@ -535,17 +536,10 @@ ifeq ($(HAVE_QT), 1)
    MOC_HEADERS += ui/drivers/ui_qt.h \
                   ui/drivers/qt/ui_qt_load_core_window.h \
                   ui/drivers/qt/gridview.h \
-                  ui/drivers/qt/coreoptionsdialog.h \
-                  ui/drivers/qt/filedropwidget.h \
-                  ui/drivers/qt/coreinfodialog.h \
-                  ui/drivers/qt/playlistentrydialog.h \
-                  ui/drivers/qt/viewoptionsdialog.h
+                  ui/drivers/qt/qt_dialogs.h \
+                  ui/drivers/qt/qt_widgets.h
    ifeq ($(HAVE_MENU), 1)
-   ifeq ($(HAVE_SHADERS_COMMON), 1)
-      MOC_HEADERS += ui/drivers/qt/shaderparamsdialog.h
-   endif
-      MOC_HEADERS += ui/drivers/qt/settingswidgets.h \
-                     ui/drivers/qt/qt_options.h
+      MOC_HEADERS += ui/drivers/qt/qt_options.h
    endif
 
    DEFINES += -DHAVE_MAIN
@@ -979,6 +973,7 @@ OBJ += $(LIBRETRO_COMM_DIR)/audio/conversion/s16_to_float.o \
        $(LIBRETRO_COMM_DIR)/audio/conversion/float_to_s16.o
 
 ifeq ($(HAVE_RWAV), 1)
+DEFINES += -DHAVE_RWAV
 OBJ += $(LIBRETRO_COMM_DIR)/formats/wav/rwav.o
 endif
 
@@ -1742,7 +1737,8 @@ ifeq ($(HAVE_D3D9), 1)
    OBJ  += gfx/drivers_font/d3d_w32_font.o
    ifeq ($(HAVE_CG), 1)
       LIBS += -lcgD3D9
-      OBJ  += gfx/drivers_renderchain/d3d9_cg_renderchain.o
+      OBJ  += gfx/drivers/d3d9cg.o
+      OBJ  += gfx/drivers_display/gfx_display_d3d9cg.o
    endif
 endif
 
@@ -1812,9 +1808,7 @@ endif
 
 ifeq ($(HAVE_D3D9), 1)
    DEFINES += -DHAVE_D3D9
-   OBJ += gfx/drivers/d3d9.o
    OBJ += gfx/common/d3d9_common.o
-	OBJ += gfx/drivers_display/gfx_display_d3d9.o
 endif
 
 ifeq ($(HAVE_D3D_COMMON), 1)
@@ -1835,7 +1829,8 @@ endif
 
 ifeq ($(HAVE_HLSL),1)
    DEFINES += -DHAVE_HLSL
-   OBJ += gfx/drivers_renderchain/d3d9_hlsl_renderchain.o
+   OBJ += gfx/drivers/d3d9hlsl.o
+   OBJ += gfx/drivers_display/gfx_display_d3d9hlsl.o
 endif
 
 ifeq ($(HAVE_SLANG),1)

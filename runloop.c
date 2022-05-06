@@ -2093,6 +2093,24 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                                  break;
                            }
                            break;
+                        case RETRO_DEVICE_ID_JOYPAD_R2:
+                           switch (desc->index)
+                           {
+                              case RETRO_DEVICE_INDEX_ANALOG_BUTTON:
+                                 system->input_desc_btn[retro_port]
+                                    [retro_id] = desc->description;
+                                 break;
+                           }
+                           break;
+                        case RETRO_DEVICE_ID_JOYPAD_L2:
+                           switch (desc->index)
+                           {
+                              case RETRO_DEVICE_INDEX_ANALOG_BUTTON:
+                                 system->input_desc_btn[retro_port]
+                                    [retro_id] = desc->description;
+                                 break;
+                           }
+                           break;
                      }
                      break;
                }
@@ -5016,7 +5034,7 @@ void runloop_event_deinit_core(void)
          || !string_is_empty(runloop_st->name.remapfile)
       )
    {
-      input_remapping_deinit(true);
+      input_remapping_deinit(settings->bools.remap_save_on_exit);
       input_remapping_set_defaults(true);
    }
    else
@@ -6185,7 +6203,7 @@ static enum runloop_state_enum runloop_check_state(
    bool widgets_active                 = dispwidget_get_ptr()->active;
 #endif
 #ifdef HAVE_CHEEVOS
-   bool cheevos_hardcore_active        = rcheevos_hardcore_active();
+   bool cheevos_hardcore_active        = false;
 #endif
 
 #if defined(HAVE_TRANSLATE) && defined(HAVE_GFX_WIDGETS)
@@ -6885,6 +6903,10 @@ static enum runloop_state_enum runloop_check_state(
       bool trig_frameadvance        = false;
       bool pause_pressed            = BIT256_GET(current_bits, RARCH_PAUSE_TOGGLE);
 #ifdef HAVE_CHEEVOS
+      /* make sure not to evaluate this before calling menu_driver_iterate
+       * as that may change its value */
+      cheevos_hardcore_active = rcheevos_hardcore_active();
+
       if (cheevos_hardcore_active)
       {
          static int unpaused_frames = 0;
