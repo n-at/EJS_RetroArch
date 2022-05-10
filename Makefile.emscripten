@@ -65,7 +65,7 @@ OBJDIR := obj-emscripten
 
 LIBS    := -s USE_ZLIB=1
 LDFLAGS := -L. --no-heap-copy -s $(LIBS) -s TOTAL_MEMORY=$(MEMORY) -s NO_EXIT_RUNTIME=0 -s FULL_ES2=1 -s "EXPORTED_RUNTIME_METHODS=['callMain', 'cwrap', 'getValue']" \
-           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_get_current_frame_count','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat'] \
+           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_get_current_frame_count','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop'] \
            -lidbfs.js \
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
            -s ALLOW_MEMORY_GROWTH=1 \

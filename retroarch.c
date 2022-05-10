@@ -3431,6 +3431,11 @@ bool command_event(enum event_command cmd, void *data)
    return true;
 }
 
+void toggleMainLoop(int running) {
+    runloop_state_t *runloop_st     = runloop_state_get_ptr();
+    runloop_st->paused = !(running>0);
+}
+
 /* FRONTEND */
 
 void retroarch_override_setting_set(
