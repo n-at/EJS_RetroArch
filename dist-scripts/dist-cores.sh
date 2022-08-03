@@ -204,6 +204,10 @@ for f in `ls -v *_${platform}.${EXT}`; do
    lto=0
    whole_archive=
    big_stack=
+   
+   gles3=0
+   stack_mem=8388608
+   heap_mem=268435456
 
    if [ $name = "nxengine" ] ; then
       echo "Applying whole archive linking..."
@@ -212,10 +216,31 @@ for f in `ls -v *_${platform}.${EXT}`; do
       echo "Applying big stack..."
       lto=0
       big_stack="BIG_STACK=1"
-   elif [ $name = "mupen64plus" ] ; then
+   elif [ $name = "mupen64plus_next" ] ; then
+      gles3=1
       async=1
-   elif [ $name = "dosbox" ] ; then
-      async=0
+      pthread=0
+      stack_mem=268435456
+      heap_mem=536870912
+   elif [ $name = "parallel_n64" ] ; then
+      gles3=1
+      async=1
+   elif [ $name = "mednafen_psx" ] ; then
+      heap_mem=536870912
+   elif [ $name = "mednafen_psx_hw" ] ; then
+      gles3=1
+      heap_mem=536870912
+    elif [ $name = "dosbox" ] ; then
+      async=1
+   elif [ $name = "scummvm" ] ; then
+      async=1
+      pthread=0
+   elif [ $name = "melonds" ] ; then
+      pthread=0
+   elif [ $name = "yabause" ] ; then
+      pthread=0
+   elif [ $name = "yabasanshiro" ] ; then
+      pthread=0
    fi
    echo "-- Building core: $name --"
    if [ $PLATFORM = "unix" ]; then
@@ -225,7 +250,11 @@ for f in `ls -v *_${platform}.${EXT}`; do
    fi
    echo NAME: $name
    echo ASYNC: $async
+   echo PTHREAD: $pthread
    echo LTO: $lto
+   echo GLES3: $gles3
+   echo STACK_MEMORY: $stack_mem
+   echo HEAP_MEMORY: $heap_mem
 
    # Do cleanup if this is a big stack core
    if [ "$big_stack" = "BIG_STACK=1" ] ; then
@@ -244,8 +273,8 @@ for f in `ls -v *_${platform}.${EXT}`; do
    if [ $MAKEFILE_GRIFFIN = "yes" ]; then
       make -C ../ -f Makefile.griffin $OPTS platform=${platform} $whole_archive $big_stack -j3 || exit 1
    elif [ $PLATFORM = "emscripten" ]; then
-       echo "BUILD COMMAND: make -C ../ -f Makefile.emscripten PTHREAD=$pthread ASYNC=$async LTO=$lto -j7 TARGET=${name}_libretro.js"
-       make -C ../ -f Makefile.emscripten $OPTS PTHREAD=$pthread ASYNC=$async LTO=$lto -j7 TARGET=${name}_libretro.js || exit 1
+       echo "BUILD COMMAND: make -C ../ -f Makefile.emscripten $OPTS PTHREAD=$pthread ASYNC=$async LTO=$lto HAVE_OPENGLES3=$gles3 STACK_MEMORY=$stack_mem HEAP_MEMORY=$heap_mem -j7 TARGET=${name}_libretro.js"
+       make -C ../ -f Makefile.emscripten $OPTS PTHREAD=$pthread ASYNC=$async LTO=$lto HAVE_OPENGLES3=$gles3 STACK_MEMORY=$stack_mem HEAP_MEMORY=$heap_mem -j7 TARGET=${name}_libretro.js || exit 1
    elif [ $PLATFORM = "unix" ]; then
       make -C ../ -f Makefile LINK=g++ $whole_archive $big_stack -j3 || exit 1
    elif [ $PLATFORM = "ctr" ]; then
@@ -313,7 +342,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mv -f ../${name}_libretro.js ../pkg/emscripten/${name}_libretro.js
       mv -f ../${name}_libretro.wasm ../pkg/emscripten/${name}_libretro.wasm
       if [ $pthread != 0 ] ; then
-         mv -f ../pthread-main.js ../pkg/emscripten/pthread-main.js
+         mv -f ../${name}_libretro.worker.js ../pkg/emscripten/${name}_libretro.worker.js
       fi
    fi
 
