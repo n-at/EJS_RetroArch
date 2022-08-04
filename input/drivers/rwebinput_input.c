@@ -232,7 +232,7 @@ static void rwebinput_generate_lut(void)
    key_map->rk  = RETROK_UNKNOWN;
    key_map->sym = 0;
 }
-
+/*
 static EM_BOOL rwebinput_keyboard_cb(int event_type,
    const EmscriptenKeyboardEvent *key_event, void *user_data)
 {
@@ -257,7 +257,7 @@ static EM_BOOL rwebinput_keyboard_cb(int event_type,
 
    return EM_TRUE;
 }
-
+*/
 static EM_BOOL rwebinput_mouse_cb(int event_type,
    const EmscriptenMouseEvent *mouse_event, void *user_data)
 {
@@ -300,24 +300,6 @@ static void *rwebinput_input_init(const char *joypad_driver)
 
    rwebinput_generate_lut();
 
-   r = emscripten_set_keydown_callback(
-         EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
-         rwebinput_keyboard_cb);
-   if (r != EMSCRIPTEN_RESULT_SUCCESS)
-   {
-      RARCH_ERR(
-         "[EMSCRIPTEN/INPUT] failed to create keydown callback: %d\n", r);
-   }
-
-   r = emscripten_set_keyup_callback(
-         EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
-         rwebinput_keyboard_cb);
-   if (r != EMSCRIPTEN_RESULT_SUCCESS)
-   {
-      RARCH_ERR(
-         "[EMSCRIPTEN/INPUT] failed to create keyup callback: %d\n", r);
-   }
-
    r = emscripten_set_mousedown_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, rwebinput, false,
          rwebinput_mouse_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)
@@ -355,7 +337,7 @@ static void *rwebinput_input_init(const char *joypad_driver)
 
    return rwebinput;
 }
-
+/*
 static bool rwebinput_key_pressed(rwebinput_input_t *rwebinput, int key)
 {
    if (key >= RETROK_LAST)
@@ -363,7 +345,7 @@ static bool rwebinput_key_pressed(rwebinput_input_t *rwebinput, int key)
 
    return rwebinput->keys[key];
 }
-
+*/
 static int16_t rwebinput_mouse_state(
       rwebinput_mouse_state_t *mouse,
       unsigned id, bool screen)
@@ -396,7 +378,7 @@ static int16_t rwebinput_mouse_state(
 
    return 0;
 }
-
+/*
 static int16_t rwebinput_is_pressed(
       rwebinput_input_t *rwebinput,
       const struct retro_keybind *binds,
@@ -405,7 +387,6 @@ static int16_t rwebinput_is_pressed(
 {
    const struct retro_keybind *bind = &binds[id];
    int key                          = bind->key;
-
    if ((key < RETROK_LAST) && rwebinput_key_pressed(rwebinput, key))
       if ((id == RARCH_GAME_FOCUS_TOGGLE) || !keyboard_mapping_blocked)
          return 1;
@@ -414,6 +395,80 @@ static int16_t rwebinput_is_pressed(
       return 1;
    return 0;
 }
+*/
+struct rwebinput_code_to_key
+{
+   const int id;
+   int down_1;
+   int down_2;
+   int down_3;
+   int down_4;
+};
+
+static struct rwebinput_code_to_key stuff[] =
+{
+   { 0, 0, 0, 0, 0 }, //b
+   { 1, 0, 0, 0, 0 }, //y
+   { 2, 0, 0, 0, 0 }, //select
+   { 3, 0, 0, 0, 0 }, //start
+   { 4, 0, 0, 0, 0 }, //up
+   { 5, 0, 0, 0, 0 }, //down
+   { 6, 0, 0, 0, 0 }, //left
+   { 7, 0, 0, 0, 0 }, //right
+   { 8, 0, 0, 0, 0 }, //a
+   { 9, 0, 0, 0, 0 }, //x
+   { 10, 0, 0, 0, 0 }, //l
+   { 11, 0, 0, 0, 0 }, //r
+   { 12, 0, 0, 0, 0 }, //l2
+   { 13, 0, 0, 0, 0 }, //r2
+   { 14, 0, 0, 0, 0 }, //l3
+   { 15, 0, 0, 0, 0 }, //r3
+   { 16, 0, 0, 0, 0 }, //L STICK RIGHT
+   { 17, 0, 0, 0, 0 }, //L STICK LEFT
+   { 18, 0, 0, 0, 0 }, //L STICK DOWN
+   { 19, 0, 0, 0, 0 }, //L STICK UP
+   { 20, 0, 0, 0, 0 }, //R STICK RIGHT
+   { 21, 0, 0, 0, 0 }, //R STICK LEFT
+   { 22, 0, 0, 0, 0 }, //R STICK DOWN
+   { 23, 0, 0, 0, 0 }, //R STICK UP
+};
+
+void simulate_input(int user, int key, int down)
+{
+    int i;
+    for (i=0; i<ARRAY_SIZE(stuff); i++) {
+        if (stuff[i].id == key) {
+            if (user == 0) {
+                stuff[i].down_1 = down;
+            } else if (user == 1) {
+                stuff[i].down_2 = down;
+            } else if (user == 2) {
+                stuff[i].down_3 = down;
+            } else if (user == 3) {
+                stuff[i].down_4 = down;
+            }
+            break;
+        }
+    }
+}
+
+int is_pressed_hehe(int user, int id) {
+    for (int i=0; i<ARRAY_SIZE(stuff); i++) {
+        if (stuff[i].id == id) {
+            if (user == 0) {
+                return stuff[i].down_1;
+            } else if (user == 1) {
+                return stuff[i].down_2;
+            } else if (user == 2) {
+                return stuff[i].down_3;
+            } else if (user == 3) {
+                return stuff[i].down_4;
+            }
+        }
+    }
+    return 0;
+}
+
 
 static int16_t rwebinput_input_state(
       void *data,
@@ -438,13 +493,8 @@ static int16_t rwebinput_input_state(
             int16_t ret = 0;
             for (i = 0; i < RARCH_FIRST_CUSTOM_BIND; i++)
             {
-               if (binds[port][i].valid)
-               {
-                  if (rwebinput_is_pressed(
-                           rwebinput, binds[port], port, i,
-                           keyboard_mapping_blocked))
-                     ret |= (1 << i);
-               }
+                if (is_pressed_hehe(port, i))
+                   ret |= (1 << i);
             }
 
             return ret;
@@ -452,48 +502,25 @@ static int16_t rwebinput_input_state(
 
          if (id < RARCH_BIND_LIST_END)
          {
-            if (binds[port][id].valid)
-            {
-               if (rwebinput_is_pressed(rwebinput,
-                        binds[port],
-                        port, id,
-                        keyboard_mapping_blocked))
-                  return 1;
-            }
+             if (is_pressed_hehe(port, id))
+                return 1;
          }
          break;
-      case RETRO_DEVICE_ANALOG:
-         if (binds[port])
-         {
-            int id_minus_key      = 0;
-            int id_plus_key       = 0;
+      case RETRO_DEVICE_ANALOG: {
             unsigned id_minus     = 0;
             unsigned id_plus      = 0;
             int16_t ret           = 0;
-            bool id_plus_valid    = false;
-            bool id_minus_valid   = false;
+            int rv = 0;
 
             input_conv_analog_id_to_bind_id(idx, id, id_minus, id_plus);
 
-            id_minus_valid        = binds[port][id_minus].valid;
-            id_plus_valid         = binds[port][id_plus].valid;
-            id_minus_key          = binds[port][id_minus].key;
-            id_plus_key           = binds[port][id_plus].key;
 
-            if (id_plus_valid && id_plus_key < RETROK_LAST)
-            {
-               if (rwebinput_is_pressed(rwebinput,
-                        binds[port], idx, id_plus,
-                        keyboard_mapping_blocked))
-                  ret = 0x7fff;
-            }
-            if (id_minus_valid && id_minus_key < RETROK_LAST)
-            {
-               if (rwebinput_is_pressed(rwebinput, 
-                        binds[port], idx, id_minus,
-                        keyboard_mapping_blocked))
-                  ret += -0x7fff;
-            }
+            rv = is_pressed_hehe(port, id_plus);
+            if (rv)
+               ret = rv;
+            rv = is_pressed_hehe(port, id_minus);
+            if (rv)
+               ret -= rv;
 
             return ret;
          }
@@ -584,43 +611,14 @@ static void rwebinput_process_keyboard_events(
 {
    uint32_t keycode;
    unsigned translated_keycode;
-   uint32_t character                       = 0;
-   uint16_t mod                             = 0;
    const EmscriptenKeyboardEvent *key_event = &event->event;
    bool keydown                             = 
       event->type == EMSCRIPTEN_EVENT_KEYDOWN;
-
-   /* a printable key: populate character field */
-   if (utf8len(key_event->key) == 1)
-   {
-      const char *key_ptr = &key_event->key[0];
-      character           = utf8_walk(&key_ptr);
-   }
-
-   if (key_event->ctrlKey)
-      mod |= RETROKMOD_CTRL;
-   if (key_event->altKey)
-      mod |= RETROKMOD_ALT;
-   if (key_event->shiftKey)
-      mod |= RETROKMOD_SHIFT;
-   if (key_event->metaKey)
-      mod |= RETROKMOD_META;
 
    keycode = encoding_crc32(0, (const uint8_t *)key_event->code,
       strnlen(key_event->code, sizeof(key_event->code)));
    translated_keycode = input_keymaps_translate_keysym_to_rk(keycode);
 
-   if (     translated_keycode == RETROK_BACKSPACE)
-      character = '\b';
-   else if (translated_keycode == RETROK_RETURN ||
-            translated_keycode == RETROK_KP_ENTER)
-      character = '\n';
-   else if (translated_keycode == RETROK_TAB)
-      character = '\t';
-
-   if (translated_keycode != RETROK_UNKNOWN)
-      input_keyboard_event(keydown, translated_keycode, character, mod,
-         RETRO_DEVICE_KEYBOARD);
    
    if (     translated_keycode  < RETROK_LAST 
          && translated_keycode != RETROK_UNKNOWN)

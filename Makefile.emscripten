@@ -54,7 +54,7 @@ EM_OPENGL ?= 0
 HAVE_REGAL ?= 0
 
 HAVE_OPENGLES ?= 1
-HAVE_OPENGLES3 ?= 0
+HAVE_OPENGLES3 ?= 0 #3D cores only
 
 GL_DEBUG ?= 0 # help diagnose GLSL problems (can cause errors in normal operation)
 GENERATE_SOURCEMAP ?= 0

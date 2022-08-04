@@ -75,11 +75,6 @@ void set_variable(void)
     printf("set variable called\n");
 }
 
-void simulate_input(void)
-{
-    printf("simulate input called\n");//grrrrrrrrrrr
-}
-
 void set_cheat(unsigned index, bool enabled, const char *code)
 {
     retro_cheat_set(index, enabled, code);//done
