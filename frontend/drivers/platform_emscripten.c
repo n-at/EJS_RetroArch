@@ -77,12 +77,7 @@ void set_variable(void)
 
 void simulate_input(void)
 {
-    printf("simulate input called\n");
-}
-
-void shader_enable(void)
-{
-    printf("shader_enable called\n");
+    printf("simulate input called\n");//grrrrrrrrrrr
 }
 
 void set_cheat(unsigned index, bool enabled, const char *code)

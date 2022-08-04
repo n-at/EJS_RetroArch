@@ -1441,6 +1441,15 @@ bool command_set_shader(command_t *cmd, const char *arg)
 
    return apply_shader(settings, type, arg, true);
 }
+
+void shader_enable(int enabled)
+{
+    if (enabled) {
+        command_set_shader(NULL, "/shader/shader.glslp");
+    } else {
+        command_set_shader(NULL, "");
+    }
+}
 #endif
 
 #ifdef HAVE_CONFIGFILE
