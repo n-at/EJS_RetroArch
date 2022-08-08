@@ -312,7 +312,7 @@ input_driver_t *input_drivers[] = {
    &input_qnx,
 #endif
 #ifdef EMSCRIPTEN
-   &input_rwebinput,
+   &input_emulatorjs,
 #endif
 #ifdef DJGPP
    &input_dos,

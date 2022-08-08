@@ -757,8 +757,9 @@ INPUT
 #include "../input/drivers/qnx_input.c"
 #include "../input/drivers_joypad/qnx_joypad.c"
 #elif defined(EMSCRIPTEN)
-#include "../input/drivers/rwebinput_input.c"
-#include "../input/drivers_joypad/rwebpad_joypad.c"
+//#include "../input/drivers/rwebinput_input.c"
+#include "../input/drivers/emulatorjs_input.c"
+//#include "../input/drivers_joypad/rwebpad_joypad.c"
 #elif defined(DJGPP)
 #include "../input/drivers/dos_input.c"
 #include "../input/drivers_joypad/dos_joypad.c"
