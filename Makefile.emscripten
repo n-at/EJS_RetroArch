@@ -46,6 +46,7 @@ HAVE_7ZIP = 1
 ASYNC ?= 0
 PTHREAD ?= 0
 LTO ?= 0
+WASM ?= 1
 
 DEFINES := -DRARCH_INTERNAL -DHAVE_MAIN
 DEFINES += -DHAVE_FILTERS_BUILTIN -DNO_MISSING_ASSET_WARNING -DNO_AUTO_CANVAS_RESIZE -DWEB_SCALING -DNO_CANVAS_FULLSCREEN -DNO_INITIAL_CANVAS_RESIZE
@@ -160,11 +161,17 @@ ifneq ($(V), 1)
    Q := @
 endif
 
+ifeq ($(WASM), 1)
+   LDFLAGS += -s WASM=1
+else
+   LDFLAGS += -s WASM=0
+endif
+
 ifeq ($(DEBUG), 1)
    LDFLAGS += -O0 -g
    CFLAGS += -O0 -g
 else
-   LDFLAGS += -O3 -s WASM=1
+   LDFLAGS += -O3
    # WARNING: some optimizations can break some cores (ex: LTO breaks tyrquake)
    LDFLAGS += -s PRECISE_F32=$(PRECISE_F32)
    ifeq ($(LTO), 1)
