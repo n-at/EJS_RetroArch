@@ -185,24 +185,15 @@ bool d3d9_initialize_symbols(enum gfx_ctx_api api)
 #ifdef HAVE_DYNAMIC_D3D
    if (d3d9_dylib_initialized)
       return true;
-
-#if defined(DEBUG) || defined(_DEBUG)
-   g_d3d9_dll     = dylib_load("d3d9d.dll");
-   if(!g_d3d9_dll)
-#endif
-      g_d3d9_dll  = dylib_load("d3d9.dll");
 #ifdef HAVE_D3DX
-   g_d3d9x_dll    = dylib_load_d3d9x();
-
-   if (!g_d3d9x_dll)
+   if (!(g_d3d9x_dll = dylib_load_d3d9x()))
       return false;
 #endif
-
-   if (!g_d3d9_dll)
-      return false;
+#if defined(DEBUG) || defined(_DEBUG)
+   if (!(g_d3d9_dll     = dylib_load("d3d9d.dll")))
 #endif
-
-#ifdef HAVE_DYNAMIC_D3D
+      if (!(g_d3d9_dll  = dylib_load("d3d9.dll")))
+	      return false;
    D3D9Create                 = (D3D9Create_t)dylib_proc(g_d3d9_dll, "Direct3DCreate9");
 #ifdef HAVE_D3DX
    D3D9CompileShaderFromFile  = (D3D9CompileShaderFromFile_t)dylib_proc(g_d3d9x_dll, "D3DXCompileShaderFromFile");
@@ -254,28 +245,28 @@ void d3d9_deinitialize_symbols(void)
 #endif
 }
 
-#ifdef HAVE_D3DX
-static void *d3d9_texture_new_from_file(
-      void *dev,
+void *d3d9_texture_new_from_file(void *_dev,
       const char *path, unsigned width, unsigned height,
-      unsigned miplevels, unsigned usage, D3DFORMAT format,
+      unsigned miplevels, unsigned usage, INT32 format,
       INT32 pool, unsigned filter, unsigned mipfilter,
       INT32 color_key, void *src_info_data,
-      PALETTEENTRY *palette)
+      PALETTEENTRY *palette, bool want_mipmap)
 {
-   void *buf  = NULL;
-   if (FAILED(D3D9CreateTextureFromFile((LPDIRECT3DDEVICE9)dev,
-               path, width, height, miplevels, usage, format,
+#ifdef HAVE_D3DX
+   LPDIRECT3DDEVICE9 dev = (LPDIRECT3DDEVICE9)_dev;
+   void *buf             = NULL;
+   if (SUCCEEDED(D3D9CreateTextureFromFile((LPDIRECT3DDEVICE9)dev,
+               path, width, height, miplevels, usage, (D3DFORMAT)format,
                (D3DPOOL)pool, filter, mipfilter, color_key,
                (D3DXIMAGE_INFO*)src_info_data,
                palette, (struct IDirect3DTexture9**)&buf)))
-      return NULL;
-   return buf;
-}
+      return buf;
 #endif
+   return NULL;
+}
 
 void *d3d9_texture_new(void *_dev,
-      const char *path, unsigned width, unsigned height,
+      unsigned width, unsigned height,
       unsigned miplevels, unsigned usage, INT32 format,
       INT32 pool, unsigned filter, unsigned mipfilter,
       INT32 color_key, void *src_info_data,
@@ -283,25 +274,10 @@ void *d3d9_texture_new(void *_dev,
 {
    LPDIRECT3DDEVICE9 dev = (LPDIRECT3DDEVICE9)_dev;
    void *buf             = NULL;
-
-   if (path)
-   {
-#ifdef HAVE_D3DX
-      return d3d9_texture_new_from_file(_dev,
-            path, width, height, miplevels,
-            usage, (D3DFORMAT)format,
-            (D3DPOOL)pool, filter, mipfilter,
-            color_key, src_info_data, palette);
-#else
-      return NULL;
-#endif
-   }
-
 #ifndef _XBOX
    if (want_mipmap)
       usage |= D3DUSAGE_AUTOGENMIPMAP;
 #endif
-
    if (FAILED(IDirect3DDevice9_CreateTexture(dev,
                width, height, miplevels, usage,
                (D3DFORMAT)format,
@@ -317,20 +293,12 @@ void *d3d9_vertex_buffer_new(void *_dev,
 {
    void              *buf = NULL;
    LPDIRECT3DDEVICE9 dev  = (LPDIRECT3DDEVICE9)_dev;
-
-#ifndef _XBOX
-   if (usage == 0)
-      if (IDirect3DDevice9_GetSoftwareVertexProcessing(dev))
-         usage = D3DUSAGE_SOFTWAREPROCESSING;
-#endif
-
-   if (FAILED(IDirect3DDevice9_CreateVertexBuffer(
+   if (SUCCEEDED(IDirect3DDevice9_CreateVertexBuffer(
                dev, length, usage, fvf,
                (D3DPOOL)pool,
                (LPDIRECT3DVERTEXBUFFER9*)&buf, NULL)))
-      return NULL;
-
-   return buf;
+      return buf;
+   return NULL;
 }
 
 void d3d9_vertex_buffer_free(void *vertex_data, void *vertex_declaration)
@@ -350,28 +318,6 @@ void d3d9_vertex_buffer_free(void *vertex_data, void *vertex_declaration)
       IDirect3DVertexDeclaration9_Release(vertex_decl);
       vertex_decl = NULL;
    }
-}
-
-static bool d3d9_reset_internal(void *data,
-      D3DPRESENT_PARAMETERS *d3dpp
-      )
-{
-   LPDIRECT3DDEVICE9 dev = (LPDIRECT3DDEVICE9)data;
-   if (dev &&
-         IDirect3DDevice9_Reset(dev, d3dpp) == D3D_OK)
-      return true;
-
-   return false;
-}
-
-static HRESULT d3d9_test_cooperative_level(void *data)
-{
-#ifndef _XBOX
-   LPDIRECT3DDEVICE9 dev = (LPDIRECT3DDEVICE9)data;
-   if (dev)
-      return IDirect3DDevice9_TestCooperativeLevel(dev);
-#endif
-   return E_FAIL;
 }
 
 static bool d3d9_create_device_internal(
@@ -418,18 +364,16 @@ bool d3d9_create_device(void *dev,
    return true;
 }
 
-bool d3d9_reset(void *dev, void *d3dpp)
+bool d3d9_reset(void *data, void *d3dpp)
 {
-   const char *err = NULL;
-
-   if (d3d9_reset_internal(dev, (D3DPRESENT_PARAMETERS*)d3dpp))
+   const char       *err = NULL;
+   LPDIRECT3DDEVICE9 dev = (LPDIRECT3DDEVICE9)data;
+   if (dev && IDirect3DDevice9_Reset(dev, (D3DPRESENT_PARAMETERS*)d3dpp) == D3D_OK)
       return true;
-
-   RARCH_WARN("[D3D]: Attempting to recover from dead state...\n");
-
 #ifndef _XBOX
+   RARCH_WARN("[D3D]: Attempting to recover from dead state...\n");
    /* Try to recreate the device completely. */
-   switch (d3d9_test_cooperative_level(dev))
+   switch (IDirect3DDevice9_TestCooperativeLevel(dev))
    {
       case D3DERR_DEVICELOST:
          err = "DEVICELOST";
@@ -448,7 +392,6 @@ bool d3d9_reset(void *dev, void *d3dpp)
    }
    RARCH_WARN("[D3D]: recovering from dead state: (%s).\n", err);
 #endif
-
    return false;
 }
 
@@ -464,17 +407,6 @@ bool d3d9x_create_font_indirect(void *_dev,
 #endif
 
    return false;
-}
-
-void d3d9x_buffer_release(void *data)
-{
-#ifdef HAVE_D3DX
-   LPD3DXBUFFER p = (LPD3DXBUFFER)data;
-   if (!p)
-      return;
-
-   p->lpVtbl->Release(p);
-#endif
 }
 
 bool d3d9x_compile_shader(
@@ -565,16 +497,6 @@ bool d3d9x_compile_shader_from_file(
    return false;
 }
 
-const void *d3d9x_get_buffer_ptr(void *data)
-{
-#if defined(HAVE_D3DX)
-   ID3DXBuffer *listing = (ID3DXBuffer*)data;
-   if (listing)
-      return listing->lpVtbl->GetBufferPointer(listing);
-#endif
-   return NULL;
-}
-
 void *d3d9x_constant_table_get_constant_by_name(void *_tbl,
       void *_handle, void *_name)
 {
@@ -649,120 +571,15 @@ static bool d3d9_is_windowed_enable(bool info_fullscreen)
    return false;
 }
 
-static D3DFORMAT d3d9_get_color_format_backbuffer(bool rgb32, bool windowed)
+static D3DFORMAT d3d9_get_color_format_backbuffer(bool rgb32)
 {
    if (rgb32)
       return D3DFMT_X8R8G8B8;
-   return d3d9_get_rgb565_format();
+   return D3D9_RGB565_FORMAT;
 }
 
 bool d3d9_has_windowed(void *data) { return false; }
-#else
-static bool d3d9_is_windowed_enable(bool info_fullscreen)
-{
-   settings_t *settings = config_get_ptr();
-   if (!info_fullscreen)
-      return true;
-   if (settings)
-      return settings->bools.video_windowed_fullscreen;
-   return false;
-}
 
-static D3DFORMAT d3d9_get_color_format_backbuffer(bool rgb32, bool windowed)
-{
-   if (windowed)
-   {
-      D3DDISPLAYMODE display_mode;
-      if (d3d9_get_adapter_display_mode(g_pD3D9, 0, &display_mode))
-         return display_mode.Format;
-   }
-   return D3DFMT_X8R8G8B8;
-}
-
-bool d3d9_has_windowed(void *data) { return true; }
-#endif
-
-void d3d9_make_d3dpp(d3d9_video_t *d3d,
-      const video_info_t *info, void *_d3dpp)
-{
-   D3DPRESENT_PARAMETERS *d3dpp   = (D3DPRESENT_PARAMETERS*)_d3dpp;
-#ifdef _XBOX
-   /* TODO/FIXME - get rid of global state dependencies. */
-   global_t *global               = global_get_ptr();
-   int gamma_enable               = global ?
-      global->console.screen.gamma_correction : 0;
-#endif
-   bool windowed_enable           = d3d9_is_windowed_enable(info->fullscreen);
-
-   memset(d3dpp, 0, sizeof(*d3dpp));
-
-   d3dpp->Windowed                = windowed_enable;
-   FS_PRESENTINTERVAL(d3dpp)      = D3DPRESENT_INTERVAL_IMMEDIATE;
-
-   if (info->vsync)
-   {
-      settings_t *settings         = config_get_ptr();
-      unsigned video_swap_interval = settings->uints.video_swap_interval;
-
-      switch (video_swap_interval)
-      {
-         default:
-         case 1:
-            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_ONE;
-            break;
-         case 2:
-            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_TWO;
-            break;
-         case 3:
-            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_THREE;
-            break;
-         case 4:
-            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_FOUR;
-            break;
-      }
-   }
-
-   d3dpp->SwapEffect              = D3DSWAPEFFECT_DISCARD;
-   d3dpp->BackBufferCount         = 2;
-   d3dpp->BackBufferFormat        = d3d9_get_color_format_backbuffer(
-         info->rgb32, windowed_enable);
-
-#ifdef _XBOX
-   d3dpp->FrontBufferFormat       = d3d9_get_color_format_front_buffer();
-
-   if (gamma_enable)
-   {
-      d3dpp->BackBufferFormat     = (D3DFORMAT)MAKESRGBFMT(
-            d3dpp->BackBufferFormat);
-      d3dpp->FrontBufferFormat    = (D3DFORMAT)MAKESRGBFMT(
-            d3dpp->FrontBufferFormat);
-   }
-#else
-   d3dpp->hDeviceWindow           = win32_get_window();
-#endif
-
-   if (!windowed_enable)
-   {
-#ifdef _XBOX
-      unsigned width  = 0;
-      unsigned height = 0;
-      d3d9_get_video_size(d3d, &width, &height);
-      video_driver_set_size(width, height);
-#endif
-      video_driver_get_size(&d3dpp->BackBufferWidth,
-            &d3dpp->BackBufferHeight);
-   }
-
-#ifdef _XBOX
-   d3dpp->MultiSampleType         = D3DMULTISAMPLE_NONE;
-   d3dpp->EnableAutoDepthStencil  = FALSE;
-   if (!d3d->widescreen_mode)
-      d3dpp->Flags |= D3DPRESENTFLAG_NO_LETTERBOX;
-   d3dpp->MultiSampleQuality      = 0;
-#endif
-}
-
-#ifdef _XBOX
 static void d3d9_get_video_size(d3d9_video_t *d3d,
       unsigned *width, unsigned *height)
 {
@@ -794,7 +611,115 @@ static D3DFORMAT d3d9_get_color_format_front_buffer(void)
 {
    return D3DFMT_LE_X8R8G8B8;
 }
+#else
+static bool d3d9_is_windowed_enable(bool info_fullscreen)
+{
+   settings_t *settings = config_get_ptr();
+   if (!info_fullscreen)
+      return true;
+   if (settings)
+      return settings->bools.video_windowed_fullscreen;
+   return false;
+}
+
+static D3DFORMAT d3d9_get_color_format_backbuffer(
+      bool rgb32, bool windowed)
+{
+   if (windowed)
+   {
+      D3DDISPLAYMODE display_mode;
+      if (IDirect3D9_GetAdapterDisplayMode(g_pD3D9, 0, &display_mode))
+         return display_mode.Format;
+   }
+   return D3DFMT_X8R8G8B8;
+}
+
+bool d3d9_has_windowed(void *data) { return true; }
 #endif
+
+void d3d9_make_d3dpp(d3d9_video_t *d3d,
+      const video_info_t *info, void *_d3dpp)
+{
+   D3DPRESENT_PARAMETERS *d3dpp   = (D3DPRESENT_PARAMETERS*)_d3dpp;
+#ifdef _XBOX
+   /* TODO/FIXME - get rid of global state dependencies. */
+   global_t *global               = global_get_ptr();
+   int gamma_enable               = global ?
+      global->console.screen.gamma_correction : 0;
+#endif
+   bool windowed_enable           = d3d9_is_windowed_enable(info->fullscreen);
+
+   memset(d3dpp, 0, sizeof(*d3dpp));
+
+   d3dpp->Windowed                = windowed_enable;
+   FS_PRESENTINTERVAL(d3dpp)      = D3DPRESENT_INTERVAL_IMMEDIATE;
+
+   if (info->vsync)
+   {
+      settings_t *settings         = config_get_ptr();
+      unsigned video_swap_interval = runloop_get_video_swap_interval(
+            settings->uints.video_swap_interval);
+
+      switch (video_swap_interval)
+      {
+         default:
+         case 1:
+            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_ONE;
+            break;
+         case 2:
+            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_TWO;
+            break;
+         case 3:
+            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_THREE;
+            break;
+         case 4:
+            FS_PRESENTINTERVAL(d3dpp) = D3DPRESENT_INTERVAL_FOUR;
+            break;
+      }
+   }
+
+   d3dpp->SwapEffect              = D3DSWAPEFFECT_DISCARD;
+   d3dpp->BackBufferCount         = 2;
+
+#ifdef _XBOX
+   d3dpp->BackBufferFormat        = d3d9_get_color_format_backbuffer(
+         info->rgb32);
+   d3dpp->FrontBufferFormat       = d3d9_get_color_format_front_buffer();
+
+   if (gamma_enable)
+   {
+      d3dpp->BackBufferFormat     = (D3DFORMAT)MAKESRGBFMT(
+            d3dpp->BackBufferFormat);
+      d3dpp->FrontBufferFormat    = (D3DFORMAT)MAKESRGBFMT(
+            d3dpp->FrontBufferFormat);
+   }
+#else
+   d3dpp->BackBufferFormat        = d3d9_get_color_format_backbuffer(
+         info->rgb32, windowed_enable);
+   d3dpp->hDeviceWindow           = win32_get_window();
+#endif
+
+   if (!windowed_enable)
+   {
+#ifdef _XBOX
+      unsigned width  = 0;
+      unsigned height = 0;
+      d3d9_get_video_size(d3d, &width, &height);
+      video_driver_set_size(width, height);
+#endif
+      video_driver_get_size(&d3dpp->BackBufferWidth,
+            &d3dpp->BackBufferHeight);
+   }
+
+#ifdef _XBOX
+   d3dpp->MultiSampleType         = D3DMULTISAMPLE_NONE;
+   d3dpp->EnableAutoDepthStencil  = FALSE;
+   if (!d3d->widescreen_mode)
+      d3dpp->Flags |= D3DPRESENTFLAG_NO_LETTERBOX;
+   d3dpp->MultiSampleQuality      = 0;
+#endif
+}
+
 
 void d3d9_log_info(const struct LinkInfo *info)
 {
@@ -1000,7 +925,6 @@ void d3d9_set_viewport(void *data,
    d3d9_set_font_rect(d3d, NULL);
 }
 
-
 #if defined(HAVE_MENU) || defined(HAVE_OVERLAY)
 void d3d9_overlay_render(d3d9_video_t *d3d,
       unsigned width,
@@ -1134,15 +1058,6 @@ void d3d9_free_overlay(d3d9_video_t *d3d, overlay_t *overlay)
 }
 #endif
 
-bool d3d9_suppress_screensaver(void *data, bool enable)
-{
-#ifdef _XBOX
-   return true;
-#else
-   return win32_suppress_screensaver(data, enable);
-#endif
-}
-
 void d3d9_set_aspect_ratio(void *data, unsigned aspect_ratio_idx)
 {
    d3d9_video_t *d3d = (d3d9_video_t*)data;
@@ -1193,9 +1108,9 @@ void d3d9_set_menu_texture_frame(void *data,
    {
       IDirect3DTexture9_Release((LPDIRECT3DTEXTURE9)d3d->menu->tex);
 
-      d3d->menu->tex = d3d9_texture_new(d3d->dev, NULL,
+      d3d->menu->tex = d3d9_texture_new(d3d->dev,
             width, height, 1,
-            0, d3d9_get_argb8888_format(),
+            0, D3D9_ARGB8888_FORMAT,
             D3DPOOL_MANAGED, 0, 0, 0, NULL, NULL, false);
 
       if (!d3d->menu->tex)
@@ -1285,9 +1200,9 @@ static void d3d9_video_texture_load_d3d(
       (info->type == TEXTURE_FILTER_MIPMAP_NEAREST))
       want_mipmap        = true;
 
-   tex = (LPDIRECT3DTEXTURE9)d3d9_texture_new(d3d->dev, NULL,
+   tex = (LPDIRECT3DTEXTURE9)d3d9_texture_new(d3d->dev,
                ti->width, ti->height, 0,
-               usage, d3d9_get_argb8888_format(),
+               usage, D3D9_ARGB8888_FORMAT,
                D3DPOOL_MANAGED, 0, 0, 0,
                NULL, NULL, want_mipmap);
 
@@ -1360,6 +1275,19 @@ void d3d9_set_video_mode(void *data,
 #endif
 }
 
+static INLINE bool d3d9_device_get_render_target_data(
+      LPDIRECT3DDEVICE9 dev,
+      LPDIRECT3DSURFACE9 src, LPDIRECT3DSURFACE9 dst)
+{
+#ifndef _XBOX
+   if (dev &&
+         SUCCEEDED(IDirect3DDevice9_GetRenderTargetData(
+               dev, src, dst)))
+      return true;
+#endif
+   return false;
+}
+
 bool d3d9_read_viewport(void *data, uint8_t *buffer, bool is_idle)
 {
    unsigned width, height;
@@ -1375,7 +1303,7 @@ bool d3d9_read_viewport(void *data, uint8_t *buffer, bool is_idle)
    if (
          !d3d9_device_get_render_target(d3dr, 0, (void**)&target)     ||
          !d3d9_device_create_offscreen_plain_surface(d3dr, width, height,
-            d3d9_get_xrgb8888_format(),
+            D3D9_XRGB8888_FORMAT,
             D3DPOOL_SYSTEMMEM, (void**)&dest, NULL) ||
          !d3d9_device_get_render_target_data(d3dr, target, dest)
          )
@@ -1607,10 +1535,10 @@ static bool d3d9_overlay_load(void *data,
       unsigned height    = images[i].height;
       overlay_t *overlay = (overlay_t*)&d3d->overlays[i];
 
-      overlay->tex       = d3d9_texture_new(d3d->dev, NULL,
+      overlay->tex       = d3d9_texture_new(d3d->dev,
                   width, height, 1,
                   0,
-                  d3d9_get_argb8888_format(),
+                  D3D9_ARGB8888_FORMAT,
                   D3DPOOL_MANAGED, 0, 0, 0,
                   NULL, NULL, false);
 

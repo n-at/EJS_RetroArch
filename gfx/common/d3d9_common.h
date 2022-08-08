@@ -31,6 +31,17 @@
    { (WORD)(stream), (WORD)(offset * sizeof(float)), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, \
       D3DDECLUSAGE_TEXCOORD, (BYTE)(index) }
 
+#ifdef _XBOX
+#define D3D9_RGB565_FORMAT D3DFMT_LIN_R5G6B5
+#define D3D9_ARGB8888_FORMAT D3DFMT_LIN_A8R8G8B8
+#define D3D9_XRGB8888_FORMAT D3DFMT_LIN_X8R8G8B8
+#else
+#define D3D9_RGB565_FORMAT D3DFMT_R5G6B5
+#define D3D9_ARGB8888_FORMAT D3DFMT_A8R8G8B8
+#define D3D9_XRGB8888_FORMAT D3DFMT_X8R8G8B8
+#endif
+
+
 RETRO_BEGIN_DECLS
 
 typedef struct d3d9_video d3d9_video_t;
@@ -89,42 +100,19 @@ void *d3d9_vertex_buffer_new(void *dev,
 
 void d3d9_vertex_buffer_free(void *vertex_data, void *vertex_declaration);
 
-static INLINE bool d3d9_texture_get_surface_level(
-      LPDIRECT3DTEXTURE9 tex,
-      unsigned idx, void **_ppsurface_level)
-{
-   if (tex &&
-         SUCCEEDED(IDirect3DTexture9_GetSurfaceLevel(
-               tex, idx, (IDirect3DSurface9**)_ppsurface_level)))
-      return true;
-   return false;
-}
-
 void *d3d9_texture_new(void *dev,
-      const char *path, unsigned width, unsigned height,
+      unsigned width, unsigned height,
       unsigned miplevels, unsigned usage, INT32 format,
       INT32 pool, unsigned filter, unsigned mipfilter,
       INT32 color_key, void *src_info,
       PALETTEENTRY *palette, bool want_mipmap);
 
-static INLINE bool d3d9_create_vertex_shader(
-      LPDIRECT3DDEVICE9 dev, const DWORD *a, void **b)
-{
-   if (dev && IDirect3DDevice9_CreateVertexShader(dev, a,
-            (LPDIRECT3DVERTEXSHADER9*)b) == D3D_OK)
-      return true;
-   return false;
-}
-
-static INLINE bool d3d9_create_pixel_shader(
-      LPDIRECT3DDEVICE9 dev, const DWORD *a, void **b)
-{
-   if (dev &&
-         IDirect3DDevice9_CreatePixelShader(dev, a,
-            (LPDIRECT3DPIXELSHADER9*)b) == D3D_OK)
-      return true;
-   return false;
-}
+void *d3d9_texture_new_from_file(void *dev,
+      const char *path, unsigned width, unsigned height,
+      unsigned miplevels, unsigned usage, INT32 format,
+      INT32 pool, unsigned filter, unsigned mipfilter,
+      INT32 color_key, void *src_info,
+      PALETTEENTRY *palette, bool want_mipmap);
 
 static INLINE bool d3d9_vertex_declaration_new(
       LPDIRECT3DDEVICE9 dev,
@@ -136,22 +124,6 @@ static INLINE bool d3d9_vertex_declaration_new(
    if (SUCCEEDED(IDirect3DDevice9_CreateVertexDeclaration(dev,
                vertex_elements, (IDirect3DVertexDeclaration9**)vertex_decl)))
       return true;
-
-   return false;
-}
-
-void d3d9_frame_postprocess(void *data);
-
-static INLINE bool d3d9_device_get_render_target_data(
-      LPDIRECT3DDEVICE9 dev,
-      LPDIRECT3DSURFACE9 src, LPDIRECT3DSURFACE9 dst)
-{
-#ifndef _XBOX
-   if (dev &&
-         SUCCEEDED(IDirect3DDevice9_GetRenderTargetData(
-               dev, src, dst)))
-      return true;
-#endif
 
    return false;
 }
@@ -187,23 +159,6 @@ static INLINE bool d3d9_device_create_offscreen_plain_surface(
    return false;
 }
 
-static INLINE bool d3d9_get_adapter_display_mode(
-      LPDIRECT3D9 d3d,
-      unsigned idx,
-      D3DDISPLAYMODE *display_mode)
-{
-   if (!d3d)
-      return false;
-#ifndef _XBOX
-   if (FAILED(
-            IDirect3D9_GetAdapterDisplayMode(
-               d3d, idx, display_mode)))
-      return false;
-#endif
-
-   return true;
-}
-
 bool d3d9_create_device(void *dev,
       void *d3dpp,
       void *d3d,
@@ -212,37 +167,11 @@ bool d3d9_create_device(void *dev,
 
 bool d3d9_reset(void *dev, void *d3dpp);
 
-static INLINE void d3d9_device_free(LPDIRECT3DDEVICE9 dev, LPDIRECT3D9 pd3d)
-{
-   if (dev)
-      IDirect3DDevice9_Release(dev);
-   if (pd3d)
-      IDirect3D9_Release(pd3d);
-}
-
 void *d3d9_create(void);
 
 bool d3d9_initialize_symbols(enum gfx_ctx_api api);
 
 void d3d9_deinitialize_symbols(void);
-
-static INLINE bool d3d9_check_device_type(
-      LPDIRECT3D9 d3d,
-      unsigned idx,
-      INT32 disp_format,
-      INT32 backbuffer_format,
-      bool windowed_mode)
-{
-   if (d3d &&
-         SUCCEEDED(IDirect3D9_CheckDeviceType(d3d,
-               0,
-               D3DDEVTYPE_HAL,
-               (D3DFORMAT)disp_format,
-               (D3DFORMAT)backbuffer_format,
-               windowed_mode)))
-      return true;
-   return false;
-}
 
 bool d3d9x_create_font_indirect(void *dev,
       void *desc, void **font_data);
@@ -251,8 +180,6 @@ void d3d9x_font_draw_text(void *data, void *sprite_data, void *string_data,
       unsigned count, void *rect_data, unsigned format, unsigned color);
 
 void d3d9x_font_get_text_metrics(void *data, void *metrics);
-
-void d3d9x_buffer_release(void *data);
 
 void d3d9x_font_release(void *data);
 
@@ -288,82 +215,11 @@ void d3d9x_constant_table_set_defaults(LPDIRECT3DDEVICE9 dev,
 void d3d9x_constant_table_set_matrix(LPDIRECT3DDEVICE9 dev,
       void *p, void *data, const void *matrix);
 
-const void *d3d9x_get_buffer_ptr(void *data);
-
 const bool d3d9x_constant_table_set_float(void *p,
       void *a, void *b, float val);
 
 void *d3d9x_constant_table_get_constant_by_name(void *_tbl,
       void *_handle, void *_name);
-
-static INLINE INT32 d3d9_get_rgb565_format(void)
-{
-#ifdef _XBOX
-   return D3DFMT_LIN_R5G6B5;
-#else
-   return D3DFMT_R5G6B5;
-#endif
-}
-
-static INLINE INT32 d3d9_get_argb8888_format(void)
-{
-#ifdef _XBOX
-   return D3DFMT_LIN_A8R8G8B8;
-#else
-   return D3DFMT_A8R8G8B8;
-#endif
-}
-
-static INLINE INT32 d3d9_get_xrgb8888_format(void)
-{
-#ifdef _XBOX
-   return D3DFMT_LIN_X8R8G8B8;
-#else
-   return D3DFMT_X8R8G8B8;
-#endif
-}
-
-static INLINE void d3d9_convert_geometry(
-      const struct LinkInfo *info,
-      unsigned *out_width,
-      unsigned *out_height,
-      unsigned width,
-      unsigned height,
-      D3DVIEWPORT9 *final_viewport)
-{
-   if (!info)
-      return;
-
-   switch (info->pass->fbo.type_x)
-   {
-      case RARCH_SCALE_VIEWPORT:
-         *out_width = info->pass->fbo.scale_x * final_viewport->Width;
-         break;
-
-      case RARCH_SCALE_ABSOLUTE:
-         *out_width = info->pass->fbo.abs_x;
-         break;
-
-      case RARCH_SCALE_INPUT:
-         *out_width = info->pass->fbo.scale_x * width;
-         break;
-   }
-
-   switch (info->pass->fbo.type_y)
-   {
-      case RARCH_SCALE_VIEWPORT:
-         *out_height = info->pass->fbo.scale_y * final_viewport->Height;
-         break;
-
-      case RARCH_SCALE_ABSOLUTE:
-         *out_height = info->pass->fbo.abs_y;
-         break;
-
-      case RARCH_SCALE_INPUT:
-         *out_height = info->pass->fbo.scale_y * height;
-         break;
-   }
-}
 
 void d3d9_make_d3dpp(d3d9_video_t *d3d,
       const video_info_t *info, void *_d3dpp);
@@ -376,10 +232,6 @@ void d3d9_calculate_rect(d3d9_video_t *d3d,
 
 void d3d9_log_info(const struct LinkInfo *info);
 
-#ifdef HAVE_OVERLAY
-void d3d9_free_overlays(d3d9_video_t *d3d);
-#endif
-
 #if defined(HAVE_MENU) || defined(HAVE_OVERLAY)
 void d3d9_free_overlay(d3d9_video_t *d3d, overlay_t *overlay);
 
@@ -390,6 +242,7 @@ void d3d9_overlay_render(d3d9_video_t *d3d,
 #endif
 
 #if defined(HAVE_OVERLAY)
+void d3d9_free_overlays(d3d9_video_t *d3d);
 void d3d9_get_overlay_interface(void *data,
       const video_overlay_interface_t **iface);
 #endif
@@ -401,8 +254,6 @@ void d3d9_viewport_info(void *data, struct video_viewport *vp);
 bool d3d9_read_viewport(void *data, uint8_t *buffer, bool is_idle);
 
 bool d3d9_has_windowed(void *data);
-
-bool d3d9_suppress_screensaver(void *data, bool enable);
 
 bool d3d9_process_shader(d3d9_video_t *d3d);
 

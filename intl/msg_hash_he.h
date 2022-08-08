@@ -191,10 +191,6 @@ MSG_HASH(
    "מאפייני מעבד"
    )
 MSG_HASH( /* FIXME Colon should be handled in menu_display.c like the rest */
-   MENU_ENUM_LABEL_VALUE_CPU_ARCHITECTURE,
-   "ארכיטקטורת מעבד:"
-   )
-MSG_HASH( /* FIXME Colon should be handled in menu_display.c like the rest */
    MENU_ENUM_LABEL_VALUE_CPU_CORES,
    "ליבות מעבד:"
    )
@@ -487,6 +483,7 @@ MSG_HASH(
 
 
 /* Settings > Input > Menu Controls */
+
 
 
 /* Settings > Input > Hotkeys */
@@ -869,6 +866,7 @@ MSG_HASH( /* FIXME Seems related to MENU_ENUM_LABEL_VALUE_CORE_ASSETS_DIRECTORY,
 
 
 /* Notifications */
+
 
 
 /* Lakka */

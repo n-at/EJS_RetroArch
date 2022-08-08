@@ -507,10 +507,6 @@ MSG_HASH(
    "CPU funktioner"
    )
 MSG_HASH( /* FIXME Colon should be handled in menu_display.c like the rest */
-   MENU_ENUM_LABEL_VALUE_CPU_ARCHITECTURE,
-   "CPU arkitektur:"
-   )
-MSG_HASH( /* FIXME Colon should be handled in menu_display.c like the rest */
    MENU_ENUM_LABEL_VALUE_CPU_CORES,
    "CPU kerner:"
    )
@@ -1057,6 +1053,7 @@ MSG_HASH(
 /* Settings > Input > Menu Controls */
 
 
+
 /* Settings > Input > Hotkeys */
 
 MSG_HASH(
@@ -1433,6 +1430,7 @@ MSG_HASH(
 
 
 /* Notifications */
+
 
 
 /* Lakka */

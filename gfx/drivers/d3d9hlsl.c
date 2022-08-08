@@ -155,21 +155,25 @@ static bool d3d9_hlsl_load_program_from_file(
       goto error;
    }
 
-   d3d9_create_pixel_shader(dev,  (const DWORD*)d3d9x_get_buffer_ptr(code_f),  (void**)&pass->fprg);
-   d3d9_create_vertex_shader(dev, (const DWORD*)d3d9x_get_buffer_ptr(code_v), (void**)&pass->vprg);
-   d3d9x_buffer_release((void*)code_f);
-   d3d9x_buffer_release((void*)code_v);
+   IDirect3DDevice9_CreatePixelShader(dev,
+         (const DWORD*)code_f->lpVtbl->GetBufferPointer(code_f),
+         (LPDIRECT3DPIXELSHADER9*)&pass->fprg);
+   IDirect3DDevice9_CreateVertexShader(dev,
+         (const DWORD*)code_v->lpVtbl->GetBufferPointer(code_v),
+         (LPDIRECT3DVERTEXSHADER9*)&pass->vprg);
+   code_f->lpVtbl->Release(code_f);
+   code_v->lpVtbl->Release(code_v);
 
    return true;
 
 error:
    RARCH_ERR("Cg/HLSL error:\n");
    if (listing_f)
-      RARCH_ERR("Fragment:\n%s\n", (char*)d3d9x_get_buffer_ptr(listing_f));
+      RARCH_ERR("Fragment:\n%s\n", (char*)listing_f->lpVtbl->GetBufferPointer(listing_f));
    if (listing_v)
-      RARCH_ERR("Vertex:\n%s\n", (char*)d3d9x_get_buffer_ptr(listing_v));
-   d3d9x_buffer_release((void*)listing_f);
-   d3d9x_buffer_release((void*)listing_v);
+      RARCH_ERR("Vertex:\n%s\n", (char*)listing_v->lpVtbl->GetBufferPointer(listing_v));
+   listing_f->lpVtbl->Release(listing_f);
+   listing_v->lpVtbl->Release(listing_v);
 
    return false;
 }
@@ -199,21 +203,25 @@ static bool d3d9_hlsl_load_program(
       goto error;
    }
 
-   d3d9_create_pixel_shader(dev,  (const DWORD*)d3d9x_get_buffer_ptr(code_f),  (void**)&pass->fprg);
-   d3d9_create_vertex_shader(dev, (const DWORD*)d3d9x_get_buffer_ptr(code_v), (void**)&pass->vprg);
-   d3d9x_buffer_release((void*)code_f);
-   d3d9x_buffer_release((void*)code_v);
+   IDirect3DDevice9_CreatePixelShader(dev,
+         (const DWORD*)code_f->lpVtbl->GetBufferPointer(code_f),
+         (LPDIRECT3DPIXELSHADER9*)&pass->fprg);
+   IDirect3DDevice9_CreateVertexShader(dev,
+         (const DWORD*)code_v->lpVtbl->GetBufferPointer(code_v),
+         (LPDIRECT3DVERTEXSHADER9*)&pass->vprg);
+   code_f->lpVtbl->Release(code_f);
+   code_v->lpVtbl->Release(code_v);
 
    return true;
 
 error:
    RARCH_ERR("Cg/HLSL error:\n");
    if (listing_f)
-      RARCH_ERR("Fragment:\n%s\n", (char*)d3d9x_get_buffer_ptr(listing_f));
+      RARCH_ERR("Fragment:\n%s\n", (char*)listing_f->lpVtbl->GetBufferPointer(listing_f));
    if (listing_v)
-      RARCH_ERR("Vertex:\n%s\n", (char*)d3d9x_get_buffer_ptr(listing_v));
-   d3d9x_buffer_release((void*)listing_f);
-   d3d9x_buffer_release((void*)listing_v);
+      RARCH_ERR("Vertex:\n%s\n", (char*)listing_v->lpVtbl->GetBufferPointer(listing_v));
+   listing_f->lpVtbl->Release(listing_f);
+   listing_v->lpVtbl->Release(listing_v);
 
    return false;
 }
@@ -230,8 +238,8 @@ static void hlsl_d3d9_renderchain_set_shader_params(
    float video_size[2];
    float texture_size[2];
    float output_size[2];
-   void *fprg                               = pass->ftable;
-   void *vprg                               = pass->vtable;
+   LPD3DXCONSTANTTABLE fprg                 = (LPD3DXCONSTANTTABLE)pass->ftable;
+   LPD3DXCONSTANTTABLE vprg                 = (LPD3DXCONSTANTTABLE)pass->vtable;
 
    video_size[0]                            = video_w;
    video_size[1]                            = video_h;
@@ -289,8 +297,8 @@ static bool hlsl_d3d9_renderchain_create_first_pass(
    struct shader_pass pass       = { 0 };
    unsigned fmt                  =
         (_fmt == RETRO_PIXEL_FORMAT_RGB565) 
-      ? d3d9_get_rgb565_format()
-      : d3d9_get_xrgb8888_format();
+      ? D3D9_RGB565_FORMAT
+      : D3D9_XRGB8888_FORMAT;
 
    pass.info                     = *info;
    pass.last_width               = 0;
@@ -314,7 +322,7 @@ static bool hlsl_d3d9_renderchain_create_first_pass(
          return false;
 
       chain->prev.tex[i] = (LPDIRECT3DTEXTURE9)
-         d3d9_texture_new(chain->dev, NULL,
+         d3d9_texture_new(chain->dev,
             info->tex_w, info->tex_h, 1, 0, fmt,
             D3DPOOL_MANAGED, 0, 0, 0, NULL, NULL, false);
 
@@ -346,13 +354,15 @@ static void hlsl_d3d9_renderchain_calc_and_set_shader_mvp(
 {
    struct d3d_matrix proj, ortho, rot, matrix;
 
+   d3d_matrix_identity(&ortho);
    d3d_matrix_ortho_off_center_lh(&ortho, 0,
          vp_width, 0, vp_height, 0, 1);
+   d3d_matrix_identity(&rot);
    d3d_matrix_rotation_z(&rot, rotation * (D3D_PI / 2.0));
    d3d_matrix_multiply(&proj, &ortho, &rot);
    d3d_matrix_transpose(&matrix, &proj);
 
-   d3d9_hlsl_set_param_matrix(pass->vtable,
+   d3d9_hlsl_set_param_matrix((LPD3DXCONSTANTTABLE)pass->vtable,
          chain->chain.dev, "modelViewProj", (const void*)&matrix);
 }
 
@@ -507,22 +517,13 @@ static void hlsl_d3d9_renderchain_free(void *data)
 
 static bool hlsl_d3d9_renderchain_init(
       d3d9_video_t *d3d,
+      hlsl_renderchain_t *chain,
       LPDIRECT3DDEVICE9 dev,
       const D3DVIEWPORT9 *final_viewport,
       const struct LinkInfo *info,
-      bool rgb32
+      unsigned fmt
       )
 {
-   hlsl_renderchain_t *chain                = (hlsl_renderchain_t*)
-      d3d->renderchain_data;
-   unsigned fmt                             = (rgb32)
-      ? RETRO_PIXEL_FORMAT_XRGB8888 : RETRO_PIXEL_FORMAT_RGB565;
-
-   if (!chain)
-      return false;
-
-   RARCH_LOG("[D3D9]: Using HLSL shader backend.\n");
-
    chain->chain.dev                         = dev;
    chain->chain.final_viewport              = (D3DVIEWPORT9*)final_viewport;
    chain->chain.frame_count                 = 0;
@@ -683,8 +684,8 @@ static void hlsl_d3d9_renderchain_render(
       struct shader_pass *to_pass    = (struct shader_pass*)
          &chain->chain.passes->data[i + 1];
 
-      d3d9_texture_get_surface_level(to_pass->tex, 0, (void**)&target);
-
+      IDirect3DTexture9_GetSurfaceLevel(
+		      (LPDIRECT3DTEXTURE9)to_pass->tex, 0, (IDirect3DSurface9**)&target);
       IDirect3DDevice9_SetRenderTarget(chain->chain.dev, 0, target);
 
       d3d9_convert_geometry(&from_pass->info,
@@ -878,11 +879,16 @@ static bool d3d9_hlsl_init_chain(d3d9_video_t *d3d,
    if (!d3d->renderchain_data)
       return false;
 
+   RARCH_LOG("[D3D9]: Using HLSL shader backend.\n");
+
    if (
          !hlsl_d3d9_renderchain_init(
-            d3d,
+            d3d, (hlsl_renderchain_t*)d3d->renderchain_data,
             d3d->dev, &d3d->final_viewport, &link_info,
-            rgb32)
+            rgb32
+            ? RETRO_PIXEL_FORMAT_XRGB8888 
+            : RETRO_PIXEL_FORMAT_RGB565
+            )
       )
       return false;
 
@@ -909,7 +915,7 @@ static bool d3d9_hlsl_init_chain(d3d9_video_t *d3d,
       current_height  = out_height;
 
       if (!hlsl_d3d9_renderchain_add_pass(
-               d3d->renderchain_data, &link_info))
+               (hlsl_renderchain_t*)d3d->renderchain_data, &link_info))
       {
          RARCH_ERR("[D3D9]: Failed to add pass.\n");
          return false;
@@ -966,7 +972,7 @@ static bool d3d9_hlsl_initialize(
       if (!d3d9_reset(d3d->dev, &d3dpp))
       {
          d3d9_hlsl_deinitialize(d3d);
-         d3d9_device_free(NULL, g_pD3D9);
+         IDirect3D9_Release(g_pD3D9);
          g_pD3D9 = NULL;
 
          ret     = d3d9_hlsl_init_base(d3d, info);
@@ -1027,6 +1033,7 @@ static bool d3d9_hlsl_initialize(
    if (!d3d->menu_display.buffer)
       return false;
 
+   d3d_matrix_identity(&d3d->mvp_transposed);
    d3d_matrix_ortho_off_center_lh(&d3d->mvp_transposed, 0, 1, 0, 1, 0, 1);
    d3d_matrix_transpose(&d3d->mvp, &d3d->mvp_transposed);
 
@@ -1277,8 +1284,9 @@ static void d3d9_hlsl_free(void *data)
    if (!string_is_empty(d3d->shader_path))
       free(d3d->shader_path);
 
+   IDirect3DDevice9_Release(d3d->dev);
+   IDirect3D9_Release(g_pD3D9);
    d3d->shader_path = NULL;
-   d3d9_device_free(d3d->dev, g_pD3D9);
    d3d->dev         = NULL;
    g_pD3D9          = NULL;
 
@@ -1573,13 +1581,24 @@ static void d3d9_hlsl_set_nonblock_state(void *data, bool state,
 #endif
 }
 
+#ifdef _XBOX
+static bool d3d9_hlsl_suppress_screensaver(void *data, bool enable)
+{
+   return true;
+}
+#endif
+
 video_driver_t video_d3d9_hlsl = {
    d3d9_hlsl_init,
    d3d9_hlsl_frame,
    d3d9_hlsl_set_nonblock_state,
    d3d9_hlsl_alive,
    NULL,                      /* focus */
-   d3d9_suppress_screensaver,
+#ifdef _XBOX
+   d3d9_hlsl_suppress_screensaver,
+#else
+   win32_suppress_screensaver,
+#endif
    d3d9_has_windowed,
    d3d9_hlsl_set_shader,
    d3d9_hlsl_free,

@@ -22,8 +22,9 @@
 #include "../menu_driver.h"
 #include "../menu_cbs.h"
 
-#include "../../retroarch.h"
 #include "../../configuration.h"
+#include "../../file_path_special.h"
+#include "../../retroarch.h"
 #include "../../core_option_manager.h"
 #include "../../core_info.h"
 
@@ -67,7 +68,7 @@
 { \
    const char *title = msg_hash_to_str(lbl); \
    if (!string_is_empty(path) && !string_is_empty(title)) \
-      fill_pathname_join_delim(s, title, path, ' ', len); \
+      snprintf(s, len, "%s: %s", title, path); \
    else if (!string_is_empty(title)) \
       strlcpy(s, title, len); \
    return 1; \
@@ -390,9 +391,6 @@ static int action_get_title_deferred_playlist_list(const char *path, const char 
       else
       {
          char playlist_name[PATH_MAX_LENGTH];
-
-         playlist_name[0] = '\0';
-
          strlcpy(playlist_name, playlist_file, sizeof(playlist_name));
          path_remove_extension(playlist_name);
 
@@ -507,8 +505,6 @@ static int action_get_title_dropdown_input_description_common(
    const char *input_label_ptr = input_name;
    char input_label[256];
 
-   input_label[0] = '\0';
-
    if (!string_is_empty(input_label_ptr))
    {
       /* Strip off 'Auto:' prefix, if required */
@@ -585,6 +581,7 @@ DEFAULT_TITLE_MACRO(action_get_add_content_list,                MENU_ENUM_LABEL_
 DEFAULT_TITLE_MACRO(action_get_configurations_list,             MENU_ENUM_LABEL_VALUE_CONFIGURATIONS_LIST)
 DEFAULT_TITLE_MACRO(action_get_core_option_override_list,       MENU_ENUM_LABEL_VALUE_CORE_OPTION_OVERRIDE_LIST)
 DEFAULT_TITLE_MACRO(action_get_quick_menu_list,                 MENU_ENUM_LABEL_VALUE_CONTENT_SETTINGS)
+DEFAULT_TITLE_MACRO(action_get_savestate_list,                  MENU_ENUM_LABEL_VALUE_SAVESTATE_LIST)
 DEFAULT_TITLE_MACRO(action_get_input_remapping_options_list,    MENU_ENUM_LABEL_VALUE_CORE_INPUT_REMAPPING_OPTIONS)
 DEFAULT_TITLE_MACRO(action_get_remap_file_manager_list,         MENU_ENUM_LABEL_VALUE_REMAP_FILE_MANAGER_LIST)
 DEFAULT_TITLE_MACRO(action_get_shader_options_list,             MENU_ENUM_LABEL_VALUE_SHADER_OPTIONS)
@@ -648,6 +645,9 @@ DEFAULT_TITLE_MACRO(action_get_bluetooth_settings_list,         MENU_ENUM_LABEL_
 DEFAULT_TITLE_MACRO(action_get_wifi_networks_list,              MENU_ENUM_LABEL_VALUE_WIFI_NETWORKS)
 DEFAULT_TITLE_MACRO(action_get_wifi_settings_list,              MENU_ENUM_LABEL_VALUE_WIFI_SETTINGS)
 DEFAULT_TITLE_MACRO(action_get_network_hosting_settings_list,   MENU_ENUM_LABEL_VALUE_NETWORK_HOSTING_SETTINGS)
+DEFAULT_TITLE_MACRO(action_get_netplay_kick_list,               MENU_ENUM_LABEL_VALUE_NETPLAY_KICK)
+DEFAULT_TITLE_MACRO(action_get_netplay_ban_list,                MENU_ENUM_LABEL_VALUE_NETPLAY_BAN)
+DEFAULT_TITLE_MACRO(action_get_netplay_lobby_filters_list,      MENU_ENUM_LABEL_VALUE_NETPLAY_LOBBY_FILTERS)
 DEFAULT_TITLE_MACRO(action_get_subsystem_settings_list,         MENU_ENUM_LABEL_VALUE_SUBSYSTEM_SETTINGS)
 DEFAULT_TITLE_MACRO(action_get_network_settings_list,           MENU_ENUM_LABEL_VALUE_NETWORK_SETTINGS)
 DEFAULT_TITLE_MACRO(action_get_netplay_lan_scan_settings_list,  MENU_ENUM_LABEL_VALUE_NETPLAY_LAN_SCAN_SETTINGS)
@@ -789,20 +789,22 @@ static int action_get_title_generic(char *s, size_t len,
       string_list_initialize(&list_path);
       if (string_split_noalloc(&list_path, path, "|"))
       {
+         size_t _len;
          char elem0_path[255];
-         elem0_path[0] = '\0';
-
          if (list_path.size > 0)
             strlcpy(elem0_path, list_path.elems[0].data,
                   sizeof(elem0_path));
          string_list_deinitialize(&list_path);
 
+         _len      = strlcpy(s, text, len);
          if (!string_is_empty(elem0_path))
-            snprintf(s, len, "%s- %s",
-                  text,
-                  path_basename(elem0_path));
-         else
-            strlcpy(s, text, len);
+         {
+            path_remove_extension(elem0_path);
+            s[_len  ] = ':';
+            s[_len+1] = ' ';
+            s[_len+2] = '\0';
+            strlcat(s, path_basename(elem0_path), len);
+         }
          return 0;
       }
    }
@@ -902,9 +904,6 @@ static int action_get_title_group_settings(const char *path, const char *label,
       char elem0[255];
       char elem1[255];
       struct string_list list_label = {0};
-      
-      elem0[0] = elem1[0] = '\0';
-
       string_list_initialize(&list_label);
       string_split_noalloc(&list_label, label, "|");
 
@@ -992,6 +991,9 @@ static int menu_cbs_init_bind_title_compare_label(menu_file_list_cbs_t *cbs,
       {MENU_ENUM_LABEL_DEFERRED_WIFI_SETTINGS_LIST,                   action_get_wifi_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_UPDATER_SETTINGS_LIST,                action_get_updater_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_NETWORK_HOSTING_SETTINGS_LIST,        action_get_network_hosting_settings_list},
+      {MENU_ENUM_LABEL_DEFERRED_NETPLAY_KICK_LIST,                    action_get_netplay_kick_list},
+      {MENU_ENUM_LABEL_DEFERRED_NETPLAY_BAN_LIST,                     action_get_netplay_ban_list},
+      {MENU_ENUM_LABEL_DEFERRED_NETPLAY_LOBBY_FILTERS_LIST,           action_get_netplay_lobby_filters_list},
       {MENU_ENUM_LABEL_DEFERRED_SUBSYSTEM_SETTINGS_LIST,              action_get_subsystem_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_NETWORK_SETTINGS_LIST,                action_get_network_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_NETPLAY_LAN_SCAN_SETTINGS_LIST,       action_get_netplay_lan_scan_settings_list},
@@ -1170,6 +1172,8 @@ static int menu_cbs_init_bind_title_compare_label(menu_file_list_cbs_t *cbs,
          action_get_configurations_list},
       {MENU_ENUM_LABEL_ADD_CONTENT_LIST,
          action_get_add_content_list},
+      {MENU_ENUM_LABEL_SAVESTATE_LIST,
+         action_get_savestate_list},
       {MENU_ENUM_LABEL_CORE_OPTIONS,
          action_get_title_core_options_list},
       {MENU_ENUM_LABEL_DEFERRED_CORE_OPTION_OVERRIDE_LIST,
@@ -1502,6 +1506,9 @@ static int menu_cbs_init_bind_title_compare_label(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_CONFIGURATIONS_LIST:
             BIND_ACTION_GET_TITLE(cbs, action_get_configurations_list);
+            break;
+         case MENU_ENUM_LABEL_SAVESTATE_LIST:
+            BIND_ACTION_GET_TITLE(cbs, action_get_savestate_list);
             break;
          case MENU_ENUM_LABEL_CORE_OPTIONS:
             BIND_ACTION_GET_TITLE(cbs, action_get_title_core_options_list);

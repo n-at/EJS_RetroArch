@@ -453,6 +453,7 @@ MSG_HASH(
 /* Settings > Input > Menu Controls */
 
 
+
 /* Settings > Input > Hotkeys */
 
 MSG_HASH(
@@ -929,6 +930,7 @@ MSG_HASH(
 
 
 /* Notifications */
+
 
 MSG_HASH(
    MSG_CRC32_CHECKSUM_MISMATCH,

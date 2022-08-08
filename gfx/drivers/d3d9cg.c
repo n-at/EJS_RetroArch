@@ -785,7 +785,7 @@ static bool d3d9_cg_renderchain_create_first_pass(
    struct shader_pass pass;
    struct d3d_matrix ident;
    unsigned fmt = (_fmt == RETRO_PIXEL_FORMAT_RGB565) ?
-      d3d9_get_rgb565_format() : d3d9_get_xrgb8888_format();
+      D3D9_RGB565_FORMAT : D3D9_XRGB8888_FORMAT;
 
    d3d_matrix_identity(&ident);
 
@@ -813,7 +813,7 @@ static bool d3d9_cg_renderchain_create_first_pass(
          return false;
 
       chain->prev.tex[i] = (LPDIRECT3DTEXTURE9)
-         d3d9_texture_new(chain->dev, NULL,
+         d3d9_texture_new(chain->dev,
             info->tex_w, info->tex_h, 1, 0, fmt,
             D3DPOOL_MANAGED, 0, 0, 0, NULL, NULL, false);
 
@@ -901,7 +901,9 @@ static void d3d9_cg_renderchain_calc_and_set_shader_mvp(
    struct d3d_matrix proj, ortho, rot, matrix;
    CGparameter cgp = cgGetNamedParameter(data, "modelViewProj");
 
+   d3d_matrix_identity(&ortho);
    d3d_matrix_ortho_off_center_lh(&ortho, 0, vp_width, 0, vp_height, 0, 1);
+   d3d_matrix_identity(&rot);
    d3d_matrix_rotation_z(&rot, rotation * (D3D_PI / 2.0));
    d3d_matrix_multiply(&proj, &ortho, &rot);
    d3d_matrix_transpose(&matrix, &proj);
@@ -1133,8 +1135,8 @@ static void d3d9_cg_renderchain_render(
       struct shader_pass *from_pass  = (struct shader_pass*)&chain->passes->data[i];
       struct shader_pass *to_pass    = (struct shader_pass*)&chain->passes->data[i + 1];
 
-      d3d9_texture_get_surface_level(to_pass->tex, 0, (void**)&target);
-
+      IDirect3DTexture9_GetSurfaceLevel(
+		      (LPDIRECT3DTEXTURE9)to_pass->tex, 0, (IDirect3DSurface9**)&target);
       IDirect3DDevice9_SetRenderTarget(chain->dev, 0, target);
 
       d3d9_convert_geometry(&from_pass->info,
@@ -1407,7 +1409,7 @@ static bool d3d9_cg_initialize(d3d9_video_t *d3d, const video_info_t *info)
       if (!d3d9_reset(d3d->dev, &d3dpp))
       {
          d3d9_cg_deinitialize(d3d);
-         d3d9_device_free(NULL, g_pD3D9);
+         IDirect3D9_Release(g_pD3D9);
          g_pD3D9 = NULL;
 
          ret = d3d9_cg_init_base(d3d, info);
@@ -1465,6 +1467,7 @@ static bool d3d9_cg_initialize(d3d9_video_t *d3d, const video_info_t *info)
    if (!d3d->menu_display.buffer)
       return false;
 
+   d3d_matrix_identity(&d3d->mvp_transposed);
    d3d_matrix_ortho_off_center_lh(&d3d->mvp_transposed, 0, 1, 0, 1, 0, 1);
    d3d_matrix_transpose(&d3d->mvp, &d3d->mvp_transposed);
 
@@ -1715,8 +1718,9 @@ static void d3d9_cg_free(void *data)
    if (!string_is_empty(d3d->shader_path))
       free(d3d->shader_path);
 
+   IDirect3DDevice9_Release(d3d->dev);
+   IDirect3D9_Release(g_pD3D9);
    d3d->shader_path = NULL;
-   d3d9_device_free(d3d->dev, g_pD3D9);
    d3d->dev         = NULL;
    g_pD3D9          = NULL;
 
@@ -1993,7 +1997,7 @@ video_driver_t video_d3d9_cg = {
    d3d9_cg_set_nonblock_state,
    d3d9_cg_alive,
    NULL,                      /* focus */
-   d3d9_suppress_screensaver,
+   win32_suppress_screensaver,
    d3d9_has_windowed,
    d3d9_cg_set_shader,
    d3d9_cg_free,

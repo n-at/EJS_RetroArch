@@ -581,6 +581,10 @@ MSG_HASH(
    "sideload_core"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_SAVESTATE_LIST,
+   "savestate_list"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_CORE_OPTIONS,
    "core_options"
    )
@@ -1045,6 +1049,18 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_NETWORK_SETTINGS_LIST,
    "deferred_network_settings_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_NETPLAY_KICK_LIST,
+   "deferred_netplay_kick_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_NETPLAY_BAN_LIST,
+   "deferred_netplay_ban_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_NETPLAY_LOBBY_FILTERS_LIST,
+   "deferred_netplay_lobby_filters_list"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_ONSCREEN_DISPLAY_SETTINGS_LIST,
@@ -2031,6 +2047,14 @@ MSG_HASH(
    "menu_netplay_enable_host"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_KICK,
+   "menu_netplay_kick"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_BAN,
+   "menu_netplay_ban"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_NETPLAY_ALLOW_SLAVES,
    "netplay_allow_slaves"
    )
@@ -2081,6 +2105,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_NETPLAY_FADE_CHAT,
    "netplay_fade_chat"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_CHAT_COLOR_NAME,
+   "netplay_chat_color_name"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_CHAT_COLOR_MSG,
+   "netplay_chat_color_msg"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_NETPLAY_ALLOW_PAUSING,
@@ -2155,6 +2187,10 @@ MSG_HASH(
    "network_settings"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_LOBBY_FILTERS,
+   "netplay_lobby_filters"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_NO_ACHIEVEMENTS_TO_DISPLAY,
    "no_achievements_to_display"
    )
@@ -2189,6 +2225,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_NO_NETPLAY_HOSTS_FOUND,
    "no_netplay_hosts_found"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_NO_NETPLAY_CLIENTS_FOUND,
+   "no_netplay_clients_found"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_NO_BT_DEVICES_FOUND,
@@ -3043,6 +3083,14 @@ MSG_HASH(
    "netplay_show_only_connectable"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_SHOW_ONLY_INSTALLED_CORES,
+   "netplay_show_only_installed_cores"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_NETPLAY_SHOW_PASSWORDED,
+   "netplay_show_passworded"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_NETPLAY_REFRESH_ROOMS,
    "refresh_rooms"
    )
@@ -3559,6 +3607,10 @@ MSG_HASH(
    "video_max_swapchain_images"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_MAX_FRAME_LATENCY,
+   "video_max_frame_latency"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_MESSAGE_POS_X,
    "video_message_pos_x"
    )
@@ -3599,6 +3651,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_REFRESH_RATE_POLLED,
    "video_refresh_rate_polled"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_AUTOSWITCH_REFRESH_RATE,
+   "video_autoswitch_refresh_rate"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_ROTATION,
@@ -4375,6 +4431,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_QUICK_MENU_SHOW_RESET_CORE_ASSOCIATION,
    "quick_menu_show_reset_core_association"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_QUICK_MENU_SHOW_SAVESTATE_SUBMENU,
+   "quick_menu_show_savestate_submenu"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_QUICK_MENU_SHOW_OPTIONS,
