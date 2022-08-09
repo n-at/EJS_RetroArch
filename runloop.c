@@ -3306,6 +3306,58 @@ bool runloop_environment_cb(unsigned cmd, void *data)
    return true;
 }
 
+void set_variable(char key[], char value[])
+{
+   runloop_state_t *runloop_st  = &runloop_state;
+   size_t opt_idx;
+   size_t val_idx;
+    if (!core_option_manager_get_idx(runloop_st->core_options, key, &opt_idx)) {
+       printf("invalid core option %s\n", key);
+       return;
+    }
+    if (!core_option_manager_get_val_idx(runloop_st->core_options, opt_idx, value, &val_idx)) {
+       printf("invalid core value %s for %s\n", value, key);
+       return;
+    }
+    if (val_idx != runloop_st->core_options->opts[opt_idx].index) {
+        core_option_manager_set_val(runloop_st->core_options, opt_idx, val_idx, true);
+    }
+}
+
+char rv[10000];
+char* get_core_options(void)
+{
+    memset(rv, '\0', sizeof(rv));
+    runloop_state_t *runloop_st  = &runloop_state;
+    int o = 0;
+    for (int i=0; i<runloop_st->core_options->size; i++) {
+        size_t opt_idx;
+        size_t val_idx1;
+        struct core_option *option = (struct core_option*)&runloop_st->core_options->opts[i];
+        if (core_option_manager_get_idx(runloop_st->core_options, runloop_st->core_options->opts[i].key, &opt_idx) && core_option_manager_get_val_idx(runloop_st->core_options, i, option->val_labels->elems[runloop_st->core_options->opts[i].default_index].data, &val_idx1)) {
+            if (o>0) strcat(rv, "\n");
+            o++;
+            strcat(rv, runloop_st->core_options->opts[i].key);
+            strcat(rv, "|");
+            strcat(rv, option->val_labels->elems[runloop_st->core_options->opts[i].default_index].data);
+            strcat(rv, "; ");
+            int w = 0;
+            for (int j=0; j<option->val_labels->size; j++) {
+                size_t val_idx;
+                if (core_option_manager_get_val_idx(runloop_st->core_options, i, option->val_labels->elems[j].data, &val_idx)) {
+                    if (w>0) strcat(rv, "|");
+                    strcat(rv, option->val_labels->elems[j].data);
+                    w++;
+                }
+            }
+        }
+    }
+    return rv;
+}
+
+
+
+
 bool libretro_get_system_info(
       const char *path,
       struct retro_system_info *info,

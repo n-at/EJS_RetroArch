@@ -70,11 +70,6 @@ void cmd_take_screenshot(void)
    command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);//done
 }
 
-void set_variable(void)
-{
-    printf("set variable called\n");
-}
-
 void set_cheat(unsigned index, bool enabled, const char *code)
 {
     retro_cheat_set(index, enabled, code);//done
@@ -88,11 +83,6 @@ void reset_cheat(void)
 void system_restart(void)
 {
     command_event(CMD_EVENT_RESET, NULL);//done
-}
-
-void get_core_options(void)
-{
-    printf("get_core_options called\n");
 }
 
 
