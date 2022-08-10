@@ -47,6 +47,7 @@ ASYNC ?= 0
 PTHREAD ?= 0
 LTO ?= 0
 WASM ?= 1
+DEBUG ?= 0
 
 DEFINES := -DRARCH_INTERNAL -DHAVE_MAIN
 DEFINES += -DHAVE_FILTERS_BUILTIN -DNO_MISSING_ASSET_WARNING -DNO_AUTO_CANVAS_RESIZE -DWEB_SCALING -DNO_CANVAS_FULLSCREEN -DNO_INITIAL_CANVAS_RESIZE
@@ -90,7 +91,7 @@ ifeq ($(HAVE_SDL2), 1)
 endif
 
 LIBS    := -s USE_ZLIB=1
-LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=0 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
+LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=0 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue', 'FS']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
            -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_get_current_frame_count','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop'] \
            -lidbfs.js \
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
