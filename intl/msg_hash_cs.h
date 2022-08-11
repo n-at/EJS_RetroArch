@@ -5539,6 +5539,22 @@ MSG_HASH(
    "Blednutí zpráv chatu v průběhu času."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NETPLAY_CHAT_COLOR_NAME,
+   "Barva Chatu (Přezdívka)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_CHAT_COLOR_NAME,
+   "Format: #RRGGBB nebo RRGGBB"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NETPLAY_CHAT_COLOR_MSG,
+   "Barva Chatu (Zpráva)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_CHAT_COLOR_MSG,
+   "Format: #RRGGBB nebo RRGGBB"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_ALLOW_PAUSING,
    "Povolit Pozastavení"
    )
@@ -5561,14 +5577,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY_REQUIRE_SLAVES,
    "Zakázat připojení, která nejsou v podřízeném režimu. Nedoporučuje se s výjimkou velmi rychlých sítí s velmi slabými stroji."
-   )
-MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_NETPLAY_STATELESS_MODE,
-   "Bezstavový Režim Netplay"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_NETPLAY_STATELESS_MODE,
-   "Spusťte hru po síti v režimu, který nevyžaduje uložení pozic. Je vyžadována velmi rychlá síť, ale neprovádí se žádné převíjení, takže nedochází k žádnému trhání při přehrávání v síti."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_CHECK_FRAMES,

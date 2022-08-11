@@ -1622,8 +1622,6 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("netplay_allow_pausing",         &settings->bools.netplay_allow_pausing, true, netplay_allow_pausing, false);
    SETTING_BOOL("netplay_allow_slaves",          &settings->bools.netplay_allow_slaves, true, netplay_allow_slaves, false);
    SETTING_BOOL("netplay_require_slaves",        &settings->bools.netplay_require_slaves, true, netplay_require_slaves, false);
-   SETTING_BOOL("netplay_stateless_mode",        &settings->bools.netplay_stateless_mode, true, netplay_stateless_mode, false);
-   SETTING_OVERRIDE(RARCH_OVERRIDE_SETTING_NETPLAY_STATELESS_MODE);
    SETTING_BOOL("netplay_use_mitm_server",       &settings->bools.netplay_use_mitm_server, true, netplay_use_mitm_server, false);
    SETTING_BOOL("netplay_request_device_p1",     &settings->bools.netplay_request_devices[0], true, false, false);
    SETTING_BOOL("netplay_request_device_p2",     &settings->bools.netplay_request_devices[1], true, false, false);
@@ -4262,7 +4260,7 @@ static void save_keybind_axis(config_file_t *conf,
    key[len+2] = 'x';
    key[len+3] = 'i';
    key[len+4] = 's';
-   key[len+4] = '\0';
+   key[len+5] = '\0';
 
    if (bind->joyaxis == AXIS_NONE)
    {
@@ -4298,7 +4296,7 @@ static void save_keybind_mbutton(config_file_t *conf,
    key[len+2] = 'b';
    key[len+3] = 't';
    key[len+4] = 'n';
-   key[len+4] = '\0';
+   key[len+5] = '\0';
 
    switch (bind->mbutton)
    {
