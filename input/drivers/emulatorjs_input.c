@@ -373,6 +373,9 @@ static struct rwebinput_code_to_key stuff[] =
    { 21, 0, 0, 0, 0 }, //R STICK LEFT
    { 22, 0, 0, 0, 0 }, //R STICK DOWN
    { 23, 0, 0, 0, 0 }, //R STICK UP
+   { 24, 0, 0, 0, 0 },
+   { 25, 0, 0, 0, 0 },
+   { 26, 0, 0, 0, 0 },
 };
 
 void simulate_input(int user, int key, int down)
@@ -395,6 +398,7 @@ void simulate_input(int user, int key, int down)
 }
 
 int is_pressed_hehe(int user, int id) {
+    if (id >=24) return 0;
     for (int i=0; i<ARRAY_SIZE(stuff); i++) {
         if (stuff[i].id == id) {
             if (user == 0) {

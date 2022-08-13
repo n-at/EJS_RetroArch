@@ -755,7 +755,7 @@ static void gfx_widgets_font_init(
       bool is_threaded, char *font_path, float font_size)
 {
    int                glyph_width   = 0;
-   float                scaled_size = font_size * 
+   float                scaled_size = font_size * 1.25 * 
       p_dispwidget->last_scale_factor;
 
    /* Free existing font */
@@ -1625,7 +1625,7 @@ void gfx_widgets_frame(void *data)
       int text_width        = font_driver_get_message_width(
             p_dispwidget->gfx_widget_fonts.regular.font,
             text,
-            (unsigned)strlen(text), 1.0f);
+            (unsigned)strlen(text), 1.5f);
       int total_width       = text_width
          + p_dispwidget->simple_widget_padding * 2;
 

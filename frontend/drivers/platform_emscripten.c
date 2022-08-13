@@ -148,14 +148,13 @@ static void frontend_emscripten_get_env(int *argc, char *argv[],
          "playlists", sizeof(g_defaults.dirs[DEFAULT_DIR_PLAYLIST]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_REMAP], g_defaults.dirs[DEFAULT_DIR_MENU_CONFIG],
          "remaps", sizeof(g_defaults.dirs[DEFAULT_DIR_REMAP]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SRAM], user_path,
-         "saves", sizeof(g_defaults.dirs[DEFAULT_DIR_SRAM]));
+   fill_pathname_join("/data/saves", user_path,
+         "saves", sizeof("/data/saves"));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SCREENSHOT], user_path,
          "screenshots", sizeof(g_defaults.dirs[DEFAULT_DIR_SCREENSHOT]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SAVESTATE], user_path,
          "states", sizeof(g_defaults.dirs[DEFAULT_DIR_SAVESTATE]));
-   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SYSTEM], user_path,
-         "system", sizeof(g_defaults.dirs[DEFAULT_DIR_SYSTEM]));
+   fill_pathname_join("/", user_path, "system", sizeof("/"));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_THUMBNAILS], user_path,
          "thumbnails", sizeof(g_defaults.dirs[DEFAULT_DIR_THUMBNAILS]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_LOGS], user_path,
@@ -180,7 +179,7 @@ int main(int argc, char *argv[])
 {
    dummyErrnoCodes();
 
-   printf("Official emulatorjs build\ndownload a copy from https://github.com/ethanaobrien/emulatorjs\n\nView the licence here: https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
+   printf("Built for EmulatorJS Version 2.2.6\nDownload a copy from https://github.com/ethanaobrien/emulatorjs\nView the licence here: https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
    emscripten_set_main_loop(emscripten_mainloop, 0, 0);
    rarch_main(argc, argv, NULL);
 

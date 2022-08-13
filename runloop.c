@@ -3308,6 +3308,15 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
 void set_variable(char key[], char value[])
 {
+    if (strcmp(key, "fps") == 0) {
+        settings_t *settings = config_get_ptr();
+        if (strcmp(value, "show") == 0) {
+            settings->bools.video_fps_show = true;
+        } else {
+            settings->bools.video_fps_show = false;
+        }
+        return;
+    }
    runloop_state_t *runloop_st  = &runloop_state;
    size_t opt_idx;
    size_t val_idx;
