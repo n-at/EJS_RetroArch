@@ -864,11 +864,15 @@ void retroarch_path_set_redirect(settings_t *settings)
       if (savestate_is_dir)
          strlcpy(runloop_st->name.savestate, new_savestate_dir,
                sizeof(runloop_st->name.savestate));
-      else
+      else {
          savestate_is_dir   = path_is_directory(runloop_st->name.savestate);
+      }
 
-      if (savefile_is_dir)
-      {
+
+      //if (savefile_is_dir)
+      //{
+         runloop_st->name.savefile[0] = '\0';
+         strlcpy(runloop_st->name.savefile, "/data/saves/", sizeof(runloop_st->name.savefile));
          fill_pathname_dir(runloop_st->name.savefile,
                !string_is_empty(runloop_st->runtime_content_path_basename)
                ? runloop_st->runtime_content_path_basename
@@ -878,7 +882,7 @@ void retroarch_path_set_redirect(settings_t *settings)
          RARCH_LOG("[Overrides]: %s \"%s\".\n",
                msg_hash_to_str(MSG_REDIRECTING_SAVEFILE_TO),
                runloop_st->name.savefile);
-      }
+      //}
 
       if (savestate_is_dir)
       {
