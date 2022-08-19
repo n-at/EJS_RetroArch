@@ -807,6 +807,7 @@ void task_set_progress(retro_task_t *task, int8_t progress)
 
 void task_set_title(retro_task_t *task, char *title)
 {
+    /*
 #ifdef HAVE_THREADS
    slock_lock(property_lock);
 #endif
@@ -814,6 +815,7 @@ void task_set_title(retro_task_t *task, char *title)
 #ifdef HAVE_THREADS
    slock_unlock(property_lock);
 #endif
+    */
 }
 
 void task_set_data(retro_task_t *task, void *data)
