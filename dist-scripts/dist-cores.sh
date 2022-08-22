@@ -219,11 +219,21 @@ for f in `ls -v *_${platform}.${EXT}`; do
       big_stack="BIG_STACK=1"
    elif [ $name = "mupen64plus_next" ] ; then
       gles3=1
-      wasm=1
       async=1
       pthread=0
       stack_mem=268435456
       heap_mem=536870912
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "snes9x" ] ; then
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "mame2003" ] ; then
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
    elif [ $name = "parallel_n64" ] ; then
       gles3=1
       async=1
@@ -342,16 +352,52 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mv -f ../retrodos.exe ../pkg/${platform}/cores/${name}.exe
    elif [ $PLATFORM = "emscripten" ] ; then
       mkdir -p ../pkg/emscripten/
-      mv -f ../${name}_libretro.js ../pkg/emscripten/${name}_libretro.js
-      if [ $wasm = 0 ] ; then
-         mv -f ../${name}_libretro.js.mem ../pkg/emscripten/${name}_libretro.js.mem
+      mkdir -p ../../emulatorjs/data/cores/
+      
+      core=""
+      if [ $name = "fceumm" ]; then
+        core="nes"
+      elif [ $name = "desmume2015" ]; then
+        core="nds"
+      elif [ $name = "a5200" ]; then
+        core="a5200"
+      elif [ $name = "gambatte" ]; then
+        core="gb"
+      elif [ $name = "mednafen_vb" ]; then
+        core="vb"
+      elif [ $name = "mgba" ]; then
+        core="gba"
+      elif [ $name = "mame2003" ]; then
+        core="mame2003"
+      elif [ $name = "mupen64plus_next" ]; then
+        core="n64"
+      elif [ $name = "snes9x" ]; then
+        core="snes"
+      elif [ $name = "fbalpha2012_cps1" ]; then
+        core="arcade"
       else
-         mv -f ../${name}_libretro.wasm ../pkg/emscripten/${name}_libretro.wasm
+        core=${name}
       fi
       
-      if [ $pthread != 0 ] ; then
-         mv -f ../${name}_libretro.worker.js ../pkg/emscripten/${name}_libretro.worker.js
+      if [ $wasm = 0 ]; then
+        7z a ../../emulatorjs/data/cores/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
+        rm ../${name}_libretro.js.mem
+      else
+        7z a ../../emulatorjs/data/cores/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
+        rm ../${name}_libretro.wasm
       fi
+      rm ../${name}_libretro.js
+      
+#      mv -f ../${name}_libretro.js ../pkg/emscripten/${name}_libretro.js
+#      if [ $wasm = 0 ] ; then
+#         mv -f ../${name}_libretro.js.mem ../pkg/emscripten/${name}_libretro.js.mem
+#      else
+#         mv -f ../${name}_libretro.wasm ../pkg/emscripten/${name}_libretro.wasm
+#      fi
+#      
+#      if [ $pthread != 0 ] ; then
+#         mv -f ../${name}_libretro.worker.js ../pkg/emscripten/${name}_libretro.worker.js
+#      fi
    fi
 
   # Do manual executable step

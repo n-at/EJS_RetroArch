@@ -169,7 +169,7 @@ else
 endif
 
 ifeq ($(DEBUG), 1)
-   LDFLAGS += -O0 -g
+   LDFLAGS += -O0 -g -s ASSERTIONS=2
    CFLAGS += -O0 -g
 else
    LDFLAGS += -O3
