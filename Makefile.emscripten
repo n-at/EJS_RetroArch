@@ -202,7 +202,7 @@ $(OBJDIR)/%.o: %.cpp
 	$(Q)$(CXX) $(CXXFLAGS) $(DEFINES) $(EOPTS) -c -o $@ $<
 
 clean:
-	#rm -rf $(OBJDIR)
+	rm -rf $(OBJDIR)
 	rm -f $(TARGET)
 
 .PHONY: all clean
