@@ -109,6 +109,17 @@ bool netstream_truncate(netstream_t *stream, size_t used);
 void netstream_data(netstream_t *stream, void **data, size_t *len);
 
 /**
+ * netstream_eof:
+ *
+ * @stream : Pointer to a network stream object.
+ *
+ * Checks whether the network stream is at EOF or not.
+ *
+ * Returns: true if the stream is at EOF, false otherwise.
+ */
+bool netstream_eof(netstream_t *stream);
+
+/**
  * netstream_tell:
  *
  * @stream : Pointer to a network stream object.
@@ -166,6 +177,33 @@ bool netstream_read_double(netstream_t *stream, double   *data);
 #endif
 
 /**
+ * netstream_read_string:
+ *
+ * @stream : Pointer to a network stream object.
+ * @s      : Pointer to a string buffer.
+ * @len    : Size of the string buffer.
+ *
+ * Reads a string from the network stream.
+ *
+ * Returns: Length of the original string on success or
+ * a negative value on error.
+ */
+int netstream_read_string(netstream_t *stream, char *s, size_t len);
+
+/**
+ * netstream_read_fixed_string:
+ *
+ * @stream : Pointer to a network stream object.
+ * @s      : Pointer to a string buffer.
+ * @len    : Size of the string buffer.
+ *
+ * Reads a fixed-length string from the network stream.
+ *
+ * Returns: true on success, false otherwise.
+ */
+bool netstream_read_fixed_string(netstream_t *stream, char *s, size_t len);
+
+/**
  * netstream_write:
  *
  * @stream : Pointer to a network stream object.
@@ -197,6 +235,32 @@ bool netstream_write_qword(netstream_t  *stream, uint64_t data);
 bool netstream_write_float(netstream_t  *stream, float    data);
 bool netstream_write_double(netstream_t *stream, double   data);
 #endif
+
+/**
+ * netstream_write_string:
+ *
+ * @stream : Pointer to a network stream object.
+ * @s      : Pointer to a string.
+ *
+ * Writes a null-terminated string into the network stream.
+ *
+ * Returns: true on success, false otherwise.
+ */
+bool netstream_write_string(netstream_t *stream, const char *s);
+
+/**
+ * netstream_write_fixed_string:
+ *
+ * @stream : Pointer to a network stream object.
+ * @s      : Pointer to a string.
+ * @len    : Size of the string.
+ *
+ * Writes a null-terminated fixed-length string into the network stream.
+ *
+ * Returns: true on success, false otherwise.
+ */
+bool netstream_write_fixed_string(netstream_t *stream, const char *s,
+      size_t len);
 
 RETRO_END_DECLS
 

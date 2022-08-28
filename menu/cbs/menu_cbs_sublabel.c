@@ -69,6 +69,7 @@
 
 static int menu_action_sublabel_file_browser_core(file_list_t *list, unsigned type, unsigned i, const char *label, const char *path, char *s, size_t len)
 {
+   size_t _len;
    core_info_t *core_info = NULL;
 
    /* Search for specified core */
@@ -80,17 +81,22 @@ static int menu_action_sublabel_file_browser_core(file_list_t *list, unsigned ty
       /* Add license text */
       string_list_join_concat(tmp, sizeof(tmp),
             core_info->licenses_list, ", ");
-      snprintf(s, len, "%s: %s", 
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES),
-            tmp);
+      _len      = strlcpy(s,
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
+      s[_len  ] = ':';
+      s[_len+1] = ' ';
+      s[_len+2] = '\0';
+      strlcat(s, tmp, len);
       return 1;
    }
 
    /* No license found - set to N/A */
-   snprintf(s, len, "%s: %s", 
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES),
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
-         );
+   _len      = strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
+   s[_len  ] = ':';
+   s[_len+1] = ' ';
+   s[_len+2] = '\0';
+   strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
    return 1;
 }
 
@@ -304,6 +310,9 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_views_settings_list,      MENU_
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_quick_menu_views_settings_list, MENU_ENUM_SUBLABEL_QUICK_MENU_VIEWS_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_settings_views_settings_list, MENU_ENUM_SUBLABEL_SETTINGS_VIEWS_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_settings_list,            MENU_ENUM_SUBLABEL_MENU_SETTINGS)
+#ifdef _3DS
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_bottom_settings_list,     MENU_ENUM_SUBLABEL_MENU_BOTTOM_SETTINGS)
+#endif
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_settings_list,           MENU_ENUM_SUBLABEL_VIDEO_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_synchronization_settings_list,           MENU_ENUM_SUBLABEL_VIDEO_SYNCHRONIZATION_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_fullscreen_mode_settings_list,           MENU_ENUM_SUBLABEL_VIDEO_FULLSCREEN_MODE_SETTINGS)
@@ -1096,10 +1105,17 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_gamemode_enable,                MENU
 
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_brightness_control,             MENU_ENUM_SUBLABEL_BRIGHTNESS_CONTROL)
 
-#if defined(_3DS)
+#ifdef _3DS
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_new3ds_speedup_enable,          MENU_ENUM_SUBLABEL_NEW3DS_SPEEDUP_ENABLE)
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_3ds_lcd_bottom,           MENU_ENUM_SUBLABEL_VIDEO_3DS_LCD_BOTTOM)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_3ds_display_mode,         MENU_ENUM_SUBLABEL_VIDEO_3DS_DISPLAY_MODE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_3ds_lcd_bottom,           MENU_ENUM_SUBLABEL_VIDEO_3DS_LCD_BOTTOM)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_assets_directory,        MENU_ENUM_SUBLABEL_BOTTOM_ASSETS_DIRECTORY)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_enable,             MENU_ENUM_SUBLABEL_BOTTOM_FONT_ENABLE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_color_red,          MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_RED)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_color_green,        MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_GREEN)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_color_blue,         MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_BLUE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_color_opacity,      MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_OPACITY)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_bottom_font_scale,              MENU_ENUM_SUBLABEL_BOTTOM_FONT_SCALE)
 #endif
 
 #if defined (WIIU)
@@ -1526,9 +1542,17 @@ static int action_bind_sublabel_netplay_room(file_list_t *list,
 
    if (string_is_empty(room->subsystem_name) ||
          string_is_equal_case_insensitive(room->subsystem_name, "N/A"))
-      snprintf(buf, sizeof(buf), "(%08lX)", (unsigned long)room->gamecrc);
+      snprintf(buf, sizeof(buf), "(%08lX)",
+         (unsigned long)(unsigned)room->gamecrc);
    else
-      snprintf(buf, sizeof(buf), "(%s)", room->subsystem_name);
+   {
+      size_t _len;
+      buf[0 ]     = '(';
+      buf[1 ]     = '\0';
+      _len        = strlcat(buf, room->subsystem_name, sizeof(buf));
+      buf[_len  ] = ')';
+      buf[_len+1] = '\0';
+   }
 
    strlcat(s, buf, len);
 
@@ -1568,8 +1592,14 @@ static int action_bind_sublabel_netplay_kick_client(file_list_t *list,
 
    if (status)
    {
-      snprintf(buf, sizeof(buf), "%s: %s\n",
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATUS), status);
+      size_t _len = strlcpy(buf, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATUS),
+            sizeof(buf));
+      buf[_len  ] = ':';
+      buf[_len+1] = ' ';
+      buf[_len+2] = '\0';
+      _len        = strlcat(buf, status, sizeof(buf));
+      buf[_len  ] = '\n';
+      buf[_len+1] = '\0';
       strlcat(s, buf, len);
    }
 
@@ -1648,6 +1678,7 @@ static int action_bind_sublabel_playlist_entry(
       const char *label, const char *path,
       char *s, size_t len)
 {
+   size_t _len;
    size_t list_size                          = menu_entries_get_size();
    playlist_t *playlist                      = NULL;
    const struct playlist_entry *entry        = NULL;
@@ -1706,10 +1737,11 @@ static int action_bind_sublabel_playlist_entry(
       return 0;
 
    /* Add core name */
-   snprintf(s, len, "%s %s",
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_CORE),
-         entry->core_name
-         );
+   _len      = strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_CORE), len);
+   s[_len  ] =  ' ';
+   s[_len+1] =  '\0';
+   strlcat(s, entry->core_name, len);
 
    /* Get runtime info *if* required runtime log is enabled
     * *and* this is a valid playlist type */
@@ -1831,6 +1863,7 @@ static int action_bind_sublabel_core_updater_entry(
       const char *label, const char *path,
       char *s, size_t len)
 {
+   size_t _len;
    core_updater_list_t *core_list         = core_updater_list_get_cached();
    const core_updater_list_entry_t *entry = NULL;
 
@@ -1844,20 +1877,22 @@ static int action_bind_sublabel_core_updater_entry(
       /* Add license text */
       string_list_join_concat(tmp, sizeof(tmp),
             entry->licenses_list, ", ");
-      snprintf(s, len,
-            "%s: %s",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES),
-            tmp
-            );
+      _len      = strlcpy(s,
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
+      s[_len  ] = ':';
+      s[_len+1] = ' ';
+      s[_len+2] = '\0';
+      strlcat(s, tmp, len);
       return 1;
    }
 
    /* No license found - set to N/A */
-   snprintf(s, len,
-         "%s: %s",
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES),
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
-         );
+   _len      = strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
+   s[_len  ] = ':';
+   s[_len+1] = ' ';
+   s[_len+2] = '\0';
+   strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
    return 1;
 }
 #endif
@@ -1873,7 +1908,7 @@ static int action_bind_sublabel_core_backup_entry(
       ? list->list[i].alt
       : list->list[i].path;
    /* Set sublabel prefix */
-   size_t _len = strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_BACKUP_CRC), len);
+   size_t _len     = strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_BACKUP_CRC), len);
 
    /* Add crc string */
    if (string_is_empty(crc))
@@ -4299,6 +4334,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_MENU_SETTINGS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_menu_settings_list);
             break;
+#ifdef _3DS
+         case MENU_ENUM_LABEL_MENU_BOTTOM_SETTINGS:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_menu_bottom_settings_list);
+            break;
+#endif
          case MENU_ENUM_LABEL_VIDEO_SETTINGS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_video_settings_list);
             break;
@@ -4676,15 +4716,36 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_BRIGHTNESS_CONTROL:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_brightness_control);
             break;
-#if defined(_3DS)
+#ifdef _3DS
          case MENU_ENUM_LABEL_NEW3DS_SPEEDUP_ENABLE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_new3ds_speedup_enable);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_3DS_DISPLAY_MODE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_video_3ds_display_mode);
             break;
          case MENU_ENUM_LABEL_VIDEO_3DS_LCD_BOTTOM:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_video_3ds_lcd_bottom);
             break;
-         case MENU_ENUM_LABEL_VIDEO_3DS_DISPLAY_MODE:
-            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_video_3ds_display_mode);
+         case MENU_ENUM_LABEL_BOTTOM_ASSETS_DIRECTORY:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_assets_directory);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_ENABLE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_enable);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_COLOR_RED:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_color_red);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_COLOR_GREEN:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_color_green);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_COLOR_BLUE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_color_blue);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_COLOR_OPACITY:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_color_opacity);
+            break;
+         case MENU_ENUM_LABEL_BOTTOM_FONT_SCALE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_bottom_font_scale);
             break;
 #endif
 #if defined(WIIU)

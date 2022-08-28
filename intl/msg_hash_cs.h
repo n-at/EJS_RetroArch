@@ -1249,6 +1249,40 @@ MSG_HASH(
    "Změnit výchozí adresáře, kde jsou soubory umístěny."
    )
 
+/* Core option category placeholders for icons */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MAPPING_SETTINGS,
+   "Mapování"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MEDIA_SETTINGS,
+   "Média"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS,
+   "Výkon"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SOUND_SETTINGS,
+   "Zvuk"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SPECS_SETTINGS,
+   "Specifikace"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_STORAGE_SETTINGS,
+   "Úložiště"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_SETTINGS,
+   "Systém"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_TIMING_SETTINGS,
+   "Časování"
+   )
+
 #ifdef HAVE_MIST
 MSG_HASH(
    MENU_ENUM_SUBLABEL_STEAM_SETTINGS,
@@ -4317,6 +4351,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_SETTINGS,
    "Změna nastavení vzhledu obrazovky nabídky."
    )
+#ifdef _3DS
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_BOTTOM_SETTINGS,
+   "Vzhled Spodní Obrazovky 3DS"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_BOTTOM_SETTINGS,
+   "Změna nastavení vzhledu spodní obrazovky."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Zobrazit Pokročilé Nastavení"
@@ -10725,7 +10769,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_OUT_OF_DATE,
-   "Partner netplay používá starou verzi RetroArch. Nelze se připojit."
+   "V partnerské síti je spuštěna stará verze aplikace RetroArch. Nelze se připojit."
    )
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
@@ -10741,11 +10785,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "Toto jádro nepodporuje meziarchitekturní netplay mezi těmito systémy"
+   "Toto jádro nepodporuje síťovou hru mezi těmito platformami"
    )
 MSG_HASH(
    MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "Toto jádro nepodporuje netplay mezi architekturou"
+   "Toto jádro nepodporuje hraní po síti mezi různými platformami"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -12802,7 +12846,7 @@ MSG_HASH(
    "Hardwarové škálování kontextu (je-li k dispozici)."
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NEW3DS_SPEEDUP_ENABLE,
    "Povolit New3DS Clock / L2 cache"
@@ -12862,6 +12906,62 @@ MSG_HASH(
 MSG_HASH(
    MSG_3DS_BOTTOM_MENU_LOAD_STATE,
    "Načíst\nObnovit Bod"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_ASSETS_DIRECTORY,
+   "Adresář Aktiv Na Spodní Obrazovce"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_ASSETS_DIRECTORY,
+   "Adresář aktiv na spodní obrazovce. Adresář musí obsahovat \"spodní_menu.png\"."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_ENABLE,
+   "Povolení Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_ENABLE,
+   "Zobrazení písma spodního menu. Povolit zobrazení popisů tlačítek na spodní obrazovce. To se netýká data uložení."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_RED,
+   "Červená Barva Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_RED,
+   "Úprava červené barvy písma na spodní obrazovce."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_GREEN,
+   "Zelená Barva Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_GREEN,
+   "Úprava zelené barvy písma na spodní obrazovce."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_BLUE,
+   "Modrá Barva Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_BLUE,
+   "Úprava modré barvy písma na spodní obrazovce."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_OPACITY,
+   "Průhlednost Barvy Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_OPACITY,
+   "Úprava neprůhlednosti písma na spodní obrazovce."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_SCALE,
+   "Měřítko Písma"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_SCALE,
+   "Úprava měřítka písma na spodní obrazovce."
    )
 #endif
 #ifdef HAVE_QT

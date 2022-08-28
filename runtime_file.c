@@ -235,7 +235,6 @@ runtime_log_t *runtime_log_init(
       const char *dir_playlist,
       bool log_per_core)
 {
-   size_t len;
    char content_name[PATH_MAX_LENGTH];
    char core_name[PATH_MAX_LENGTH];
    char log_file_dir[PATH_MAX_LENGTH];
@@ -324,7 +323,10 @@ runtime_log_t *runtime_log_init(
        * no content is provided, 'content' is simply
        * the name of the core itself */
       if (supports_no_game)
+      {
          strlcpy(content_name, core_name, sizeof(content_name));
+         strlcat(content_name, ".lrtl", sizeof(content_name));
+      }
    }
    /* NOTE: TyrQuake requires a specific hack, since all
     * content has the same name... */
@@ -341,6 +343,7 @@ runtime_log_t *runtime_log_init(
                   content_path, path_length * sizeof(char));
             strlcpy(content_name,
                   path_basename(tmp_buf), sizeof(content_name));
+            strlcat(content_name, ".lrtl", sizeof(content_name));
          }
       }
    }
@@ -357,20 +360,15 @@ runtime_log_t *runtime_log_init(
          return NULL;
 
       strlcpy(content_name, tmp_buf_no_ext, sizeof(content_name));
+      strlcat(content_name, ".lrtl", sizeof(content_name));
    }
 
    if (string_is_empty(content_name))
       return NULL;
 
    /* Build final log file path */
-   len = fill_pathname_join_special(log_file_path, log_file_dir,
+   fill_pathname_join_special(log_file_path, log_file_dir,
          content_name, sizeof(log_file_path));
-   log_file_path[len  ] = '.';
-   log_file_path[len+1] = 'l';
-   log_file_path[len+2] = 'r';
-   log_file_path[len+3] = 't';
-   log_file_path[len+4] = 'l';
-   log_file_path[len+5] = '\0';
 
    if (string_is_empty(log_file_path))
       return NULL;
@@ -577,14 +575,32 @@ void runtime_log_get_runtime_usec(
 void runtime_log_get_runtime_str(runtime_log_t *runtime_log,
       char *s, size_t len)
 {
+   size_t _len = strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_RUNTIME),
+         len);
+   s[_len  ]   = ' ';
+   s[_len+1]   = '\0';
    if (runtime_log)
-      snprintf(s, len, "%s %02u:%02u:%02u",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_RUNTIME),
+   {
+      char t[64];
+      t[0] = '\0';
+      snprintf(t, sizeof(t), "%02u:%02u:%02u",
             runtime_log->runtime.hours, runtime_log->runtime.minutes,
             runtime_log->runtime.seconds);
+      strlcat(s, t, len);
+   }
    else
-      snprintf(s, len, "%s 00:00:00",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_RUNTIME));
+   {
+      s[_len+1]   = '0';
+      s[_len+2]   = '0';
+      s[_len+3]   = ':';
+      s[_len+4]   = '0';
+      s[_len+5]   = '0';
+      s[_len+6]   = ':';
+      s[_len+7]   = '0';
+      s[_len+8]   = '0';
+      s[_len+9]   = '\0';
+   }
 }
 
 /* Gets last played entry values */
@@ -671,6 +687,8 @@ static bool runtime_last_played_human(runtime_log_t *runtime_log,
 
    float periods[6] = {60.0f, 60.0f, 24.0f, 7.0f, 4.35f, 12.0f};
 
+   tmp[0]           = '\0';
+
    if (!runtime_log)
       return false;
 
@@ -687,10 +705,13 @@ static bool runtime_last_played_human(runtime_log_t *runtime_log,
       delta /= periods[i];
 
    /* Generate string */
-   snprintf(tmp, sizeof(tmp), "%u %s",
-         (int)delta, msg_hash_to_str((delta == 1) 
-            ? (enum msg_hash_enums)units[i][0] 
-            : (enum msg_hash_enums)units[i][1]));
+   snprintf(tmp, sizeof(tmp), "%u ", (int)delta);
+   if (delta == 1)
+      strlcat(tmp, msg_hash_to_str((enum msg_hash_enums)units[i][0]),
+            sizeof(tmp));
+   else
+      strlcat(tmp, msg_hash_to_str((enum msg_hash_enums)units[i][1]),
+            sizeof(tmp));
    strlcat(str, tmp, len);
    strlcat(str, " ", len);
    strlcat(str, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_TIME_UNIT_AGO), len);
@@ -704,6 +725,7 @@ void runtime_log_get_last_played_str(runtime_log_t *runtime_log,
       enum playlist_sublabel_last_played_style_type timedate_style,
       enum playlist_sublabel_last_played_date_separator_type date_separator)
 {
+   size_t _len;
    char tmp[64];
    bool has_am_pm         = false;
    const char *format_str = "";
@@ -854,10 +876,11 @@ void runtime_log_get_last_played_str(runtime_log_t *runtime_log,
             runtime_log_get_last_played_time(runtime_log, &time_info);
             runtime_last_played_strftime(tmp, sizeof(tmp), format_str, &time_info);
          }
-         snprintf(str, len, "%s%s",
-               msg_hash_to_str(
-                  MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_LAST_PLAYED),
-               tmp);
+         _len        = strlcpy(str, msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_LAST_PLAYED), len);
+         str[_len  ] = ' ';
+         str[_len+1] = '\0';
+         strlcat(str, tmp, len);
          return;
       }
 
@@ -1140,10 +1163,11 @@ void runtime_log_get_last_played_str(runtime_log_t *runtime_log,
                      msg_hash_to_str(
                         MENU_ENUM_LABEL_VALUE_PLAYLIST_INLINE_CORE_DISPLAY_NEVER),
                      sizeof(tmp));
-            snprintf(str, len, "%s %s",
-                  msg_hash_to_str(
-                     MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_LAST_PLAYED),
-                  tmp);
+            _len        =  strlcpy(str, msg_hash_to_str(
+                     MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_LAST_PLAYED), len);
+            str[_len  ] = ' ';
+            str[_len+1] = '\0';
+            strlcat(str, tmp, len);
             return;
          case PLAYLIST_LAST_PLAYED_STYLE_YMD_HMS:
          default:

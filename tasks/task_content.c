@@ -23,7 +23,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <time.h>
-#include <errno.h>
 
 #ifdef _WIN32
 #ifdef _XBOX
@@ -871,11 +870,12 @@ static void content_file_get_path(
          if (!string_is_empty(archive_file))
          {
             char info_path[PATH_MAX_LENGTH];
-            info_path[0] = '\n';
-
             /* Build 'complete' archive file path */
-            snprintf(info_path, sizeof(info_path), "%s#%s",
-                  content_path, archive_file);
+            size_t _len       = strlcpy(info_path,
+                  content_path, sizeof(info_path));
+            info_path[_len  ] = '#';
+            info_path[_len+1] = '\0';
+            strlcat(info_path, archive_file, sizeof(info_path));
 
             /* Update 'content' string_list */
             string_list_set(content, idx, info_path);
@@ -1056,9 +1056,10 @@ static bool content_file_load(
                         "but cache directory was not set or found. "
                         "Setting cache directory to root of writable app directory...\n");
                      strlcpy(new_basedir, uwp_dir_data, sizeof(new_basedir));
-                     strcat(new_basedir, "VFSCACHE\\");
+                     strlcat(new_basedir, "VFSCACHE\\", sizeof(new_basedir));
                      basedir_attribs = GetFileAttributes(new_basedir);
-                     if ((basedir_attribs == INVALID_FILE_ATTRIBUTES) || (!(basedir_attribs & FILE_ATTRIBUTE_DIRECTORY)))
+                     if (       (basedir_attribs == INVALID_FILE_ATTRIBUTES) 
+                           || (!(basedir_attribs & FILE_ATTRIBUTE_DIRECTORY)))
                      {
                         if (!CreateDirectoryA(new_basedir, NULL))
                            strlcpy(new_basedir, uwp_dir_data, sizeof(new_basedir));
@@ -1346,7 +1347,7 @@ static void content_load_init_wrap(
       int *argc, char **argv)
 {
    *argc = 0;
-   argv[(*argc)++] = strdup("retroarch");
+   argv[(*argc)++] = strldup("retroarch", sizeof("retroarch"));
 
    if (args->content_path)
    {
@@ -1358,38 +1359,38 @@ static void content_load_init_wrap(
    {
       RARCH_LOG("[Core]: %s\n",
             msg_hash_to_str(MSG_NO_CONTENT_STARTING_DUMMY_CORE));
-      argv[(*argc)++] = strdup("--menu");
+      argv[(*argc)++] = strldup("--menu", sizeof("--menu"));
    }
 #endif
 
    if (args->sram_path)
    {
-      argv[(*argc)++] = strdup("-s");
+      argv[(*argc)++] = strldup("-s", sizeof("-s"));
       argv[(*argc)++] = strdup(args->sram_path);
    }
 
    if (args->state_path)
    {
-      argv[(*argc)++] = strdup("-S");
+      argv[(*argc)++] = strldup("-S", sizeof("-S"));
       argv[(*argc)++] = strdup(args->state_path);
    }
 
    if (args->config_path)
    {
-      argv[(*argc)++] = strdup("-c");
+      argv[(*argc)++] = strldup("-c", sizeof("-c"));
       argv[(*argc)++] = strdup(args->config_path);
    }
 
 #ifdef HAVE_DYNAMIC
    if (args->libretro_path)
    {
-      argv[(*argc)++] = strdup("-L");
+      argv[(*argc)++] = strldup("-L", sizeof("-L"));
       argv[(*argc)++] = strdup(args->libretro_path);
    }
 #endif
 
    if (args->verbose)
-      argv[(*argc)++] = strdup("-v");
+      argv[(*argc)++] = strldup("-v", sizeof("-v"));
 }
 
 /**

@@ -57,7 +57,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
-#include <errno.h>
 #include <math.h>
 #include <locale.h>
 
@@ -3021,7 +3020,10 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             result &= ~(1|2);
 #endif
 #if defined(HAVE_RUNAHEAD) || defined(HAVE_NETWORKING)
-         if (runloop_st->request_fast_savestate)
+         /* Deprecated.
+            Use RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT instead. */
+         /* TODO/FIXME: Get rid of this ugly hack. */
+         if (runloop_st->request_special_savestate)
             result |= 4;
 #endif
          if (data)
@@ -3034,32 +3036,36 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
       case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:
       {
-         int result           = RETRO_SAVESTATE_CONTEXT_NORMAL;
+         int result = RETRO_SAVESTATE_CONTEXT_NORMAL;
+
 #if defined(HAVE_RUNAHEAD) || defined(HAVE_NETWORKING)
-         if (runloop_st->request_fast_savestate)
+         if (runloop_st->request_special_savestate)
          {
-#ifdef HAVE_RUNAHEAD
-#if defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB)
-            settings_t
-            *settings         = config_get_ptr();
-            result = (settings->bools.run_ahead_secondary_instance
-               && runloop_st->runahead_secondary_core_available
-               && secondary_core_ensure_exists(settings) ? RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_BINARY : RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_INSTANCE);
-#else
-            result = RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_INSTANCE;
-#endif
-#endif
 #ifdef HAVE_NETWORKING
             if (netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL))
                result = RETRO_SAVESTATE_CONTEXT_ROLLBACK_NETPLAY;
+            else
 #endif
+            {
+#ifdef HAVE_RUNAHEAD
+#if defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB)
+               settings_t *settings = config_get_ptr();
+
+               if (settings->bools.run_ahead_secondary_instance &&
+                     runloop_st->runahead_secondary_core_available &&
+                     secondary_core_ensure_exists(settings))
+                  result = RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_BINARY;
+               else
+#endif
+                  result = RETRO_SAVESTATE_CONTEXT_RUNAHEAD_SAME_INSTANCE;
+#endif
+            }
          }
 #endif
+
          if (data)
-         {
-            int* result_p = (int*)data;
-            *result_p = result;
-         }
+            *(int*)data = result;
+
          break;
       }
 
@@ -3500,10 +3506,11 @@ static bool init_libretro_symbols_custom(
                            path_get_realsize(RARCH_PATH_CORE)
                            )))
                {
-                  RARCH_ERR("%s: \"%s\"\nError(s): %s\n",
-                        msg_hash_to_str(MSG_FAILED_TO_OPEN_LIBRETRO_CORE),
+                  const char *failed_open_str =
+                     msg_hash_to_str(MSG_FAILED_TO_OPEN_LIBRETRO_CORE);
+                  RARCH_ERR("%s: \"%s\"\nError(s): %s\n", failed_open_str,
                         path, dylib_error());
-                  runloop_msg_queue_push(msg_hash_to_str(MSG_FAILED_TO_OPEN_LIBRETRO_CORE),
+                  runloop_msg_queue_push(failed_open_str,
                         1, 180, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
                   return false;
                }
@@ -4193,13 +4200,22 @@ bool secondary_core_ensure_exists(settings_t *settings)
 
 #if defined(HAVE_RUNAHEAD) && defined(HAVE_DYNAMIC)
 static bool secondary_core_deserialize(settings_t *settings,
-      const void *buffer, int size)
+      const void *data, size_t size)
 {
-   runloop_state_t *runloop_st   = &runloop_state;
+   bool ret = false;
+
    if (secondary_core_ensure_exists(settings))
-      return runloop_st->secondary_core.retro_unserialize(buffer, size);
-   runloop_secondary_core_destroy();
-   return false;
+   {
+      runloop_state_t *runloop_st = &runloop_state;
+
+      runloop_st->request_special_savestate = true;
+      ret = runloop_st->secondary_core.retro_unserialize(data, size);
+      runloop_st->request_special_savestate = false;
+   }
+   else
+      runloop_secondary_core_destroy();
+
+   return ret;
 }
 #endif
 
@@ -4675,9 +4691,7 @@ static bool runahead_create(runloop_state_t *runloop_st)
    retro_ctx_size_info_t info;
    video_driver_state_t *video_st           = video_state_get_ptr();
 
-   runloop_st->request_fast_savestate       = true;
-   core_serialize_size(&info);
-   runloop_st->request_fast_savestate       = false;
+   core_serialize_size_special(&info);
 
    runahead_save_state_list_init(runloop_st, info.size);
    video_st->runahead_is_active             = video_st->active;
@@ -4699,7 +4713,6 @@ static bool runahead_create(runloop_state_t *runloop_st)
 static bool runahead_save_state(runloop_state_t *runloop_st)
 {
    retro_ctx_serialize_info_t *serialize_info;
-   bool okay                       = false;
 
    if (!runloop_st->runahead_save_state_list)
       return false;
@@ -4707,11 +4720,7 @@ static bool runahead_save_state(runloop_state_t *runloop_st)
    serialize_info                  =
       (retro_ctx_serialize_info_t*)runloop_st->runahead_save_state_list->data[0];
 
-   runloop_st->request_fast_savestate = true;
-   okay                               = core_serialize(serialize_info);
-   runloop_st->request_fast_savestate = false;
-
-   if (okay)
+   if (core_serialize_special(serialize_info))
       return true;
 
    runahead_error(runloop_st);
@@ -4720,47 +4729,35 @@ static bool runahead_save_state(runloop_state_t *runloop_st)
 
 static bool runahead_load_state(runloop_state_t *runloop_st)
 {
-   bool okay                                  = false;
    retro_ctx_serialize_info_t *serialize_info = 
       (retro_ctx_serialize_info_t*)
       runloop_st->runahead_save_state_list->data[0];
    bool last_dirty                            = runloop_st->input_is_dirty;
+   bool ret                                   =
+      core_unserialize_special(serialize_info);
 
-   runloop_st->request_fast_savestate         = true;
-   /* calling core_unserialize has side effects with
-    * netplay (it triggers transmitting your save state)
-      call retro_unserialize directly from the core instead */
-   okay = runloop_st->current_core.retro_unserialize(
-         serialize_info->data_const, serialize_info->size);
-
-   runloop_st->request_fast_savestate         = false;
    runloop_st->input_is_dirty                 = last_dirty;
 
-   if (!okay)
+   if (!ret)
       runahead_error(runloop_st);
 
-   return okay;
+   return ret;
 }
 
 #if HAVE_DYNAMIC
 static bool runahead_load_state_secondary(void)
 {
-   bool okay                                  = false;
    runloop_state_t                *runloop_st = &runloop_state;
    settings_t                       *settings = config_get_ptr();
    retro_ctx_serialize_info_t *serialize_info =
       (retro_ctx_serialize_info_t*)runloop_st->runahead_save_state_list->data[0];
 
-   runloop_st->request_fast_savestate         = true;
-   okay                                       = 
-      secondary_core_deserialize(settings,
-         serialize_info->data_const, (int)serialize_info->size);
-   runloop_st->request_fast_savestate         = false;
-
-   if (!okay)
+   if (!secondary_core_deserialize(settings, serialize_info->data_const,
+         serialize_info->size))
    {
       runloop_st->runahead_secondary_core_available = false;
       runahead_error(runloop_st);
+
       return false;
    }
 
@@ -4836,9 +4833,11 @@ static void do_runahead(
 
       if (!runahead_create(runloop_st))
       {
+         const char *runahead_failed_str =
+            msg_hash_to_str(MSG_RUNAHEAD_CORE_DOES_NOT_SUPPORT_SAVESTATES);
          if (!runahead_hide_warnings)
-            runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_CORE_DOES_NOT_SUPPORT_SAVESTATES), 0, 2 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-         RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_CORE_DOES_NOT_SUPPORT_SAVESTATES));
+            runloop_msg_queue_push(runahead_failed_str, 0, 2 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
          goto force_input_dirty;
       }
    }
@@ -4882,8 +4881,10 @@ static void do_runahead(
          {
             if (!runahead_save_state(runloop_st))
             {
-               runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE), 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-               RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE));
+               const char *runahead_failed_str =
+                  msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE);
+               runloop_msg_queue_push(runahead_failed_str, 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+               RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
                return;
             }
          }
@@ -4892,8 +4893,10 @@ static void do_runahead(
          {
             if (!runahead_load_state(runloop_st))
             {
-               runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE), 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-               RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE));
+               const char *runahead_failed_str =
+                  msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE);
+               runloop_msg_queue_push(runahead_failed_str, 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+               RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
                return;
             }
          }
@@ -4904,10 +4907,12 @@ static void do_runahead(
 #if HAVE_DYNAMIC
       if (!secondary_core_ensure_exists(config_get_ptr()))
       {
+         const char *runahead_failed_str =
+            msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_CREATE_SECONDARY_INSTANCE);
          runloop_secondary_core_destroy();
          runloop_st->runahead_secondary_core_available = false;
-         runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_CREATE_SECONDARY_INSTANCE), 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-         RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_CREATE_SECONDARY_INSTANCE));
+         runloop_msg_queue_push(runahead_failed_str, 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
          goto force_input_dirty;
       }
 
@@ -4923,15 +4928,19 @@ static void do_runahead(
 
          if (!runahead_save_state(runloop_st))
          {
-            runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE), 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-            RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE));
+            const char *runahead_failed_str =
+               msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_SAVE_STATE);
+            runloop_msg_queue_push(runahead_failed_str, 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+            RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
             return;
          }
 
          if (!runahead_load_state_secondary())
          {
-            runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE), 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-            RARCH_WARN("[Run-Ahead]: %s\n", msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE));
+            const char *runahead_failed_str =
+               msg_hash_to_str(MSG_RUNAHEAD_FAILED_TO_LOAD_STATE);
+            runloop_msg_queue_push(runahead_failed_str, 0, 3 * 60, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+            RARCH_WARN("[Run-Ahead]: %s\n", runahead_failed_str);
             return;
          }
 
@@ -8192,7 +8201,8 @@ bool retroarch_get_entry_state_path(char *path, size_t len, unsigned slot)
    if (string_is_empty(name_savestate))
       return false;
 
-   snprintf(path, len, "%s%d%s", name_savestate, slot, ".entry");
+   snprintf(path, len, "%s%d", name_savestate, slot);
+   strlcat(path, ".entry", len);
 
    return true;
 }
@@ -8452,6 +8462,26 @@ bool core_unserialize(retro_ctx_serialize_info_t *info)
    return true;
 }
 
+bool core_unserialize_special(retro_ctx_serialize_info_t *info)
+{
+   bool ret;
+   runloop_state_t *runloop_st = &runloop_state;
+
+   if (!info)
+      return false;
+
+   runloop_st->request_special_savestate = true;
+   ret = runloop_st->current_core.retro_unserialize(info->data_const, info->size);
+   runloop_st->request_special_savestate = false;
+
+#ifdef HAVE_NETWORKING
+   if (ret)
+      netplay_driver_ctl(RARCH_NETPLAY_CTL_LOAD_SAVESTATE, info);
+#endif
+
+   return ret;
+}
+
 bool core_serialize(retro_ctx_serialize_info_t *info)
 {
    runloop_state_t *runloop_st  = &runloop_state;
@@ -8460,12 +8490,41 @@ bool core_serialize(retro_ctx_serialize_info_t *info)
    return true;
 }
 
+bool core_serialize_special(retro_ctx_serialize_info_t *info)
+{
+   bool ret;
+   runloop_state_t *runloop_st = &runloop_state;
+
+   if (!info)
+      return false;
+
+   runloop_st->request_special_savestate = true;
+   ret = runloop_st->current_core.retro_serialize(info->data, info->size);
+   runloop_st->request_special_savestate = false;
+
+   return ret;
+}
+
 bool core_serialize_size(retro_ctx_size_info_t *info)
 {
    runloop_state_t *runloop_st  = &runloop_state;
    if (!info)
       return false;
    info->size = runloop_st->current_core.retro_serialize_size();
+   return true;
+}
+
+bool core_serialize_size_special(retro_ctx_size_info_t *info)
+{
+   runloop_state_t *runloop_st = &runloop_state;
+
+   if (!info)
+      return false;
+
+   runloop_st->request_special_savestate = true;
+   info->size = runloop_st->current_core.retro_serialize_size();
+   runloop_st->request_special_savestate = false;
+
    return true;
 }
 

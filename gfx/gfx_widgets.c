@@ -215,9 +215,6 @@ void gfx_widgets_msg_queue_push(
 
          msg_widget                             = (disp_widget_msg_t*)malloc(sizeof(*msg_widget));
 
-         if (task)
-            title                               = task->title;
-
          msg_widget->msg                        = NULL;
          msg_widget->msg_new                    = NULL;
          msg_widget->msg_transition_animation   = 0.0f;
@@ -237,7 +234,6 @@ void gfx_widgets_msg_queue_push(
          msg_widget->expiration_timer_started   = false;
 
          msg_widget->task_ptr                   = task;
-         msg_widget->task_title_ptr             = NULL;
          msg_widget->task_count                 = 0;
 
          msg_widget->task_progress              = 0;
@@ -262,7 +258,7 @@ void gfx_widgets_msg_queue_push(
 
          if (task)
          {
-            msg_widget->msg                     = strdup(title);
+            title = msg_widget->msg             = strdup(task->title);
             msg_widget->msg_new                 = strdup(title);
             msg_widget->msg_len                 = (unsigned)strlen(title);
 
@@ -271,7 +267,6 @@ void gfx_widgets_msg_queue_push(
             msg_widget->task_finished           = task->finished;
             msg_widget->task_progress           = task->progress;
             msg_widget->task_ident              = task->ident;
-            msg_widget->task_title_ptr          = task->title;
             msg_widget->task_count              = 1;
 
             msg_widget->unfolded                = true;
@@ -279,7 +274,7 @@ void gfx_widgets_msg_queue_push(
             msg_widget->width                   = font_driver_get_message_width(
                   p_dispwidget->gfx_widget_fonts.msg_queue.font,
                   title,
-                  msg_widget->msg_len, 1) +
+                  msg_widget->msg_len, 1.0f) +
                   p_dispwidget->simple_widget_padding / 2;
 
             task->frontend_userdata             = msg_widget;
@@ -301,12 +296,11 @@ void gfx_widgets_msg_queue_push(
                   p_dispwidget->gfx_widget_fonts.msg_queue.font,
                   title,
                   title_length,
-                  1);
+                  1.0f);
             msg_widget->text_height             = p_dispwidget->gfx_widget_fonts.msg_queue.line_height;
-
-            msg_len = title_length + 1 + 1; /* 1 byte uses for inserting '\n' */
-            msg = (char *)malloc(msg_len);
-            if (!msg)
+            /* 1 byte uses for inserting '\n' */
+            msg_len                             = title_length + 1 + 1;
+            if (!(msg = (char *)malloc(msg_len)))
                return;
             msg[0] = '\0';
 
@@ -319,7 +313,8 @@ void gfx_widgets_msg_queue_push(
                if ((text_width - (text_width >> 2)) < width)
                   width = text_width - (text_width >> 2);
 
-               word_wrap(msg, msg_len, title, (title_length * width) / text_width,
+               word_wrap(msg, msg_len, title, title_length,
+                     (title_length * width) / text_width,
                      100, 2);
 
                msg_widget->text_height *= 2;
@@ -351,12 +346,7 @@ void gfx_widgets_msg_queue_push(
 
          if (!string_is_equal(task->title, msg_widget->msg_new))
          {
-            unsigned len         = (unsigned)strlen(task->title);
-            unsigned new_width   = font_driver_get_message_width(
-                  p_dispwidget->gfx_widget_fonts.msg_queue.font,
-                  task->title,
-                  len,
-                  1);
+            unsigned len, new_width;
 
             if (msg_widget->msg_new)
             {
@@ -364,9 +354,16 @@ void gfx_widgets_msg_queue_push(
                msg_widget->msg_new                 = NULL;
             }
 
-            msg_widget->msg_new                    = strdup(task->title);
+            title       = msg_widget->msg_new      = strdup(task->title);
+
+            len         = (unsigned)strlen(title);
+            new_width   = font_driver_get_message_width(
+                  p_dispwidget->gfx_widget_fonts.msg_queue.font,
+                  title,
+                  len,
+                  1.0f);
+
             msg_widget->msg_len                    = len;
-            msg_widget->task_title_ptr             = task->title;
             msg_widget->msg_transition_animation   = 0;
 
             if (!task->alternative_look)
@@ -1110,9 +1107,11 @@ static int gfx_widgets_draw_indicator(
       unsigned height       = p_dispwidget->simple_widget_height;
       const char *txt       = msg_hash_to_str(msg);
 
-      width = font_driver_get_message_width(p_dispwidget->gfx_widget_fonts.regular.font,
+      width = font_driver_get_message_width(
+            p_dispwidget->gfx_widget_fonts.regular.font,
             txt,
-            (unsigned)strlen(txt), 1) + p_dispwidget->simple_widget_padding * 2;
+            (unsigned)strlen(txt), 1.0f) 
+         + p_dispwidget->simple_widget_padding * 2;
 
       gfx_display_draw_quad(
             p_disp,
@@ -1167,9 +1166,9 @@ static void gfx_widgets_draw_task_msg(
    float *msg_queue_current_background;
    float *msg_queue_current_bar;
 
+   char task_percentage[256];
    bool draw_msg_new                 = false;
    unsigned task_percentage_offset   = 0;
-   char task_percentage[256]         = {0};
 
    if (msg->msg_new)
       draw_msg_new                   = !string_is_equal(msg->msg_new, msg->msg);
@@ -1182,13 +1181,19 @@ static void gfx_widgets_draw_task_msg(
    if (msg->task_finished)
    {
       if (msg->task_error)
-         strcpy_literal(task_percentage, "Task failed");
+         strlcpy(task_percentage, "Task failed", sizeof(task_percentage));
       else
-         strcpy_literal(task_percentage, " ");
+      {
+         task_percentage[0] = ' ';
+         task_percentage[1] = '\0';
+      }
    }
    else if (msg->task_progress >= 0 && msg->task_progress <= 100)
+   {
+      task_percentage[0] = '\0';
       snprintf(task_percentage, sizeof(task_percentage),
             "%i%%", msg->task_progress);
+   }
 
    rect_width = p_dispwidget->simple_widget_padding 
       + msg->width 

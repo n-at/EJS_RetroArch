@@ -689,7 +689,8 @@ static bool make_proc_acpi_key_val(char **_ptr, char **_key, char **_val)
 static void check_proc_acpi_battery(const char * node, bool * have_battery,
       bool * charging, int *seconds, int *percent)
 {
-   char path[1024];
+   char basenode[512];
+   char path[PATH_MAX_LENGTH];
    const char *base  = proc_acpi_battery_path;
    int64_t length    = 0;
    char         *ptr = NULL;
@@ -704,9 +705,8 @@ static void check_proc_acpi_battery(const char * node, bool * have_battery,
    int          secs = -1;
    int           pct = -1;
 
-   path[0]           = '\0';
-
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "state");
+   fill_pathname_join_special(basenode, base, node, sizeof(basenode));
+   fill_pathname_join_special(path, basenode, "state", sizeof(path));
 
    if (!filestream_exists(path))
       goto end;
@@ -714,7 +714,7 @@ static void check_proc_acpi_battery(const char * node, bool * have_battery,
    if (!filestream_read_file(path, (void**)&buf, &length))
       goto end;
 
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "info");
+   fill_pathname_join_special(path, basenode, "info", sizeof(path));
    if (!filestream_read_file(path, (void**)&buf_info, &length))
       goto end;
 
@@ -798,7 +798,8 @@ static void check_proc_acpi_sysfs_battery(const char *node,
       bool *have_battery, bool *charging, int *seconds,
       int *percent, int *valid_pct_idx)
 {
-   char path[1024];
+   char basenode[512];
+   char path[PATH_MAX_LENGTH];
    const char *base  = proc_acpi_sysfs_battery_path;
    char        *buf  = NULL;
    char         *ptr = NULL;
@@ -813,10 +814,9 @@ static void check_proc_acpi_sysfs_battery(const char *node,
    int          secs = -1;
    int           pct = -1;
 
-   path[0]           = '\0';
-
    /* Stat type. Avoid unknown or device supplies. Missing is considered System. */
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "scope");
+   fill_pathname_join_special(basenode, base, node, sizeof(basenode));
+   fill_pathname_join_special(path, basenode, "scope", sizeof(path));
 
    if (filestream_exists(path) != 0)
    {
@@ -831,7 +831,7 @@ static void check_proc_acpi_sysfs_battery(const char *node,
       }
    }
 
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "status");
+   fill_pathname_join_special(path, basenode, "status", sizeof(path));
 
    if (!filestream_exists(path))
       return;
@@ -854,7 +854,7 @@ static void check_proc_acpi_sysfs_battery(const char *node,
       buf = NULL;
    }
 
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "capacity");
+   fill_pathname_join_special(path, basenode, "capacity", sizeof(path));
    if (filestream_read_file(path, (void**)&buf, &length) != 1)
       goto end;
 
@@ -874,7 +874,8 @@ end:
 
 static void check_proc_acpi_ac_adapter(const char * node, bool *have_ac)
 {
-   char path[1024];
+   char basenode[512];
+   char path[PATH_MAX_LENGTH];
    const char *base = proc_acpi_ac_adapter_path;
    char       *buf  = NULL;
    char        *ptr = NULL;
@@ -882,9 +883,8 @@ static void check_proc_acpi_ac_adapter(const char * node, bool *have_ac)
    char        *val = NULL;
    int64_t length   = 0;
 
-   path[0]          = '\0';
-
-   snprintf(path, sizeof(path), "%s/%s/%s", base, node, "state");
+   fill_pathname_join_special(basenode, base, node, sizeof(basenode));
+   fill_pathname_join_special(path, basenode, "state", sizeof(path));
    if (!filestream_exists(path))
       return;
 
@@ -1246,7 +1246,7 @@ static enum frontend_architecture frontend_unix_get_arch(void)
          string_is_equal(val, "armv7b")
       )
       return FRONTEND_ARCH_ARMV7;
-   else if (string_starts_with(val, "arm"))
+   else if (string_starts_with_size(val, "arm", STRLEN_CONST("arm")))
       return FRONTEND_ARCH_ARM;
    else if (string_is_equal(val, "x86_64"))
       return FRONTEND_ARCH_X86_64;
@@ -1269,7 +1269,7 @@ static void frontend_unix_get_os(char *s,
    int rel;
    frontend_android_get_version(major, minor, &rel);
 
-   strcpy_literal(s, "Android");
+   strlcpy(s, "Android", len);
 #else
    char *ptr;
    struct utsname buffer;
@@ -1280,19 +1280,19 @@ static void frontend_unix_get_os(char *s,
    *major = (int)strtol(buffer.release, &ptr, 10);
    *minor = (int)strtol(++ptr, NULL, 10);
 #if defined(__FreeBSD__)
-   strcpy_literal(s, "FreeBSD");
+   strlcpy(s, "FreeBSD", len);
 #elif defined(__NetBSD__)
-   strcpy_literal(s, "NetBSD");
+   strlcpy(s, "NetBSD", len);
 #elif defined(__OpenBSD__)
-   strcpy_literal(s, "OpenBSD");
+   strlcpy(s, "OpenBSD", len);
 #elif defined(__DragonFly__)
-   strcpy_literal(s, "DragonFly BSD");
+   strlcpy(s, "DragonFly BSD", len);
 #elif defined(BSD)
-   strcpy_literal(s, "BSD");
+   strlcpy(s, "BSD", len);
 #elif defined(__HAIKU__)
-   strcpy_literal(s, "Haiku");
+   strlcpy(s, "Haiku", len);
 #else
-   strcpy_literal(s, "Linux");
+   strlcpy(s, "Linux", len);
 #endif
 #endif
 }
@@ -2154,43 +2154,43 @@ static int frontend_unix_parse_drive_list(void *data, bool load_content)
                internal_storage_path, "RetroArch",
                sizeof(user_data_path));
 
-         menu_entries_append_enum(list,
+         menu_entries_append(list,
                user_data_path,
                msg_hash_to_str(MSG_INTERNAL_STORAGE),
                enum_idx,
-               FILE_TYPE_DIRECTORY, 0, 0);
+               FILE_TYPE_DIRECTORY, 0, 0, NULL);
       }
 
-      menu_entries_append_enum(list,
+      menu_entries_append(list,
             internal_storage_path,
             msg_hash_to_str(MSG_INTERNAL_STORAGE),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
    else
-      menu_entries_append_enum(list,
+      menu_entries_append(list,
             "/storage/emulated/0",
             msg_hash_to_str(MSG_REMOVABLE_STORAGE),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
 
-   menu_entries_append_enum(list,
+   menu_entries_append(list,
          "/storage",
          msg_hash_to_str(MSG_REMOVABLE_STORAGE),
          enum_idx,
-         FILE_TYPE_DIRECTORY, 0, 0);
+         FILE_TYPE_DIRECTORY, 0, 0, NULL);
    if (!string_is_empty(internal_storage_app_path))
-      menu_entries_append_enum(list,
+      menu_entries_append(list,
             internal_storage_app_path,
             msg_hash_to_str(MSG_EXTERNAL_APPLICATION_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    if (!string_is_empty(app_dir))
-      menu_entries_append_enum(list,
+      menu_entries_append(list,
             app_dir,
             msg_hash_to_str(MSG_APPLICATION_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    for (unsigned i=0; i < volume_count; i++)
    {
       static char aux_path[PATH_MAX_LENGTH];
@@ -2214,26 +2214,26 @@ static int frontend_unix_parse_drive_list(void *data, bool load_content)
 
          (*env)->ReleaseStringUTFChars(env, jstr, str);
          if (!string_is_empty(aux_path))
-            menu_entries_append_enum(list,
+            menu_entries_append(list,
                   aux_path,
                   msg_hash_to_str(MSG_APPLICATION_DIR),
                   enum_idx,
-                  FILE_TYPE_DIRECTORY, 0, 0);
+                  FILE_TYPE_DIRECTORY, 0, 0, NULL);
       }
 
    }
 #elif defined(WEBOS)
    if (path_is_directory("/media/internal"))
-      menu_entries_append_enum(list, "/media/internal",
+      menu_entries_append(list, "/media/internal",
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
 
    if (path_is_directory("/tmp/usb"))
-      menu_entries_append_enum(list, "/tmp/usb",
+      menu_entries_append(list, "/tmp/usb",
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
 #else
    char base_path[PATH_MAX] = {0};
    char udisks_media_path[PATH_MAX] = {0};
@@ -2266,45 +2266,45 @@ static int frontend_unix_parse_drive_list(void *data, bool load_content)
 
    if (!string_is_empty(base_path))
    {
-      menu_entries_append_enum(list, base_path,
+      menu_entries_append(list, base_path,
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
    if (!string_is_empty(home))
    {
-      menu_entries_append_enum(list, home,
+      menu_entries_append(list, home,
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
    if (path_is_directory(udisks_media_path))
    {
-      menu_entries_append_enum(list, udisks_media_path,
+      menu_entries_append(list, udisks_media_path,
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
    if (path_is_directory("/media"))
    {
-      menu_entries_append_enum(list, "/media",
+      menu_entries_append(list, "/media",
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
    if (path_is_directory("/mnt"))
    {
-      menu_entries_append_enum(list, "/mnt",
+      menu_entries_append(list, "/mnt",
             msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
             enum_idx,
-            FILE_TYPE_DIRECTORY, 0, 0);
+            FILE_TYPE_DIRECTORY, 0, 0, NULL);
    }
 #endif
 
-   menu_entries_append_enum(list, "/",
+   menu_entries_append(list, "/",
          msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
          enum_idx,
-         FILE_TYPE_DIRECTORY, 0, 0);
+         FILE_TYPE_DIRECTORY, 0, 0, NULL);
 #endif
 
    return 0;

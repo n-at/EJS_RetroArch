@@ -1193,6 +1193,8 @@ MSG_HASH(
    "تغيير الدلائل الافتراضية حيث توجد الملفات."
    )
 
+/* Core option category placeholders for icons */
+
 #ifdef HAVE_MIST
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_STEAM_SETTINGS,
@@ -3441,6 +3443,8 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SETTINGS,
    "المظهر"
    )
+#ifdef _3DS
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "إظهار الإعدادات المتقدمة"
@@ -7924,10 +7928,6 @@ MSG_HASH(
    "فشلت محاولة الاتصال بالشبكة لأن النظير لا يقوم بتشغيل RetroArch، أو يقوم بتشغيل نسخة قديمة من RetroArch."
    )
 MSG_HASH(
-   MSG_NETPLAY_OUT_OF_DATE,
-   "يقوم ند الشبكة بتشغيل إصدار قديم من RetroArch. لا يمكن الاتصال."
-   )
-MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
    "تحذير: يقوم النظير في الشبكة بتشغيل إصدار مختلف من RetroArch. إذا حدثت مشاكل، استخدم نفس الإصدار."
    )
@@ -7938,14 +7938,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_CORE_VERSIONS,
    "تحذير: يقوم النظير في الشبكة بتشغيل إصدار مختلف من النواة الأساسية. إذا حدثت مشاكل، استخدم نفس الإصدار."
-   )
-MSG_HASH(
-   MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "هذا الجوهر لا يدعم الشبكة المشتركة بين الهندسة المعمارية بين هذه النظم"
-   )
-MSG_HASH(
-   MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "هذا الجوهر لا يدعم الشبكة المشتركة بين المعماريات"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -9414,7 +9406,7 @@ MSG_HASH(
    "قياس سياق العتاد (إن وجدت)."
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_3DS_LCD_BOTTOM,
    "أسفل شاشة 3DS"

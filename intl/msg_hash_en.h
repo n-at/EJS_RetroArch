@@ -145,6 +145,8 @@ MSG_HASH(
 /* Settings */
 
 
+/* Core option category placeholders for icons */
+
 #ifdef HAVE_MIST
 #endif
 
@@ -845,6 +847,8 @@ MSG_HASH(
 
 /* Settings > User Interface */
 
+#ifdef _3DS
+#endif
 MSG_HASH(
    MENU_ENUM_SUBLABEL_QUIT_ON_CLOSE_CONTENT,
    "Automatically quit RetroArch when closing content. 'CLI' quits only when content is launched with a command line."
@@ -989,6 +993,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY_START_AS_SPECTATOR,
    "Start net-play in spectator mode."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NETPLAY_CHAT_COLOR_NAME,
+   "Chat Colour (Nickname)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NETPLAY_CHAT_COLOR_MSG,
+   "Chat Colour (Message)"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY_ALLOW_PAUSING,
@@ -1761,7 +1773,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_OUT_OF_DATE,
-   "The net-play peer is running an old version of RetroArch. Cannot connect."
+   "A net-play peer is running an old version of RetroArch. Cannot connect."
    )
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
@@ -1777,11 +1789,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "This core does not support inter-architecture net-play between these systems"
+   "This core does not support net-play between these platforms"
    )
 MSG_HASH(
    MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "This core does not support inter-architecture net-play"
+   "This core does not support net-play between different platforms"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -2086,7 +2098,7 @@ MSG_HASH(
    )
 #else
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MSG_3DS_BOTTOM_MENU_DEFAULT,
    "Tap the Touch Screen to go\nto the RetroArch menu"

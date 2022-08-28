@@ -1205,6 +1205,28 @@ MSG_HASH(
    "Die Standard-Verzeichnisse für diverse Daten ändern."
    )
 
+/* Core option category placeholders for icons */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MAPPING_SETTINGS,
+   "Zuordnung"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MEDIA_SETTINGS,
+   "Medium"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS,
+   "Leistung"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SPECS_SETTINGS,
+   "Spezifikation"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_STORAGE_SETTINGS,
+   "Speicher"
+   )
+
 #ifdef HAVE_MIST
 MSG_HASH(
    MENU_ENUM_SUBLABEL_STEAM_SETTINGS,
@@ -4301,6 +4323,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_SETTINGS,
    "Einstellungen für das Aussehen des Menüs ändern."
    )
+#ifdef _3DS
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_BOTTOM_SETTINGS,
+   "3DS untererer Bildschirm Erscheinungsbild"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MENU_BOTTOM_SETTINGS,
+   "Einstellungen für das Erscheinungsbild des unteren Bildschirms ändern."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Erweiterte Einstellungen zeigen"
@@ -10605,7 +10637,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_OUT_OF_DATE,
-   "Der Netzwerkspiel-Teilnehmer nutzt eine alte Version von RetroArch. Kann nicht verbinden."
+   "Ein Netplay-Teilnehmer nutzt eine alte RetroArch-Version. Verbindung nicht möglich."
    )
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
@@ -10621,11 +10653,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "Dieser Core unterstützt kein Netzwerkspiel zwischen diesen Systemen"
+   "Dieser Core unterstützt kein Netzwerkspiel zwischen diesen Plattformen"
    )
 MSG_HASH(
    MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "Dieser Core unterstützt kein Netzwerkspiel zwischen verschiedenen Systemen"
+   "Dieser Core unterstützt kein Netzwerkspiel zwischen verschiedenen Plattformen"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -12706,7 +12738,7 @@ MSG_HASH(
    "Hardware-Kontextskalierung (falls verfügbar)."
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NEW3DS_SPEEDUP_ENABLE,
    "New3DS-Taktfrequenz / -L2-Cache aktivieren"
@@ -12766,6 +12798,62 @@ MSG_HASH(
 MSG_HASH(
    MSG_3DS_BOTTOM_MENU_LOAD_STATE,
    "Speicherpunkt\nladen"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_ASSETS_DIRECTORY,
+   "Unterer Bildschirm Asset-Verzeichnis"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_ASSETS_DIRECTORY,
+   "Unterer Bildschirm Asset Verzeichnis. Verzeichnis muss \"bottom_menu.png\" enthalten."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_ENABLE,
+   "Schrift aktivieren"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_ENABLE,
+   "Text am unteren Bildschirm einblenden. Aktivieren, um Tastenbeschreibungen auf dem unteren Bildschirm anzuzeigen. Dies schließt das Speicherdatum aus."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_RED,
+   "Schriftfarbe Rot"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_RED,
+   "Rote Schriftfarbe auf unteren Bildschirm anpassen."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_GREEN,
+   "Schriftfarbe Grün"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_GREEN,
+   "Grüne Schriftfarbe auf unteren Bildschirm anpassen."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_BLUE,
+   "Schriftfarbe Blau"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_BLUE,
+   "Blaue Schriftfarbe auf unteren Bildschirm anpassen."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_OPACITY,
+   "Schriftfarbendeckkraft"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_COLOR_OPACITY,
+   "Schriftdeckkraft auf unteren Bildschirm anpassen."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_SCALE,
+   "Schriftgröße"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_BOTTOM_FONT_SCALE,
+   "Schriftgröße auf unteren Bildschirm anpassen."
    )
 #endif
 #ifdef HAVE_QT

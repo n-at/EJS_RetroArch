@@ -1197,6 +1197,16 @@ MSG_HASH(
    "Muuta tiedostojen sijainnin oletuskansiot."
    )
 
+/* Core option category placeholders for icons */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS,
+   "Suorituskyky"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_SETTINGS,
+   "Järjestelmä"
+   )
+
 #ifdef HAVE_MIST
 MSG_HASH(
    MENU_ENUM_SUBLABEL_STEAM_SETTINGS,
@@ -4225,6 +4235,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_SETTINGS,
    "Muuta valikon ulkoasun asetuksia."
    )
+#ifdef _3DS
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Näytä lisäasetukset"
@@ -10701,11 +10713,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "Tämä ydin ei tue näiden järjestelmien arkkitehtuurien välistä verkkopeliä"
+   "Tämä ydin ei tue näiden alustojen välistä verkkopeliä"
    )
 MSG_HASH(
    MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "Tämä ydin ei tue arkkitehtuurien välistä verkkopeliä"
+   "Tämä ydin ei tue eri alustojen välistä verkkopeliä"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -12734,7 +12746,7 @@ MSG_HASH(
    "Laitteiston kontekstin skaalaus (jos saatavilla)."
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_3DS_LCD_BOTTOM,
    "3DS:n alanäyttö"

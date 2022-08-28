@@ -24,7 +24,6 @@
 #else
 #include <unistd.h>
 #endif
-#include <errno.h>
 
 #include <compat/strl.h>
 #include <retro_assert.h>
@@ -784,18 +783,22 @@ static void task_save_handler(retro_task_t *task)
 
       if (state->undo_save)
       {
-         RARCH_ERR("[State]: %s \"%s\".\n",
-            msg_hash_to_str(MSG_FAILED_TO_UNDO_SAVE_STATE),
+         const char *failed_undo_str = msg_hash_to_str(
+               MSG_FAILED_TO_UNDO_SAVE_STATE);
+         RARCH_ERR("[State]: %s \"%s\".\n", failed_undo_str,
             undo_save_buf.path);
 
-         snprintf(err, err_size - 1, "%s \"%s\".",
-                  msg_hash_to_str(MSG_FAILED_TO_UNDO_SAVE_STATE),
-                  "RAM");
+         snprintf(err, err_size - 1, "%s \"RAM\".", failed_undo_str);
       }
       else
-         snprintf(err, err_size - 1,
-               "%s %s",
-               msg_hash_to_str(MSG_FAILED_TO_SAVE_STATE_TO), state->path);
+      {
+         size_t _len = strlcpy(err,
+               msg_hash_to_str(MSG_FAILED_TO_SAVE_STATE_TO),
+               err_size - 1);
+         err[_len  ] = ' ';
+         err[_len+1] = '\0';
+         strlcat(err, state->path, err_size - 1);
+      }
 
       task_set_error(task, strdup(err));
       free(err);
@@ -818,7 +821,8 @@ static void task_save_handler(retro_task_t *task)
          char new_msg[128];
          new_msg[0] = '\0';
 
-         snprintf(new_msg, sizeof(new_msg), msg_hash_to_str(MSG_SAVED_STATE_TO_SLOT),
+         snprintf(new_msg, sizeof(new_msg),
+               msg_hash_to_str(MSG_SAVED_STATE_TO_SLOT),
                state->state_slot);
          msg = strdup(new_msg);
       }
@@ -1928,8 +1932,8 @@ static bool dump_to_file_desperate(const void *data,
 bool content_load_state_from_ram(void)
 {
    size_t temp_data_size;
-   bool ret                  = false;
-   void* temp_data           = NULL;
+   bool ret        = false;
+   void* temp_data = NULL;
 
    if (!core_info_current_supports_savestate())
    {
@@ -1947,19 +1951,19 @@ bool content_load_state_from_ram(void)
          msg_hash_to_str(MSG_BYTES));
 
    /* We need to make a temporary copy of the buffer, to allow the swap below */
-   temp_data              = malloc(ram_buf.state_buf.size);
-   temp_data_size         = ram_buf.state_buf.size;
+   temp_data       = malloc(ram_buf.state_buf.size);
+   temp_data_size  = ram_buf.state_buf.size;
    memcpy(temp_data, ram_buf.state_buf.data, ram_buf.state_buf.size);
 
    /* Swap the current state with the backup state. This way, we can undo
    what we're undoing */
    //content_save_state("RAM", false, false);
 
-   ret                    = content_deserialize_state(temp_data, temp_data_size);
+   ret             = content_deserialize_state(temp_data, temp_data_size);
 
    /* Clean up the temporary copy */
    free(temp_data);
-   temp_data              = NULL;
+   temp_data       = NULL;
 
    if (!ret)
    {
@@ -1972,9 +1976,9 @@ bool content_load_state_from_ram(void)
 
 /**
  * content_save_state_from_ram:
- * Save a state to ram.
+ * Save a state to RAM.
  *
- * Returns: true if successful, false otherwise.
+ * @return true if successful, false otherwise.
  **/
 bool content_save_state_to_ram(void)
 {
@@ -1997,9 +2001,7 @@ bool content_save_state_to_ram(void)
 
    if (!save_state_in_background)
    {
-      data = content_get_serialized_data(&serial_size);
-
-      if (!data)
+      if (!(data = content_get_serialized_data(&serial_size)))
       {
          RARCH_ERR("[State]: %s.\n",
                msg_hash_to_str(MSG_FAILED_TO_SAVE_SRAM));
@@ -2013,13 +2015,13 @@ bool content_save_state_to_ram(void)
    }
 
    if (!data)
-      data = content_get_serialized_data(&serial_size);
-
-   if (!data)
    {
-      RARCH_ERR("[State]: %s.\n",
-            msg_hash_to_str(MSG_FAILED_TO_SAVE_SRAM));
-      return false;
+      if (!(data = content_get_serialized_data(&serial_size)))
+      {
+         RARCH_ERR("[State]: %s.\n",
+               msg_hash_to_str(MSG_FAILED_TO_SAVE_SRAM));
+         return false;
+      }
    }
 
    /* If we were holding onto an old state already, clean it up first */
@@ -2029,8 +2031,7 @@ bool content_save_state_to_ram(void)
       ram_buf.state_buf.data = NULL;
    }
 
-   ram_buf.state_buf.data = malloc(serial_size);
-   if (!ram_buf.state_buf.data)
+   if (!(ram_buf.state_buf.data = malloc(serial_size)))
    {
       free(data);
       return false;
@@ -2039,7 +2040,7 @@ bool content_save_state_to_ram(void)
    memcpy(ram_buf.state_buf.data, data, serial_size);
    free(data);
    ram_buf.state_buf.size = serial_size;
-   ram_buf.to_write_file = true;
+   ram_buf.to_write_file  = true;
 
    return true;
 }
@@ -2047,19 +2048,19 @@ bool content_save_state_to_ram(void)
 /**
  * content_ram_state_to_file:
  * @path             : path of ram state that shall be written to.
- * Save a ram state from memory to disk.
+ * Save a RAM state from memory to disk.
  *
- * Returns: true if successful, false otherwise.
+ * @return true if successful, false otherwise.
  **/
 bool content_ram_state_to_file(const char *path)
 {
-   settings_t *settings            = config_get_ptr();
+   settings_t *settings = config_get_ptr();
 #if defined(HAVE_ZLIB)
-   bool compress_files             = settings->bools.save_file_compression;
+   bool compress_files  = settings->bools.save_file_compression;
 #else
-   bool compress_files             = false;
+   bool compress_files  = false;
 #endif
-   bool write_success;
+   bool write_success   = false;
 
    if (!path)
       return false;
@@ -2080,9 +2081,12 @@ bool content_ram_state_to_file(const char *path)
          path, ram_buf.state_buf.data, ram_buf.state_buf.size);
 
    if (write_success)
+   {
       ram_buf.to_write_file = false;
+      return true;
+   }
 
-   return write_success;
+   return false;
 }
 
 /**

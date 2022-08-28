@@ -1157,6 +1157,12 @@ MSG_HASH(
    "システムの動作に関係するファイルが格納される初期ディレクトリを変更します."
    )
 
+/* Core option category placeholders for icons */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_SETTINGS,
+   "システム"
+   )
+
 #ifdef HAVE_MIST
 #endif
 
@@ -3917,6 +3923,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_SETTINGS,
    "メニューの外観に関係する設定を変更します."
    )
+#ifdef _3DS
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "詳細設定を表示"
@@ -9420,10 +9428,6 @@ MSG_HASH(
    "相手の接続が失敗しました. 古いRetroArchバージョンを使っているかもしれません. "
    )
 MSG_HASH(
-   MSG_NETPLAY_OUT_OF_DATE,
-   "相手のRetroArchバージョンは古いため, 接続できません。"
-   )
-MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
    "警告: 相手が違うRetroArchバージョンを使っています. 問題があれば同じバージョンを使って下さい. "
    )
@@ -9434,14 +9438,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_CORE_VERSIONS,
    "警告: 相手が違うコアのバージョンを使っています. 問題があれば同じバージョンを使って下さい. "
-   )
-MSG_HASH(
-   MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "このコアはこれらのシステム間のアーキテクチャ間ネットプレイに対応していません"
-   )
-MSG_HASH(
-   MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "このコアはアーキテクチャ間ネットプレイに対応していません"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -11134,7 +11130,7 @@ MSG_HASH(
    "ハードウェアコンテキストのスケーリングです. （利用可能な場合）"
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_3DS_LCD_BOTTOM,
    "3DSボトム画面"

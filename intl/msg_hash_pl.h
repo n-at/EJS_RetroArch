@@ -1257,6 +1257,28 @@ MSG_HASH(
    "Zmień domyślne katalogi, w których znajdują się pliki."
    )
 
+/* Core option category placeholders for icons */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MAPPING_SETTINGS,
+   "Mapowanie"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS,
+   "Wydajność"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SOUND_SETTINGS,
+   "Dźwięk"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SPECS_SETTINGS,
+   "Dane techniczne"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_STORAGE_SETTINGS,
+   "Pamięć"
+   )
+
 #ifdef HAVE_MIST
 MSG_HASH(
    MENU_ENUM_SUBLABEL_STEAM_SETTINGS,
@@ -4273,6 +4295,12 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_SETTINGS,
    "Zmień ustawienia wyglądu ekranu menu."
    )
+#ifdef _3DS
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_BOTTOM_SETTINGS,
+   "Wygląd dolnego ekranu 3DS"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHOW_ADVANCED_SETTINGS,
    "Pokaż ustawienia zaawansowane"
@@ -10564,10 +10592,6 @@ MSG_HASH(
    "Próba połączenia online nie powiodła się, ponieważ peer nie działa w trybie RetroArch lub używa starej wersji RetroArch."
    )
 MSG_HASH(
-   MSG_NETPLAY_OUT_OF_DATE,
-   "Grający online korzysta ze starej wersji RetroArch. Nie można połączyć."
-   )
-MSG_HASH(
    MSG_NETPLAY_DIFFERENT_VERSIONS,
    "OSTRZEŻENIE: Grający online korzysta z innej wersji RetroArch. Jeśli wystąpią problemy, użyjcie tej samej wersji."
    )
@@ -10578,14 +10602,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_NETPLAY_DIFFERENT_CORE_VERSIONS,
    "OSTRZEŻENIE: Grający online ma inną wersję rdzenia. Jeśli wystąpią problemy, użyj tej samej wersji."
-   )
-MSG_HASH(
-   MSG_NETPLAY_ENDIAN_DEPENDENT,
-   "Ten rdzeń nie obsługuje gry online między architekturami tych systemów"
-   )
-MSG_HASH(
-   MSG_NETPLAY_PLATFORM_DEPENDENT,
-   "Ten rdzeń nie obsługuje gry online między architekturami"
    )
 MSG_HASH(
    MSG_NETPLAY_ENTER_PASSWORD,
@@ -12546,7 +12562,7 @@ MSG_HASH(
    "Skalowanie kontekstu sprzętowego (jeśli dostępne)."
    )
 #endif
-#if defined(_3DS)
+#ifdef _3DS
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_3DS_LCD_BOTTOM,
    "Dolny ekran 3DS"
