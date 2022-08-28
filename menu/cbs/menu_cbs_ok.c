@@ -383,6 +383,10 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
 #endif
       case ACTION_OK_DL_MENU_SETTINGS_LIST:
          return MENU_ENUM_LABEL_DEFERRED_MENU_SETTINGS_LIST;
+#ifdef _3DS
+      case ACTION_OK_DL_MENU_BOTTOM_SETTINGS_LIST:
+         return MENU_ENUM_LABEL_DEFERRED_MENU_BOTTOM_SETTINGS_LIST;
+#endif
       case ACTION_OK_DL_MENU_VIEWS_SETTINGS_LIST:
          return MENU_ENUM_LABEL_DEFERRED_MENU_VIEWS_SETTINGS_LIST;
       case ACTION_OK_DL_SETTINGS_VIEWS_SETTINGS_LIST:
@@ -1566,6 +1570,9 @@ int generic_action_ok_displaylist_push(const char *path,
       case ACTION_OK_DL_ONSCREEN_VIDEO_LAYOUT_SETTINGS_LIST:
 #endif
       case ACTION_OK_DL_MENU_SETTINGS_LIST:
+#ifdef _3DS
+      case ACTION_OK_DL_MENU_BOTTOM_SETTINGS_LIST:
+#endif
       case ACTION_OK_DL_MENU_VIEWS_SETTINGS_LIST:
       case ACTION_OK_DL_SETTINGS_VIEWS_SETTINGS_LIST:
       case ACTION_OK_DL_QUICK_MENU_VIEWS_SETTINGS_LIST:
@@ -1644,9 +1651,9 @@ int generic_action_ok_displaylist_push(const char *path,
          info_path          = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_SETTINGS);
          info_label         = msg_hash_to_str(MENU_ENUM_LABEL_CONTENT_SETTINGS);
          info.enum_idx      = MENU_ENUM_LABEL_CONTENT_SETTINGS;
-         menu_entries_append_enum(menu_stack, info_path, info_label,
+         menu_entries_append(menu_stack, info_path, info_label,
                MENU_ENUM_LABEL_CONTENT_SETTINGS,
-               0, 0, 0);
+               0, 0, 0, NULL);
          dl_type            = DISPLAYLIST_CONTENT_SETTINGS;
          break;
    }
@@ -5057,7 +5064,7 @@ static int action_ok_download_generic(const char *path,
          path = "shaders_cg.zip";
          break;
       case MENU_ENUM_LABEL_CB_CORE_THUMBNAILS_DOWNLOAD:
-         strcpy_literal(s, "http://thumbnailpacks.libretro.com");
+         strlcpy(s, "http://thumbnailpacks.libretro.com", sizeof(s));
          break;
       default:
          strlcpy(s, network_buildbot_url, sizeof(s));
@@ -5458,8 +5465,8 @@ static int action_ok_add_to_favorites(const char *path,
 
       if (string_is_empty(core_path) || string_is_empty(core_name))
       {
-         strcpy_literal(core_path, FILE_PATH_DETECT);
-         strcpy_literal(core_name, FILE_PATH_DETECT);
+         strlcpy(core_path, FILE_PATH_DETECT, sizeof(core_path));
+         strlcpy(core_name, FILE_PATH_DETECT, sizeof(core_name));
       }
 
       /* > crc32 + db_name */
@@ -5808,6 +5815,9 @@ DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_overlay_list, ACTION_OK_DL_ONSCREEN_OV
 DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_video_layout_list, ACTION_OK_DL_ONSCREEN_VIDEO_LAYOUT_SETTINGS_LIST)
 #endif
 DEFAULT_ACTION_OK_FUNC(action_ok_menu_list, ACTION_OK_DL_MENU_SETTINGS_LIST)
+#ifdef _3DS
+DEFAULT_ACTION_OK_FUNC(action_ok_menu_bottom_list, ACTION_OK_DL_MENU_BOTTOM_SETTINGS_LIST)
+#endif
 DEFAULT_ACTION_OK_FUNC(action_ok_quick_menu_override_options, ACTION_OK_DL_QUICK_MENU_OVERRIDE_OPTIONS_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_menu_views_list, ACTION_OK_DL_MENU_VIEWS_SETTINGS_LIST)
 DEFAULT_ACTION_OK_FUNC(action_ok_settings_views_list, ACTION_OK_DL_SETTINGS_VIEWS_SETTINGS_LIST)
@@ -8335,6 +8345,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_ONSCREEN_NOTIFICATIONS_VIEWS_SETTINGS, action_ok_onscreen_notifications_views_list},
          {MENU_ENUM_LABEL_ONSCREEN_OVERLAY_SETTINGS,           action_ok_onscreen_overlay_list},
          {MENU_ENUM_LABEL_MENU_SETTINGS,                       action_ok_menu_list},
+#ifdef _3DS
+         {MENU_ENUM_LABEL_MENU_BOTTOM_SETTINGS,                action_ok_menu_bottom_list},
+#endif
          {MENU_ENUM_LABEL_MENU_VIEWS_SETTINGS,                 action_ok_menu_views_list},
          {MENU_ENUM_LABEL_QUICK_MENU_OVERRIDE_OPTIONS,         action_ok_quick_menu_override_options},
          {MENU_ENUM_LABEL_SETTINGS_VIEWS_SETTINGS,             action_ok_settings_views_list},

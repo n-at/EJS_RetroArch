@@ -20,7 +20,6 @@
 #include <ctype.h>
 #include <boolean.h>
 #include <sys/stat.h>
-#include <errno.h>
 #include <dirent.h>
 
 #include <3ds.h>
@@ -85,7 +84,7 @@ static void get_first_valid_core(char* path_return, size_t len)
          if (strlen(ent->d_name) > strlen(extension) 
                && !strcmp(ent->d_name + strlen(ent->d_name) - strlen(extension), extension))
          {
-            strcpy_literal(path_return, "sdmc:/retroarch/cores/");
+            strlcpy(path_return, "sdmc:/retroarch/cores/", len);
             strlcat(path_return, ent->d_name, len);
             break;
          }
@@ -136,6 +135,9 @@ static void frontend_ctr_get_env(int* argc, char* argv[],
                       "logs", sizeof(g_defaults.dirs[DEFAULT_DIR_LOGS]));
    fill_pathname_join(g_defaults.path_config, g_defaults.dirs[DEFAULT_DIR_PORT],
                       FILE_PATH_MAIN_CONFIG, sizeof(g_defaults.path_config));
+
+   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_BOTTOM_ASSETS], g_defaults.dirs[DEFAULT_DIR_ASSETS],
+                      "ctr", sizeof(g_defaults.dirs[DEFAULT_DIR_BOTTOM_ASSETS]));
 
 #ifndef IS_SALAMANDER
    dir_check_defaults("custom.ini");
@@ -553,12 +555,12 @@ static int frontend_ctr_parse_drive_list(void* data, bool load_content)
    if (!list)
       return -1;
 
-   menu_entries_append_enum(list,
+   menu_entries_append(list,
          "sdmc:/",
          msg_hash_to_str(
             MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
          enum_idx,
-         FILE_TYPE_DIRECTORY, 0, 0);
+         FILE_TYPE_DIRECTORY, 0, 0, NULL);
 #endif
 
    return 0;
@@ -607,7 +609,7 @@ static void frontend_ctr_get_os(char* s, size_t len, int* major, int* minor)
    OS_VersionBin cver;
    OS_VersionBin nver;
 
-   strcpy_literal(s, "3DS OS");
+   strlcpy(s, "3DS OS", len);
    Result data_invalid = osGetSystemVersionData(&nver, &cver);
    if (data_invalid == 0)
    {
@@ -632,26 +634,26 @@ static void frontend_ctr_get_name(char* s, size_t len)
    switch (device_model)
    {
       case 0:
-         strcpy_literal(s, "Old 3DS");
+         strlcpy(s, "Old 3DS", len);
          break;
       case 1:
-         strcpy_literal(s, "Old 3DS XL");
+         strlcpy(s, "Old 3DS XL", len);
          break;
       case 2:
-         strcpy_literal(s, "New 3DS");
+         strlcpy(s, "New 3DS", len);
          break;
       case 3:
-         strcpy_literal(s, "Old 2DS");
+         strlcpy(s, "Old 2DS", len);
          break;
       case 4:
-         strcpy_literal(s, "New 3DS XL");
+         strlcpy(s, "New 3DS XL", len);
          break;
       case 5:
-         strcpy_literal(s, "New 2DS XL");
+         strlcpy(s, "New 2DS XL", len);
          break;
 
       default:
-         strcpy_literal(s, "Unknown Device");
+         strlcpy(s, "Unknown Device", len);
          break;
    }
 }

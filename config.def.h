@@ -801,7 +801,7 @@ static const float menu_header_opacity = 1.000;
 #define DEFAULT_MENU_SHADER_PIPELINE 2
 #endif
 
-#define DEFAULT_SHOW_ADVANCED_SETTINGS false
+#define DEFAULT_SHOW_ADVANCED_SETTINGS true
 
 #define DEFAULT_RGUI_COLOR_THEME RGUI_THEME_CLASSIC_GREEN
 #define DEFAULT_RGUI_TRANSPARENCY true
@@ -976,13 +976,17 @@ static const float message_bgcolor_opacity = 1.0f;
  * Used for setups where one manually rotates the monitor. */
 #define DEFAULT_ALLOW_ROTATE true
 
-#if defined(_3DS)
+#ifdef _3DS
 /* Enable New3DS clock and L2 cache */
 static const bool new3ds_speedup_enable      = true;
 /* Enable bottom LCD screen */
 static const bool video_3ds_lcd_bottom       = true;
 /* Sets video display mode (3D, 2D, etc.) */
 static const unsigned video_3ds_display_mode = CTR_VIDEO_MODE_3D;
+
+#define DEFAULT_BOTTOM_FONT_ENABLE true
+#define DEFAULT_BOTTOM_FONT_COLOR 255
+#define DEFAULT_BOTTOM_FONT_SCALE 1.48
 #endif
 
 #ifdef WIIU
@@ -1284,8 +1288,7 @@ static const bool savestate_thumbnail_enable = false;
 
 /* When creating save state files, compress
  * written data */
-#if defined(__WINRT__) || defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
-/* TODO/FIXME Apparently this is an issue on UWP for now, so disable it for now */
+#if defined(WINAPI_FAMILY) && WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
 #define DEFAULT_SAVESTATE_FILE_COMPRESSION false
 #else
 #define DEFAULT_SAVESTATE_FILE_COMPRESSION true

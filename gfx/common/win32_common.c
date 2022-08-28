@@ -1998,8 +1998,13 @@ static void win32_localize_menu(HMENU menu)
 
             if (new_label_text)
             {
+               size_t _len;
                new_label2              = new_label_text;
-               snprintf(new_label_text, buf_size, "%s\t%s", new_label, meta_key_name);
+               _len                    = strlcpy(new_label_text, new_label,
+                     buf_size);
+               new_label_text[_len  ]  = '\t';
+               new_label_text[_len+1]  = '\0';
+               strlcat(new_label_text, meta_key_name, buf_size);
                /* Make first character of shortcut name uppercase */
                new_label_text[len1 + 1] = toupper(new_label_text[len1 + 1]);
             }
@@ -2334,22 +2339,17 @@ bool win32_set_video_mode(void *data,
 void win32_update_title(void)
 {
    const ui_window_t *window         = ui_companion_driver_get_window_ptr();
-   static unsigned update_title_wait = 0;
-
-   if (update_title_wait)
-   {
-      update_title_wait--;
-      return;
-   }
-
    if (window)
    {
+      static char prev_title[128];
       char title[128];
       title[0] = '\0';
       video_driver_get_window_title(title, sizeof(title));
-      update_title_wait = g_win32_refresh_rate;
-      if (title[0])
+      if (title[0] && !string_is_equal(title, prev_title))
+      {
          window->set_title(&main_window, title);
+         strlcpy(prev_title, title, sizeof(prev_title));
+      }
    }
 }
 #endif

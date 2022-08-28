@@ -799,7 +799,7 @@ bool command_get_status(command_t *cmd, const char* arg)
    content_get_status(&contentless, &is_inited);
 
    if (!is_inited)
-       strcpy_literal(reply, "GET_STATUS CONTENTLESS");
+       strlcpy(reply, "GET_STATUS CONTENTLESS", sizeof(reply));
    else
    {
        /* add some content info */
@@ -1509,9 +1509,10 @@ bool command_event_save_core_config(
       for (i = 0; i < 16; i++)
       {
          if (i)
-            snprintf(tmp, sizeof(tmp), "%s-%u.cfg", config_path, i);
+            snprintf(tmp, sizeof(tmp), "%s-%u", config_path, i);
          else
-            snprintf(tmp, sizeof(tmp), "%s.cfg", config_path);
+            strlcpy(tmp, config_path, sizeof(tmp));
+         strlcat(tmp, ".cfg", sizeof(tmp));
 
          if (!path_is_valid(tmp))
          {

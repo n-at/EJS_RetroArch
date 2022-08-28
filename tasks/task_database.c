@@ -42,6 +42,7 @@
 #include "../gfx/video_display_server.h"
 #endif
 #include "../verbosity.h"
+#include "task_database_cue.h"
 
 typedef struct database_state_handle
 {
@@ -70,25 +71,6 @@ typedef struct db_handle
    bool scan_without_core_match;
    bool show_hidden_files;
 } db_handle_t;
-
-/* Forward declarations */
-int cue_find_track(const char *cue_path, bool first,
-      uint64_t *offset, uint64_t *size,
-      char *track_path, uint64_t max_len);
-bool cue_next_file(intfstream_t *fd, const char *cue_path,
-      char *path, uint64_t max_len);
-int gdi_find_track(const char *gdi_path, bool first,
-      char *track_path, uint64_t max_len);
-bool gdi_next_file(intfstream_t *fd, const char *gdi_path,
-      char *path, uint64_t max_len);
-int detect_system(intfstream_t *fd, const char** system_name, const char *filename);
-int detect_ps1_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_psp_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_gc_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_scd_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_sat_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_dc_game(intfstream_t *fd, char *serial, const char *filename);
-int detect_wii_game(intfstream_t *fd, char *serial, const char *filename);
 
 static const char *database_info_get_current_name(
       database_state_handle_t *handle)
@@ -148,44 +130,44 @@ static int task_database_iterate_start(retro_task_t *task,
    return 0;
 }
 
-static int intfstream_get_serial(intfstream_t *fd, char *serial, const char *filename)
+static int intfstream_get_serial(intfstream_t *fd, char *serial, size_t serial_len, const char *filename)
 {
    const char *system_name = NULL;
    if (detect_system(fd, &system_name, filename) >= 1)
    {
       if (string_is_equal(system_name, "Sony - PlayStation Portable"))
       {
-         if (detect_psp_game(fd, serial, filename) != 0)
+         if (detect_psp_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Sony - PlayStation"))
       {
-         if (detect_ps1_game(fd, serial, filename) != 0)
+         if (detect_ps1_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Nintendo - GameCube"))
       {
-         if (detect_gc_game(fd, serial, filename) != 0)
+         if (detect_gc_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Sega - Mega-CD - Sega CD"))
       {
-         if (detect_scd_game(fd, serial, filename) != 0)
+         if (detect_scd_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Sega - Saturn"))
       {
-         if (detect_sat_game(fd, serial, filename) != 0)
+         if (detect_sat_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Sega - Dreamcast"))
       {
-         if (detect_dc_game(fd, serial, filename) != 0)
+         if (detect_dc_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
       else if (string_is_equal(system_name, "Nintendo - Wii"))
       {
-         if (detect_wii_game(fd, serial, filename) != 0)
+         if (detect_wii_game(fd, serial, serial_len, filename) != 0)
             return 1;
       }
    }
@@ -193,7 +175,7 @@ static int intfstream_get_serial(intfstream_t *fd, char *serial, const char *fil
 }
 
 static bool intfstream_file_get_serial(const char *name,
-      uint64_t offset, uint64_t size, char *serial)
+      uint64_t offset, uint64_t size, char *serial, size_t serial_len)
 {
    int rv;
    uint8_t *data     = NULL;
@@ -230,17 +212,16 @@ static bool intfstream_file_get_serial(const char *name,
 
       intfstream_close(fd);
       free(fd);
-      fd = intfstream_open_memory(data, RETRO_VFS_FILE_ACCESS_READ,
+      if (!(fd = intfstream_open_memory(data, RETRO_VFS_FILE_ACCESS_READ,
             RETRO_VFS_FILE_ACCESS_HINT_NONE,
-            size);
-      if (!fd)
+            size)))
       {
          free(data);
          return 0;
       }
    }
 
-   rv = intfstream_get_serial(fd, serial, name);
+   rv = intfstream_get_serial(fd, serial, serial_len, name);
    intfstream_close(fd);
    free(fd);
    free(data);
@@ -252,59 +233,47 @@ error:
    return 0;
 }
 
-static int task_database_cue_get_serial(const char *name, char* serial)
+static int task_database_cue_get_serial(const char *name, char* serial, size_t serial_len)
 {
-   int rv;
    char track_path[PATH_MAX_LENGTH];
    uint64_t offset                  = 0;
    uint64_t size                    = 0;
 
    track_path[0]                    = '\0';
 
-   if ((rv = cue_find_track(name, true, &offset, &size, track_path,
-sizeof(track_path))) < 0)
+   if (cue_find_track(name, true, &offset, &size, track_path,
+sizeof(track_path)) < 0)
    {
 #ifdef DEBUG
-      RARCH_LOG("%s: %s\n",
-            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK),
-            strerror(-rv));
+      RARCH_LOG("%s\n",
+            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK));
 #endif
       return 0;
    }
 
-#ifdef DEBUG
-   RARCH_LOG("%s\n", msg_hash_to_str(MSG_READING_FIRST_DATA_TRACK));
-#endif
-
-   return intfstream_file_get_serial(track_path, offset, size, serial);
+   return intfstream_file_get_serial(track_path, offset, size, serial, serial_len);
 }
 
-static int task_database_gdi_get_serial(const char *name, char* serial)
+static int task_database_gdi_get_serial(const char *name, char* serial, size_t serial_len)
 {
    char track_path[PATH_MAX_LENGTH];
-   int rv                           = 0;
 
    track_path[0]                    = '\0';
 
-   if ((rv = gdi_find_track(name, true,
-               track_path, sizeof(track_path))) < 0)
+   if (gdi_find_track(name, true,
+               track_path, sizeof(track_path)) < 0)
    {
 #ifdef DEBUG
-      RARCH_LOG("%s: %s\n",
-            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK),
-            strerror(-rv));
+      RARCH_LOG("%s\n",
+            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK));
 #endif
       return 0;
    }
 
-#ifdef DEBUG
-   RARCH_LOG("%s\n", msg_hash_to_str(MSG_READING_FIRST_DATA_TRACK));
-#endif
-
-   return intfstream_file_get_serial(track_path, 0, SIZE_MAX, serial);
+   return intfstream_file_get_serial(track_path, 0, SIZE_MAX, serial, serial_len);
 }
 
-static int task_database_chd_get_serial(const char *name, char* serial)
+static int task_database_chd_get_serial(const char *name, char* serial, size_t serial_len)
 {
    int result;
    intfstream_t *fd = intfstream_open_chd_track(
@@ -315,7 +284,7 @@ static int task_database_chd_get_serial(const char *name, char* serial)
    if (!fd)
       return 0;
 
-   result = intfstream_get_serial(fd, serial, name);
+   result = intfstream_get_serial(fd, serial, serial_len, name);
    intfstream_close(fd);
    free(fd);
    return result;
@@ -385,67 +354,44 @@ static int task_database_cue_get_crc(const char *name, uint32_t *crc)
    char track_path[PATH_MAX_LENGTH];
    uint64_t offset  = 0;
    uint64_t size    = 0;
-   int rv           = 0;
 
    track_path[0]    = '\0';
 
-   if ((rv = cue_find_track(name, false, &offset, &size,
-         track_path, sizeof(track_path))) < 0)
+   if (cue_find_track(name, false, &offset, &size,
+         track_path, sizeof(track_path)) < 0)
    {
 #ifdef DEBUG
-      RARCH_LOG("%s: %s\n",
-            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK),
-            strerror(-rv));
+      RARCH_LOG("%s\n",
+            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK));
 #endif
       return 0;
    }
 
-#ifdef DEBUG
-   RARCH_LOG("CUE '%s' primary track: %s\n (%lu, %lu)\n",name, track_path, (unsigned long) offset, (unsigned long) size);
-   RARCH_LOG("%s\n", msg_hash_to_str(MSG_READING_FIRST_DATA_TRACK));
-
-   rv = intfstream_file_get_crc(track_path, offset, (size_t)size, crc);
-   if (rv == 1)
-      RARCH_LOG("CUE '%s' crc: %x\n", name, *crc);
-   return rv;
-#else
    return intfstream_file_get_crc(track_path, offset, (size_t)size, crc);
-#endif
 }
 
 static int task_database_gdi_get_crc(const char *name, uint32_t *crc)
 {
    char track_path[PATH_MAX_LENGTH];
-   int rv        = 0;
 
    track_path[0] = '\0';
 
-   if ((rv = gdi_find_track(name, true,
-               track_path, sizeof(track_path))) < 0)
+   if (gdi_find_track(name, true,
+               track_path, sizeof(track_path)) < 0)
    {
 #ifdef DEBUG
-      RARCH_LOG("%s: %s\n", msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK),
-                strerror(-rv));
+      RARCH_LOG("%s\n",
+            msg_hash_to_str(MSG_COULD_NOT_FIND_VALID_DATA_TRACK));
 #endif
       return 0;
    }
 
-#ifdef DEBUG
-   RARCH_LOG("GDI '%s' primary track: %s\n", name, track_path);
-   RARCH_LOG("%s\n", msg_hash_to_str(MSG_READING_FIRST_DATA_TRACK));
-
-   rv = intfstream_file_get_crc(track_path, 0, SIZE_MAX, crc);
-   if (rv == 1)
-      RARCH_LOG("GDI '%s' crc: %x\n", name, *crc);
-   return rv;
-#else
    return intfstream_file_get_crc(track_path, 0, SIZE_MAX, crc);
-#endif
 }
 
 static bool task_database_chd_get_crc(const char *name, uint32_t *crc)
 {
-   bool rv;
+   bool found_crc   = false;
    intfstream_t *fd = intfstream_open_chd_track(
          name,
          RETRO_VFS_FILE_ACCESS_READ,
@@ -454,17 +400,13 @@ static bool task_database_chd_get_crc(const char *name, uint32_t *crc)
    if (!fd)
       return 0;
 
-   rv = intfstream_get_crc(fd, crc);
-#ifdef DEBUG
-   if (rv)
-      RARCH_LOG("CHD '%s' crc: %x\n", name, *crc);
-#endif
+   found_crc = intfstream_get_crc(fd, crc);
    if (fd)
    {
       intfstream_close(fd);
       free(fd);
    }
-   return rv;
+   return found_crc;
 }
 
 static void task_database_cue_prune(database_info_handle_t *db,
@@ -587,7 +529,7 @@ static int task_database_iterate_playlist(
       case FILE_TYPE_CUE:
          task_database_cue_prune(db, name);
          db_state->serial[0] = '\0';
-         if (task_database_cue_get_serial(name, db_state->serial))
+         if (task_database_cue_get_serial(name, db_state->serial, sizeof(db_state->serial)))
             db->type = DATABASE_TYPE_SERIAL_LOOKUP;
          else
          {
@@ -600,7 +542,7 @@ static int task_database_iterate_playlist(
          db_state->serial[0] = '\0';
          /* There are no serial databases, so don't bother with
             serials at the moment */
-         if (0 && task_database_gdi_get_serial(name, db_state->serial))
+         if (0 && task_database_gdi_get_serial(name, db_state->serial, sizeof(db_state->serial)))
             db->type = DATABASE_TYPE_SERIAL_LOOKUP;
          else
          {
@@ -611,17 +553,17 @@ static int task_database_iterate_playlist(
       /* Consider Wii WBFS files similar to ISO files. */
       case FILE_TYPE_WBFS:
          db_state->serial[0] = '\0';
-         intfstream_file_get_serial(name, 0, SIZE_MAX, db_state->serial);
+         intfstream_file_get_serial(name, 0, SIZE_MAX, db_state->serial, sizeof(db_state->serial));
          db->type            =  DATABASE_TYPE_SERIAL_LOOKUP;
          break;
       case FILE_TYPE_ISO:
          db_state->serial[0] = '\0';
-         intfstream_file_get_serial(name, 0, SIZE_MAX, db_state->serial);
+         intfstream_file_get_serial(name, 0, SIZE_MAX, db_state->serial, sizeof(db_state->serial));
          db->type            =  DATABASE_TYPE_SERIAL_LOOKUP;
          break;
       case FILE_TYPE_CHD:
          db_state->serial[0] = '\0';
-         if (task_database_chd_get_serial(name, db_state->serial))
+         if (task_database_chd_get_serial(name, db_state->serial, sizeof(db_state->serial)))
             db->type         = DATABASE_TYPE_SERIAL_LOOKUP;
          else
          {
@@ -1047,6 +989,7 @@ static int task_database_iterate_serial_lookup(
 
    if (db_state->entry_index == 0)
    {
+      size_t _len;
       char query[50];
       char *serial_buf = bin_to_hex_alloc(
             (uint8_t*)db_state->serial,
@@ -1055,9 +998,11 @@ static int task_database_iterate_serial_lookup(
       if (!serial_buf)
          return 1;
 
-      query[0] = '\0';
-
-      snprintf(query, sizeof(query), "{'serial': b'%s'}", serial_buf);
+      strlcpy(query, "{'serial': b'", sizeof(query));
+      _len          = strlcat(query, serial_buf, sizeof(query));
+      query[_len  ] = '\'';
+      query[_len+1] = '}';
+      query[_len+2] = '\0';
       database_info_list_iterate_new(db_state, query);
 
       free(serial_buf);

@@ -286,7 +286,10 @@ static void frontend_darwin_get_os(char *s, size_t len, int *major, int *minor)
 {
 #if defined(IOS)
    get_ios_version(major, minor);
-   strcpy_literal(s, "iOS");
+   s[0] = 'i';
+   s[1] = 'O';
+   s[2] = 'S';
+   s[3] = '\0';
 #elif defined(OSX)
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300 // MAC_OS_X_VERSION_10_13
@@ -319,7 +322,10 @@ static void frontend_darwin_get_os(char *s, size_t len, int *major, int *minor)
       Gestalt(gestaltSystemVersionMajor, (SInt32*)major);
    }
 #endif
-   strcpy_literal(s, "OSX");
+   s[0] = 'O';
+   s[1] = 'S';
+   s[2] = 'X';
+   s[3] = '\0';
 #endif
 }
 
@@ -460,7 +466,7 @@ static void frontend_darwin_get_env(int *argc, char *argv[],
        int major, minor;
        get_ios_version(&major, &minor);
        if (major > 8)
-          strcpy_literal(g_defaults.path_buildbot_server_url, "http://buildbot.libretro.com/nightly/apple/ios9/latest/");
+          strlcpy(g_defaults.path_buildbot_server_url, "http://buildbot.libretro.com/nightly/apple/ios9/latest/", sizeof(g_defaults.path_buildbot_server_url));
     }
 #endif
 
@@ -772,15 +778,15 @@ static int frontend_darwin_parse_drive_list(void *data, bool load_content)
    CFSearchPathForDirectoriesInDomains(
          home_dir_buf, sizeof(home_dir_buf));
 
-   menu_entries_append_enum(list,
+   menu_entries_append(list,
          home_dir_buf,
          msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
          enum_idx,
-         FILE_TYPE_DIRECTORY, 0, 0);
-   menu_entries_append_enum(list, "/",
+         FILE_TYPE_DIRECTORY, 0, 0, NULL);
+   menu_entries_append(list, "/",
          msg_hash_to_str(MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR),
          enum_idx,
-        FILE_TYPE_DIRECTORY, 0, 0);
+        FILE_TYPE_DIRECTORY, 0, 0, NULL);
 
    ret = 0;
 
