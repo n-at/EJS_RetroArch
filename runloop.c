@@ -6311,7 +6311,6 @@ void runloop_msg_queue_push(const char *msg,
       enum message_queue_icon icon,
       enum message_queue_category category)
 {
-    return;
 #if defined(HAVE_GFX_WIDGETS)
    bool widgets_active         = dispwidget_get_ptr()->active;
 #endif
