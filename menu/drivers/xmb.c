@@ -54,7 +54,6 @@
 #include "../../input/input_osk.h"
 
 #include "../../file_path_special.h"
-#include "../../verbosity.h"
 #include "../../configuration.h"
 
 #include "../../tasks/tasks_internal.h"
@@ -342,7 +341,6 @@ typedef struct xmb_handle
    size_t categories_selection_ptr_old;
    size_t selection_ptr_old;
    size_t fullscreen_thumbnail_selection;
-   size_t playlist_index;
    size_t playlist_collection_offset;
 
    /* size of the current list */
@@ -423,6 +421,7 @@ typedef struct xmb_handle
    /* Favorites, History, Images, Music, Videos, user generated */
    bool is_playlist;
    bool is_db_manager_list;
+   bool is_explore_list;
    bool is_contentless_cores;
 
    /* Load Content file browser */
@@ -1036,7 +1035,7 @@ static void xmb_render_messagebox_internal(
       if (!string_is_empty(msg))
       {
          int width     = font_driver_get_message_width(
-               xmb->font, msg, (unsigned)strlen(msg), 1);
+               xmb->font, msg, strlen(msg), 1);
          if (width > longest_width)
             longest_width = width;
       }
@@ -1197,8 +1196,6 @@ static void xmb_update_savestate_thumbnail_path(void *data, unsigned i)
             char path[8204];
             runloop_state_t *runloop_st = runloop_state_get_ptr();
 
-            path[0] = '\0';
-
             /* State slot dropdown */
             if (string_to_unsigned(entry.label) == MENU_ENUM_LABEL_STATE_SLOT)
             {
@@ -1206,14 +1203,20 @@ static void xmb_update_savestate_thumbnail_path(void *data, unsigned i)
                xmb->is_state_slot = true;
             }
 
-            if (state_slot > 0)
-               snprintf(path, sizeof(path), "%s%d",
-                     runloop_st->name.savestate, state_slot);
-            else if (state_slot < 0)
+            if (state_slot < 0)
+            {
+               path[0] = '\0';
                fill_pathname_join_delim(path,
                      runloop_st->name.savestate, "auto", '.', sizeof(path));
+            }
             else
-               strlcpy(path, runloop_st->name.savestate, sizeof(path));
+            {
+               size_t _len = strlcpy(path,
+                     runloop_st->name.savestate, sizeof(path));
+               if (state_slot > 0)
+                  snprintf(path + _len, sizeof(path) - _len, "%d",
+                        state_slot);
+            }
 
             strlcat(path, FILE_PATH_PNG_EXTENSION, sizeof(path));
 
@@ -1228,7 +1231,7 @@ static void xmb_update_savestate_thumbnail_path(void *data, unsigned i)
                      xmb->fullscreen_thumbnail_label,
                      sizeof(xmb->fullscreen_thumbnail_label),
                      xmb->is_quick_menu,
-                     xmb->playlist_index);
+                     NULL);
             }
          }
       }
@@ -1297,20 +1300,10 @@ static void xmb_refresh_thumbnail_image(void *data, unsigned i)
       return;
 
    /* Only refresh thumbnails if thumbnails are enabled */
-   if (  gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_RIGHT) ||
-         gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_LEFT))
-   {
-      unsigned depth          = (unsigned)xmb_list_get_size(xmb, MENU_LIST_PLAIN);
-      unsigned xmb_system_tab = xmb_get_system_tab(xmb, (unsigned)xmb->categories_selection_ptr);
-
-      /* Only refresh thumbnails if we are viewing a playlist or
-       * the quick menu... */
-      if (((((xmb_system_tab > XMB_SYSTEM_TAB_SETTINGS && depth == 1) ||
-             (xmb_system_tab < XMB_SYSTEM_TAB_SETTINGS && depth == 4)) &&
-              xmb->is_playlist)) ||
-            xmb->is_quick_menu)
-         xmb_update_thumbnail_image(xmb);
-   }
+   if ((gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_RIGHT) ||
+        gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_LEFT)) &&
+        (xmb->is_quick_menu || xmb->is_playlist || xmb->is_explore_list))
+      xmb_update_thumbnail_image(xmb);
 }
 
 static void xmb_set_thumbnail_system(void *data, char*s, size_t len)
@@ -1382,9 +1375,6 @@ static void xmb_set_thumbnail_content(void *data, const char *s)
             playlist_index = list->list[selection].entry_idx;
          }
 
-         /* Remember playlist index for Quick Menu fullscreen thumbnail title */
-         xmb->playlist_index = playlist_index;
-
          gfx_thumbnail_set_content_playlist(xmb->thumbnail_path_data,
                playlist_valid ? playlist_get_cached() : NULL, playlist_index);
          xmb->fullscreen_thumbnails_available = true;
@@ -1412,6 +1402,57 @@ static void xmb_set_thumbnail_content(void *data, const char *s)
          }
       }
    }
+#if defined(HAVE_LIBRETRODB)
+   else if (xmb->is_explore_list)
+   {
+      /* Explore list */
+      if (string_is_empty(s))
+      {
+         menu_entry_t entry;
+         size_t selection         = menu_navigation_get_selection();
+
+         MENU_ENTRY_INIT(entry);
+         entry.label_enabled      = false;
+         entry.rich_label_enabled = false;
+         entry.value_enabled      = false;
+         entry.sublabel_enabled   = false;
+
+         /* First entry */
+         menu_entry_get(&entry, 0, 0, NULL, true);
+         if (string_is_empty(entry.path))
+            return;
+
+         /* No thumbnails for intermediate lists without playlist items */
+         if (!string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_ADD_ADDITIONAL_FILTER)) &&
+             !string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_SEARCH_NAME)))
+         {
+            gfx_thumbnail_set_content_playlist(xmb->thumbnail_path_data, NULL, 0);
+            xmb->fullscreen_thumbnails_available = false;
+            return;
+         }
+
+         /* Selected entry */
+         menu_entry_get(&entry, 0, selection, NULL, true);
+         if (string_is_empty(entry.path))
+            return;
+
+         /* No thumbnails for header non-items */
+         if (string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_ADD_ADDITIONAL_FILTER)) ||
+             string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_SEARCH_NAME)))
+         {
+            gfx_thumbnail_set_content_playlist(xmb->thumbnail_path_data, NULL, 0);
+            xmb->fullscreen_thumbnails_available = false;
+            return;
+         }
+         else
+         {
+            xmb->fullscreen_thumbnails_available =
+                  (menu_explore_set_entry_playlist_index(entry.type, xmb->thumbnail_path_data) >= 0 &&
+                  menu_explore_get_entry_icon(entry.type));
+         }
+      }
+   }
+#endif
    else if (string_is_equal(s, "imageviewer"))
    {
       /* Filebrowser image updates */
@@ -1549,9 +1590,9 @@ static void xmb_selection_pointer_changed(
                xmb_set_thumbnail_content(xmb, NULL);
                update_thumbnails = true;
             }
-            /* Database list updates
-             * (pointless nuisance...) */
-            else if (xmb->is_db_manager_list && depth <= 4)
+            /* Database + Explore list updates */
+            else if ((xmb->is_db_manager_list && depth <= 4) ||
+                  xmb->is_explore_list)
             {
                xmb_set_thumbnail_content(xmb, NULL);
                update_thumbnails         = true;
@@ -1797,21 +1838,18 @@ static void xmb_list_open_new(xmb_handle_t *xmb,
    xmb_system_tab = xmb_get_system_tab(xmb,
          (unsigned)xmb->categories_selection_ptr);
 
-   if (xmb_system_tab <= XMB_SYSTEM_TAB_SETTINGS)
+   if (xmb_system_tab <= XMB_SYSTEM_TAB_SETTINGS && xmb->depth > xmb->old_depth)
    {
       if (  gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_RIGHT) ||
             gfx_thumbnail_is_enabled(xmb->thumbnail_path_data, GFX_THUMBNAIL_LEFT))
       {
          if (xmb->is_playlist || xmb->is_db_manager_list)
          {
-            if (xmb->is_db_manager_list && xmb->depth < 5)
+            if (!(xmb->is_db_manager_list && xmb->depth > 4))
                xmb_unload_thumbnail_textures(xmb);
 
-            if (!(xmb->is_playlist && xmb->depth == 4 && xmb->old_depth == 5))
-            {
-               xmb_set_thumbnail_content(xmb, NULL);
-               xmb_update_thumbnail_image(xmb);
-            }
+            xmb_set_thumbnail_content(xmb, NULL);
+            xmb_update_thumbnail_image(xmb);
          }
       }
    }
@@ -2576,6 +2614,20 @@ static void xmb_populate_entries(void *data,
                         string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_SAVESTATE_LIST));
    xmb->is_state_slot = string_to_unsigned(path) == MENU_ENUM_LABEL_STATE_SLOT;
 
+   /* Explore list */
+   xmb->is_explore_list = string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_EXPLORE_LIST)) ||
+                          string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_EXPLORE_TAB));
+
+   /* Quick Menu under Explore list must also be Quick Menu */
+   if (xmb->is_explore_list)
+   {
+      xmb->is_quick_menu |= menu_is_nonrunning_quick_menu() || menu_is_running_quick_menu();
+      if (xmb->is_quick_menu)
+         xmb->is_explore_list = false;
+      else
+         xmb->skip_thumbnail_reset = true;
+   }
+
    /* Determine the first playlist item under "Load Content > Playlists" */
    xmb->playlist_collection_offset = 0;
    if (settings->uints.menu_content_show_add_entry)
@@ -2611,12 +2663,13 @@ static void xmb_populate_entries(void *data,
 
    /* Determine whether to show entry index */
    /* Update list size & entry index texts */
-   if ((xmb->entry_idx_enabled = show_entry_idx && xmb->is_playlist))
+   if ((xmb->entry_idx_enabled = show_entry_idx &&
+         (xmb->is_playlist || (xmb->is_explore_list && xmb->depth > 1))))
    {
       xmb->list_size = menu_entries_get_size();
       snprintf(xmb->entry_index_str, sizeof(xmb->entry_index_str),
-      "%lu/%lu", (unsigned long)menu_navigation_get_selection() + 1,
-                 (unsigned long)xmb->list_size);
+            "%lu/%lu", (unsigned long)menu_navigation_get_selection() + 1,
+                       (unsigned long)xmb->list_size);
    }
 
    /* By default, fullscreen thumbnails are only
@@ -2634,18 +2687,14 @@ static void xmb_populate_entries(void *data,
    {
       xmb->fullscreen_thumbnails_available = true;
    }
-   else if (xmb->is_quick_menu && xmb->depth < 6)
+   else if (xmb->is_quick_menu)
    {
-      const char *thumbnail_content_path = NULL;
-      runloop_state_t *runloop_st        = runloop_state_get_ptr();
-      gfx_thumbnail_get_content_path(xmb->thumbnail_path_data, &thumbnail_content_path);
-
-      if (xmb->libretro_running)
-         xmb->fullscreen_thumbnails_available = false;
-
-      if (!string_is_empty(thumbnail_content_path) &&
-            !string_is_equal(thumbnail_content_path, runloop_st->runtime_content_path))
-         xmb->fullscreen_thumbnails_available = true;
+      xmb->fullscreen_thumbnails_available = !menu_is_running_quick_menu();
+   }
+   else if (xmb->is_explore_list)
+   {
+      xmb_set_thumbnail_content(xmb, "");
+      xmb_update_thumbnail_image(xmb);
    }
 
    /* Hack: XMB gets into complete muddle when
@@ -4127,7 +4176,7 @@ static void xmb_show_fullscreen_thumbnails(
          xmb->fullscreen_thumbnail_label,
          sizeof(xmb->fullscreen_thumbnail_label),
          xmb->is_quick_menu,
-         xmb->playlist_index) == 0)
+         xmb->title_name) == 0)
       xmb->fullscreen_thumbnail_label[0] = '\0';
 
    /* Configure fade in animation */
@@ -4146,6 +4195,12 @@ static void xmb_show_fullscreen_thumbnails(
    xmb->fullscreen_thumbnail_selection = selection;
    xmb->show_fullscreen_thumbnails     = true;
 }
+
+/* Common thumbnail switch requires FILE_TYPE_RPL_ENTRY,
+ * which only works with playlists, therefore activate it
+ * manually for Quick Menu, Explore and Database */
+extern int action_switch_thumbnail(const char *path,
+      const char *label, unsigned type, size_t idx);
 
 static enum menu_action xmb_parse_menu_entry_action(
       xmb_handle_t *xmb, enum menu_action action)
@@ -4190,8 +4245,7 @@ static enum menu_action xmb_parse_menu_entry_action(
          break;
       case MENU_ACTION_START:
          if (xmb->is_state_slot ||
-               (xmb->is_quick_menu &&
-                  (!string_is_empty(xmb->savestate_thumbnail_file_path) || xmb->depth > 2)))
+               (xmb->is_quick_menu && menu_is_running_quick_menu()))
             break;
 
          /* If this is a menu with thumbnails, attempt
@@ -4221,10 +4275,16 @@ static enum menu_action xmb_parse_menu_entry_action(
             xmb->want_fullscreen_thumbnails = true;
             new_action = MENU_ACTION_NOOP;
          }
-         else if (xmb->show_fullscreen_thumbnails && !xmb->is_playlist)
+         else if (xmb->show_fullscreen_thumbnails &&
+               (xmb->is_state_slot || (xmb->is_quick_menu && menu_is_running_quick_menu())))
          {
             xmb_hide_fullscreen_thumbnails(xmb, true);
             xmb->want_fullscreen_thumbnails = false;
+            new_action = MENU_ACTION_NOOP;
+         }
+         else if (xmb->is_explore_list || xmb->is_quick_menu || xmb->is_db_manager_list)
+         {
+            action_switch_thumbnail(NULL, NULL, 0, 0);
             new_action = MENU_ACTION_NOOP;
          }
          break;
@@ -4246,7 +4306,7 @@ static enum menu_action xmb_parse_menu_entry_action(
          {
             xmb_hide_fullscreen_thumbnails(xmb, true);
             xmb->want_fullscreen_thumbnails = false;
-            if (!xmb->is_state_slot && !xmb->is_playlist)
+            if (!xmb->is_state_slot && !xmb->is_playlist && !xmb->is_explore_list)
                return MENU_ACTION_NOOP;
          }
          break;
@@ -4505,6 +4565,10 @@ static void xmb_render(void *data,
       playlist_t *playlist                     = playlist_get_cached();
       unsigned gfx_thumbnail_upscale_threshold = settings->uints.gfx_thumbnail_upscale_threshold;
       bool network_on_demand_thumbnails        = settings->bools.network_on_demand_thumbnails;
+
+      /* Explore list needs cached selection index */
+      if (xmb->is_explore_list)
+         selection = gfx_thumbnail_get_playlist_index(xmb->thumbnail_path_data);
 
       switch (xmb->thumbnails.pending)
       {
@@ -5624,7 +5688,7 @@ static void xmb_frame(void *data, video_frame_info_t *video_info)
 
          percent_width = (unsigned)
             font_driver_get_message_width(
-                  xmb->font, msg, (unsigned)strlen(msg), 1);
+                  xmb->font, msg, strlen(msg), 1);
 
          xmb_draw_text(xmb_shadows_enable, xmb, settings, msg,
                video_width - xmb->margins_title_left - x_pos,
@@ -6198,7 +6262,9 @@ static void *xmb_init(void **userdata, bool video_is_threaded)
 
    *userdata                          = xmb;
 
-   file_list_initialize(&xmb->selection_buf_old);
+   xmb->selection_buf_old.list        = NULL;
+   xmb->selection_buf_old.capacity    = 0;
+   xmb->selection_buf_old.size        = 0;
 
    xmb->categories_active_idx         = 0;
    xmb->categories_active_idx_old     = 0;
@@ -6260,7 +6326,9 @@ static void *xmb_init(void **userdata, bool video_is_threaded)
 
    gfx_display_init_white_texture();
 
-   file_list_initialize(&xmb->horizontal_list);
+   xmb->horizontal_list.list        = NULL;
+   xmb->horizontal_list.capacity    = 0;
+   xmb->horizontal_list.size        = 0;
 
    xmb_init_horizontal_list(xmb);
 
@@ -6868,7 +6936,7 @@ static void xmb_context_reset_internal(xmb_handle_t *xmb,
       int char_width =
          font_driver_get_message_width(xmb->font, "a", 1, 1);
       int wideglyph_width =
-         font_driver_get_message_width(xmb->font, wideglyph_str, (unsigned)strlen(wideglyph_str), 1);
+         font_driver_get_message_width(xmb->font, wideglyph_str, strlen(wideglyph_str), 1);
 
       if (wideglyph_width > 0 && char_width > 0)
          xmb->wideglyph_width = wideglyph_width * 100 / char_width;
@@ -6902,6 +6970,7 @@ static void xmb_context_reset_internal(xmb_handle_t *xmb,
              (xmb_system_tab < XMB_SYSTEM_TAB_SETTINGS && depth == 4)) &&
               xmb->is_playlist))
             || xmb->is_db_manager_list
+            || xmb->is_explore_list
             || xmb->is_file_list
             || xmb->is_quick_menu)
          xmb_update_thumbnail_image(xmb);
@@ -7797,7 +7866,7 @@ static int xmb_pointer_up(void *userdata,
              * move selection pointer up by 1 'page' */
             unsigned bottom_idx = (unsigned)selection + 1;
             size_t new_idx      = 0;
-            unsigned step       = 0;
+            size_t step         = 0;
 
             /* Determine index of entry at bottom of screen
              * Note: cannot use xmb_calculate_visible_range()

@@ -1017,10 +1017,8 @@ unsigned menu_displaylist_explore(file_list_t *list,
          if (is_top && tmplen < sizeof(tmp) - 5)
          {
             if (explore_by_info[cat].is_numeric)
-            {
                snprintf(tmp + tmplen, sizeof(tmp) - tmplen, " (%s - %s)",
                      entries[0]->str, entries[RBUF_LEN(entries) - 1]->str);
-            }
             else
             {
                strlcat(tmp, " (", sizeof(tmp));
@@ -1052,7 +1050,7 @@ SKIP_EXPLORE_BY_CATEGORY:;
    {
       /* List all items in a selected explore by category */
       explore_string_t **entries = explore_state->by[current_cat];
-      unsigned i_last            = RBUF_LEN(entries) - 1;
+      size_t i_last              = RBUF_LEN(entries) - 1;
       for (i = 0; i <= i_last; i++)
          explore_menu_entry(list, explore_state,
                entries[i]->str, EXPLORE_TYPE_FIRSTITEM + i);
@@ -1277,6 +1275,94 @@ uintptr_t menu_explore_get_entry_icon(unsigned type)
          return explore_state->icons[i];
    }
    return 0;
+}
+
+const char *menu_explore_get_entry_database(unsigned type)
+{
+   explore_entry_t* e = NULL;
+   unsigned i;
+
+   if (!explore_state || type < EXPLORE_TYPE_FIRSTITEM)
+      return 0;
+
+   i = (type - EXPLORE_TYPE_FIRSTITEM);
+   e = &explore_state->entries[i];
+
+   if (e < RBUF_END(explore_state->entries))
+      return e->by[EXPLORE_BY_SYSTEM]->str;
+
+   return NULL;
+}
+
+ssize_t menu_explore_get_entry_playlist_index(unsigned type,
+      playlist_t **playlist,
+      const struct playlist_entry **playlist_entry)
+{
+   explore_entry_t* e = NULL;
+   playlist_t*      p = NULL;
+   unsigned i;
+
+   if (!explore_state || type < EXPLORE_TYPE_FIRSTITEM)
+      return 0;
+
+   i = (type - EXPLORE_TYPE_FIRSTITEM);
+   e = &explore_state->entries[i];
+   p = explore_state->playlists[0];
+
+   if (e < RBUF_END(explore_state->entries))
+   {
+      const struct playlist_entry *entry = NULL;
+      size_t pi = 0;
+      size_t j  = 0;
+
+      playlist_get_index(p, 0, &entry);
+      while (!string_is_equal(e->playlist_entry->db_name, entry->db_name))
+      {
+         p = explore_state->playlists[pi];
+         playlist_get_index(p, 0, &entry);
+         pi++;
+      }
+
+      for (j = 0; j < playlist_size(p); j++)
+      {
+         playlist_get_index(p, j, &entry);
+         if (string_is_equal(entry->label, e->playlist_entry->label))
+         {
+            *playlist_entry = entry;
+            *playlist       = p;
+
+            /* Playlist needs to get cached for on-demand thumbnails */
+            playlist_set_cached_external(p);
+            return j;
+         }
+      }
+   }
+
+   return -1;
+}
+
+ssize_t menu_explore_set_entry_playlist_index(unsigned type,
+      gfx_thumbnail_path_data_t *thumbnail_path_data)
+{
+   const char *db_name;
+   ssize_t playlist_index                      = -1;
+   playlist_t *playlist                        = NULL;
+   const struct playlist_entry *playlist_entry = NULL;
+
+   db_name = menu_explore_get_entry_database(type);
+   if (!string_is_empty(db_name))
+      playlist_index = menu_explore_get_entry_playlist_index(type, &playlist, &playlist_entry);
+
+   if (playlist_index >= 0 && playlist && playlist_entry)
+   {
+      gfx_thumbnail_set_system(thumbnail_path_data, db_name, playlist);
+      gfx_thumbnail_set_content_playlist(thumbnail_path_data,
+            playlist, playlist_index);
+      return playlist_index;
+   }
+
+   gfx_thumbnail_set_content_playlist(thumbnail_path_data, NULL, 0);
+   return -1;
 }
 
 void menu_explore_context_init(void)

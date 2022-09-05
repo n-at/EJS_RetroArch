@@ -2325,7 +2325,11 @@ static int action_ok_file_load(const char *path,
       return 0;
    }
 
-   file_list_get_last(menu_stack, &menu_path, &menu_label, NULL, NULL);
+   if (menu_stack && menu_stack->size)
+   {
+      menu_path  = menu_stack->list[menu_stack->size - 1].path;
+      menu_label = menu_stack->list[menu_stack->size - 1].label;
+   }
 
    if (!string_is_empty(menu_label))
       setting = menu_setting_find(menu_label);
@@ -3926,7 +3930,8 @@ static int action_ok_file_load_ffmpeg(const char *path,
    const char *menu_path           = NULL;
    file_list_t *menu_stack         = menu_entries_get_menu_stack_ptr(0);
 
-   file_list_get_last(menu_stack, &menu_path, NULL, NULL, NULL);
+   if (menu_stack && menu_stack->size)
+      menu_path  = menu_stack->list[menu_stack->size - 1].path;
 
    if (string_is_empty(menu_path))
 	   return -1;
@@ -4367,13 +4372,14 @@ static int action_ok_file_load_imageviewer(const char *path,
    const char *menu_path           = NULL;
    file_list_t *menu_stack         = menu_entries_get_menu_stack_ptr(0);
 
-   file_list_get_last(menu_stack, &menu_path, NULL, NULL, NULL);
-
-   fullpath[0] = '\0';
+   if (menu_stack && menu_stack->size)
+      menu_path = menu_stack->list[menu_stack->size - 1].path;
 
    if (!string_is_empty(menu_path))
       fill_pathname_join_special(fullpath, menu_path, path,
             sizeof(fullpath));
+   else
+      fullpath[0] = '\0';
 
    return default_action_ok_load_content_with_core_from_menu(fullpath, CORE_TYPE_IMAGEVIEWER);
 }
@@ -5331,7 +5337,7 @@ int action_ok_close_content(const char *path, const char *label, unsigned type, 
          list  = MENU_LIST_GET(menu_st->entries.list, 0);
       if (list && (list->size > 1))
       {
-         file_list_get_at_offset(list, list->size - 2, NULL, &parent_label, NULL, NULL);
+         parent_label = list->list[list->size - 2].label;
 
          if (string_is_equal(parent_label, msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB)) ||
              string_is_equal(parent_label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_CONTENTLESS_CORES_LIST)))
@@ -8027,11 +8033,10 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
                   STRLEN_CONST("input_binds_list")))
          {
             unsigned i;
+            unsigned first_char = atoi(&str[0]);
 
             for (i = 0; i < MAX_USERS; i++)
             {
-               unsigned first_char = atoi(&str[0]);
-
                if (first_char != ((i+1)))
                   continue;
 

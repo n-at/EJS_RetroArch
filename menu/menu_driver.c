@@ -237,6 +237,12 @@ struct key_desc key_descriptors[RARCH_MAX_KEYS] =
    {RETROK_OEM_102,       "OEM-102"}
 };
 
+enum menu_scroll_mode
+{
+   MENU_SCROLL_PAGE = 0,
+   MENU_SCROLL_START_LETTER
+};
+
 static void *null_menu_init(void **userdata, bool video_is_threaded)
 {
    menu_handle_t *menu = (menu_handle_t*)calloc(1, sizeof(*menu));
@@ -387,12 +393,13 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
    if (cbs)
    {
       const char *label             = NULL;
+      file_list_t *menu_stack       = MENU_LIST_GET(menu_st->entries.list, 0);
 
       entry->enum_idx               = cbs->enum_idx;
       entry->checked                = cbs->checked;
 
-      file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-            NULL, &label, NULL, NULL);
+      if (menu_stack && menu_stack->size)
+         label = menu_stack->list[menu_stack->size - 1].label;
 
       if (entry->rich_label_enabled && cbs->action_label)
       {
@@ -1100,8 +1107,13 @@ int menu_entries_get_title(char *s, size_t len)
          strlcpy(s, cbs->action_title_cache, len);
          return 0;
       }
-      file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-            &path, &label, &menu_type, NULL);
+  
+      if (list && list->size)
+      {
+         path      = list->list[list->size - 1].path;
+         label     = list->list[list->size - 1].label;
+         menu_type = list->list[list->size - 1].type;
+      }
 
       /* Show playlist entry instead of "Quick Menu" */
       if (string_is_equal(label, "deferred_rpl_entry_actions"))
@@ -1129,6 +1141,20 @@ int menu_entries_get_title(char *s, size_t len)
    return 0;
 }
 
+/* Get current menu label */
+int menu_entries_get_label(char *s, size_t len)
+{
+   struct menu_state   *menu_st = &menu_driver_state;
+   const file_list_t *list      = MENU_LIST_GET(menu_st->entries.list, 0);
+
+   if (list && list->size)
+   {
+      strlcpy(s, list->list[list->size - 1].label, len);
+      return 1;
+   }
+   return 0;
+}
+
 /* Used to close an active message box (help or info)
  * TODO/FIXME: The way that message boxes are handled
  * is complete garbage. generic_menu_iterate() and
@@ -1139,11 +1165,12 @@ int menu_entries_get_title(char *s, size_t len)
 void menu_input_pointer_close_messagebox(struct menu_state *menu_st)
 {
    const char *label            = NULL;
+   const file_list_t *list      = MENU_LIST_GET(menu_st->entries.list, 0);
 
    /* Determine whether this is a help or info
     * message box */
-   file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-         NULL, &label, NULL, NULL);
+   if (list && list->size)
+      label = list->list[list->size - 1].label;
 
    /* Pop stack, if required */
    if (menu_should_pop_stack(label))
@@ -1324,17 +1351,18 @@ void menu_list_flush_stack(
       size_t idx, const char *needle, unsigned final_type)
 {
    bool refresh                = false;
-   const char *path            = NULL;
    const char *label           = NULL;
    unsigned type               = 0;
-   size_t entry_idx            = 0;
    file_list_t *menu_list      = MENU_LIST_GET(list, (unsigned)idx);
 
    menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
    menu_contentless_cores_flush_runtime();
 
    if (menu_list && menu_list->size)
-      file_list_get_at_offset(menu_list, menu_list->size - 1, &path, &label, &type, &entry_idx);
+   {
+      label     = menu_list->list[menu_list->size - 1].label;
+      type      = menu_list->list[menu_list->size - 1].type;
+   }
 
    while (menu_list_flush_stack_type(
             needle, label, type, final_type) != 0)
@@ -1359,7 +1387,10 @@ void menu_list_flush_stack(
       menu_list                = MENU_LIST_GET(list, (unsigned)idx);
 
       if (menu_list && menu_list->size)
-         file_list_get_at_offset(menu_list, menu_list->size - 1, &path, &label, &type, &entry_idx);
+      {
+         label     = menu_list->list[menu_list->size - 1].label;
+         type      = menu_list->list[menu_list->size - 1].type;
+      }
    }
 }
 
@@ -2395,7 +2426,11 @@ bool menu_driver_displaylist_push(
    menu_displaylist_info_init(&info);
 
    if (list && list->size)
-      file_list_get_at_offset(list, list->size - 1, &path, &label, &type, NULL);
+   {
+      path      = list->list[list->size - 1].path;
+      label     = list->list[list->size - 1].label;
+      type      = list->list[list->size - 1].type;
+   }
 
    if (cbs)
       enum_idx    = cbs->enum_idx;
@@ -2508,7 +2543,7 @@ void menu_cbs_init(
 #endif
 
    if (menu_list && menu_list->size)
-      file_list_get_at_offset(menu_list, menu_list->size - 1, NULL, &menu_label, NULL, NULL);
+      menu_label = menu_list->list[menu_list->size - 1].label;
 
    if (!label || !menu_label)
       return;
@@ -4129,7 +4164,16 @@ void menu_entries_get_last_stack(const char **path, const char **label,
    list                           = MENU_LIST_GET(menu_st->entries.list, 0);
 
    if (list && list->size)
-      file_list_get_at_offset(list, list->size - 1, path, label, file_type, entry_idx);
+   {
+      if (path)
+         *path      = list->list[list->size - 1].path;
+      if (label)
+	      *label     = list->list[list->size - 1].label;
+      if (file_type)
+         *file_type = list->list[list->size - 1].type;
+      if (entry_idx)
+         *entry_idx = list->list[list->size - 1].entry_idx;
+   }
 
    if (enum_idx)
    {
@@ -4197,6 +4241,7 @@ void menu_input_search_cb(void *userdata, const char *str)
    const char *label           = NULL;
    unsigned type               = MENU_SETTINGS_NONE;
    struct menu_state *menu_st  = &menu_driver_state;
+   const file_list_t *list     = MENU_LIST_GET(menu_st->entries.list, 0);
 
    if (string_is_empty(str))
       goto end;
@@ -4204,8 +4249,11 @@ void menu_input_search_cb(void *userdata, const char *str)
    /* Determine whether we are currently
     * viewing a menu list with 'search
     * filter' support */
-   file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-         NULL, &label, &type, NULL);
+   if (list && list->size)
+   {
+      label     = list->list[list->size - 1].label;
+      type      = list->list[list->size - 1].type;
+   }
 
    /* Do not apply search filter if string
     * consists of a single Latin alphabet
@@ -4349,17 +4397,17 @@ bool menu_entries_append(
    menu_ctx_list_t list_info;
    size_t i;
    size_t idx;
-   const char *menu_path           = NULL;
-   menu_file_list_cbs_t *cbs       = NULL;
-   struct menu_state  *menu_st     = &menu_driver_state;
+   const char *menu_path       = NULL;
+   menu_file_list_cbs_t *cbs   = NULL;
+   struct menu_state  *menu_st = &menu_driver_state;
+   const file_list_t *mlist    = MENU_LIST_GET(menu_st->entries.list, 0);
 
    if (!list || !label)
       return false;
 
    file_list_append(list, path, label, type, directory_ptr, entry_idx);
-   file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-         &menu_path, NULL, NULL, NULL);
-
+   if (mlist && mlist->size)
+      menu_path          = mlist->list[mlist->size - 1].path;
    idx                   = list->size - 1;
 
    list_info.fullpath    = NULL;
@@ -4442,16 +4490,17 @@ void menu_entries_prepend(file_list_t *list,
 {
    menu_ctx_list_t list_info;
    size_t i;
-   size_t idx                      = 0;
-   const char *menu_path           = NULL;
-   menu_file_list_cbs_t *cbs       = NULL;
-   struct menu_state  *menu_st     = &menu_driver_state;
+   size_t idx                  = 0;
+   const char *menu_path       = NULL;
+   menu_file_list_cbs_t *cbs   = NULL;
+   struct menu_state  *menu_st = &menu_driver_state;
+   const file_list_t *mlist    = MENU_LIST_GET(menu_st->entries.list, 0);
    if (!list || !label)
       return;
 
    file_list_insert(list, path, label, type, directory_ptr, entry_idx, 0);
-   file_list_get_last(MENU_LIST_GET(menu_st->entries.list, 0),
-         &menu_path, NULL, NULL, NULL);
+   if (mlist && mlist->size)
+      menu_path          = mlist->list[mlist->size - 1].path;
 
    list_info.fullpath    = NULL;
 
@@ -5052,23 +5101,15 @@ int menu_entries_get_core_title(char *s, size_t len)
       (system && system->library_version) 
       ? system->library_version 
       : "";
+   size_t _len = strlcpy(s, PACKAGE_VERSION, len);
+#if defined(_MSC_VER)
+   _len        = strlcat(s, msvc_vercode_to_str(_MSC_VER), len);
+#endif
 
    if (!string_is_empty(core_version))
-   {
-#if defined(_MSC_VER)
-      snprintf(s, len, PACKAGE_VERSION "%s"        " - %s (%s)", msvc_vercode_to_str(_MSC_VER), core_name, core_version);
-#else
-      snprintf(s, len, PACKAGE_VERSION             " - %s (%s)",                                core_name, core_version);
-#endif
-   }
+      snprintf(s + _len, len - _len, " - %s (%s)", core_name, core_version);
    else
-   {
-#if defined(_MSC_VER)
-      snprintf(s, len, PACKAGE_VERSION "%s"        " - %s", msvc_vercode_to_str(_MSC_VER), core_name);
-#else
-      snprintf(s, len, PACKAGE_VERSION             " - %s",                                core_name);
-#endif
-   }
+      snprintf(s + _len, len - _len, " - %s", core_name);
 
    return 0;
 }
@@ -5938,9 +5979,25 @@ unsigned menu_event(
       }
 
       if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_L))
+      {
+         menu_st->scroll.mode = MENU_SCROLL_PAGE;
          ret = MENU_ACTION_SCROLL_UP;
+      }
       else if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_R))
+      {
+         menu_st->scroll.mode = MENU_SCROLL_PAGE;
          ret = MENU_ACTION_SCROLL_DOWN;
+      }
+      else if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_L2))
+      {
+         menu_st->scroll.mode = MENU_SCROLL_START_LETTER;
+         ret = MENU_ACTION_SCROLL_UP;
+      }
+      else if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_R2))
+      {
+         menu_st->scroll.mode = MENU_SCROLL_START_LETTER;
+         ret = MENU_ACTION_SCROLL_DOWN;
+      }
       else if (ok_trigger)
          ret = MENU_ACTION_OK;
       else if (BIT256_GET_PTR(p_trigger_input, menu_cancel_btn))
@@ -6361,7 +6418,7 @@ static int menu_input_pointer_post_iterate(
             {
                /* Pointer has moved - check if this is a swipe */
                float dpi = menu ? menu_input_get_dpi(menu, p_disp,
-video_st->width, video_st->height) : 0.0f;
+                     video_st->width, video_st->height) : 0.0f;
 
                if ((dpi > 0.0f)
                      &&
@@ -7334,13 +7391,12 @@ static int generic_menu_iterate(
    unsigned accessibility_narrator_speech_speed = settings->uints.accessibility_narrator_speech_speed;
 #endif
    enum action_iterate_type iterate_type;
-   unsigned file_type              = 0;
    int ret                         = 0;
    const char *label               = NULL;
    file_list_t *list               = MENU_LIST_GET(menu_st->entries.list, 0);
 
    if (list && list->size)
-      file_list_get_at_offset(list, list->size - 1, NULL, &label, &file_type, NULL);
+      label                        = list->list[list->size - 1].label;
 
    menu->menu_state_msg[0]         = '\0';
 
@@ -7705,6 +7761,7 @@ int generic_menu_entry_action(
    settings_t   *settings         = config_get_ptr();
    void *menu_userdata            = menu_st->userdata;
    bool wraparound_enable         = settings->bools.menu_navigation_wraparound_enable;
+   bool scroll_mode               = menu_st->scroll.mode;
    size_t scroll_accel            = menu_st->scroll.acceleration;
    menu_list_t *menu_list         = menu_st->entries.list;
    file_list_t *selection_buf     = menu_list ? MENU_LIST_GET_SELECTION(menu_list, (unsigned)0) : NULL;
@@ -7775,46 +7832,96 @@ int generic_menu_entry_action(
          }
          break;
       case MENU_ACTION_SCROLL_UP:
-         if (
-                  menu_st->scroll.index_size
-               && menu_st->selection_ptr != 0
-            )
+         if (scroll_mode == MENU_SCROLL_PAGE)
          {
-            size_t l   = menu_st->scroll.index_size - 1;
+            if (selection_buf_size > 0)
+            {
+               unsigned scroll_speed  = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 10);
+               if (!(menu_st->selection_ptr == 0 && !wraparound_enable))
+               {
+                  size_t idx             = 0;
+                  if (menu_st->selection_ptr >= scroll_speed)
+                     idx = menu_st->selection_ptr - scroll_speed;
+                  else
+                     idx = 0;
 
-            while (l
-                  && menu_st->scroll.index_list[l - 1]
-                  >= menu_st->selection_ptr)
-               l--;
+                  menu_st->selection_ptr = idx;
+                  menu_driver_navigation_set(true);
 
-            if (l > 0)
-               menu_st->selection_ptr = menu_st->scroll.index_list[l - 1];
+                  if (menu_driver_ctx->navigation_decrement)
+                     menu_driver_ctx->navigation_decrement(menu_userdata);
+               }
+            }
+         }
+         else /* MENU_SCROLL_START_LETTER */
+         {
+            if (
+                     menu_st->scroll.index_size
+                  && menu_st->selection_ptr != 0
+               )
+            {
+               size_t l   = menu_st->scroll.index_size - 1;
 
-            if (menu_driver_ctx->navigation_descend_alphabet)
-               menu_driver_ctx->navigation_descend_alphabet(
-                     menu_userdata, &menu_st->selection_ptr);
+               while (l
+                     && menu_st->scroll.index_list[l - 1]
+                     >= menu_st->selection_ptr)
+                  l--;
+
+               if (l > 0)
+                  menu_st->selection_ptr = menu_st->scroll.index_list[l - 1];
+
+               if (menu_driver_ctx->navigation_descend_alphabet)
+                  menu_driver_ctx->navigation_descend_alphabet(
+                        menu_userdata, &menu_st->selection_ptr);
+            }
          }
          break;
       case MENU_ACTION_SCROLL_DOWN:
-         if (menu_st->scroll.index_size)
+         if (scroll_mode == MENU_SCROLL_PAGE)
          {
-            if (menu_st->selection_ptr == menu_st->scroll.index_list[menu_st->scroll.index_size - 1])
-               menu_st->selection_ptr = selection_buf_size - 1;
-            else
+            if (selection_buf_size > 0)
             {
-               size_t l               = 0;
-               while (l < menu_st->scroll.index_size - 1
-                     && menu_st->scroll.index_list[l + 1] <= menu_st->selection_ptr)
-                  l++;
-               menu_st->selection_ptr = menu_st->scroll.index_list[l + 1];
+               unsigned scroll_speed  = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 10);
+               if (!(menu_st->selection_ptr >= selection_buf_size - 1
+                     && !wraparound_enable))
+               {
+                  if ((menu_st->selection_ptr + scroll_speed) < selection_buf_size)
+                  {
+                     size_t idx  = menu_st->selection_ptr + scroll_speed;
 
-               if (menu_st->selection_ptr >= selection_buf_size)
-                  menu_st->selection_ptr = selection_buf_size - 1;
+                     menu_st->selection_ptr = idx;
+                     menu_driver_navigation_set(true);
+                  }
+                  else
+                     menu_driver_ctl(MENU_NAVIGATION_CTL_SET_LAST,  NULL);
+
+                  if (menu_driver_ctx->navigation_increment)
+                     menu_driver_ctx->navigation_increment(menu_userdata);
+               }
             }
+         }
+         else /* MENU_SCROLL_START_LETTER */
+         {
+            if (menu_st->scroll.index_size)
+            {
+               if (menu_st->selection_ptr == menu_st->scroll.index_list[menu_st->scroll.index_size - 1])
+                  menu_st->selection_ptr = selection_buf_size - 1;
+               else
+               {
+                  size_t l               = 0;
+                  while (l < menu_st->scroll.index_size - 1
+                        && menu_st->scroll.index_list[l + 1] <= menu_st->selection_ptr)
+                     l++;
+                  menu_st->selection_ptr = menu_st->scroll.index_list[l + 1];
 
-            if (menu_driver_ctx->navigation_ascend_alphabet)
-               menu_driver_ctx->navigation_ascend_alphabet(
-                     menu_userdata, &menu_st->selection_ptr);
+                  if (menu_st->selection_ptr >= selection_buf_size)
+                     menu_st->selection_ptr = selection_buf_size - 1;
+               }
+
+               if (menu_driver_ctx->navigation_ascend_alphabet)
+                  menu_driver_ctx->navigation_ascend_alphabet(
+                        menu_userdata, &menu_st->selection_ptr);
+            }
          }
          break;
       case MENU_ACTION_CANCEL:
@@ -7926,20 +8033,31 @@ int generic_menu_entry_action(
 
       if (!string_is_empty(title_name))
       {
+	      size_t _len             = strlcpy(speak_string,
+               title_name, sizeof(speak_string));
+         speak_string[_len  ]    = ' ';
+         speak_string[_len+1]    = '\0';
+         _len                    = strlcat(speak_string,
+               current_label, sizeof(speak_string));
          if (!string_is_equal(current_value, "..."))
-            snprintf(speak_string, sizeof(speak_string),
-                  "%s %s %s", title_name, current_label, current_value);
-         else
-            snprintf(speak_string, sizeof(speak_string),
-                  "%s %s", title_name, current_label);
+         {
+            speak_string[_len  ] = ' ';
+            speak_string[_len+1] = '\0';
+            strlcat(speak_string, current_value,
+                  sizeof(speak_string));
+         }
       }
       else
       {
+         size_t _len = strlcpy(speak_string,
+               current_label, sizeof(speak_string));
          if (!string_is_equal(current_value, "..."))
-            snprintf(speak_string, sizeof(speak_string),
-                  "%s %s", current_label, current_value);
-         else
-            strlcpy(speak_string, current_label, sizeof(speak_string));
+         {
+            speak_string[_len  ] = ' ';
+            speak_string[_len+1] = '\0';
+            strlcat(speak_string, current_value,
+                  sizeof(speak_string));
+         }
       }
 
       if (!string_is_empty(speak_string))
@@ -7965,11 +8083,8 @@ int generic_menu_entry_action(
        * find a known reference point */
       while (menu_stack && (menu_stack->size >= stack_offset))
       {
-         const char *parent_label = NULL;
-
-         file_list_get_at_offset(menu_stack,
-               menu_stack->size - stack_offset,
-               NULL, &parent_label, NULL, NULL);
+         const char *parent_label = menu_stack->list[
+            menu_stack->size - stack_offset].label;
 
          if (string_is_empty(parent_label))
             continue;
@@ -8158,7 +8273,7 @@ bool menu_input_dialog_start(menu_input_ctx_line_t *line)
 
 size_t menu_update_fullscreen_thumbnail_label(
       char *s, size_t len,
-      bool is_quick_menu, size_t playlist_index)
+      bool is_quick_menu, const char *title)
 {
    menu_entry_t selected_entry;
    const char *thumbnail_label     = NULL;
@@ -8196,13 +8311,8 @@ size_t menu_update_fullscreen_thumbnail_label(
       thumbnail_label = tmpstr;
    }
    /* > Quick Menu playlist label */
-   else if (is_quick_menu)
-   {
-      const struct playlist_entry *entry = NULL;
-      playlist_get_index(playlist_get_cached(), playlist_index, &entry);
-      if (entry)
-         thumbnail_label = entry->label;
-   }
+   else if (is_quick_menu && title)
+      thumbnail_label = title;
    else
       thumbnail_label = selected_entry.path;
 
@@ -8224,4 +8334,17 @@ bool menu_is_running_quick_menu(void)
 
    return string_is_equal(entry.label, "resume_content") ||
           string_is_equal(entry.label, "state_slot");
+}
+
+bool menu_is_nonrunning_quick_menu(void)
+{
+   menu_entry_t entry;
+
+   MENU_ENTRY_INIT(entry);
+   entry.path_enabled     = false;
+   entry.value_enabled    = false;
+   entry.sublabel_enabled = false;
+   menu_entry_get(&entry, 0, 0, NULL, true);
+
+   return string_is_equal(entry.label, "collection");
 }

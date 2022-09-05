@@ -3921,7 +3921,8 @@ static char *get_tmpdir_alloc(const char *override_dir)
 static bool write_file_with_random_name(char **temp_dll_path,
       const char *tmp_path, const void* data, ssize_t dataSize)
 {
-   int i, ext_len;
+   int i;
+   size_t ext_len;
    char number_buf[32];
    bool okay                = false;
    const char *prefix       = "tmp";
@@ -3943,7 +3944,7 @@ static bool write_file_with_random_name(char **temp_dll_path,
    else
       ext                   = (char*)calloc(1,1);
 
-   ext_len                  = (int)strlen(ext);
+   ext_len                  = strlen(ext);
 
    if (ext_len > 0)
    {
@@ -7091,6 +7092,7 @@ static enum runloop_state_enum runloop_check_state(
 
       old_pressed             = pressed;
    }
+#endif
 
    /* Check if we have pressed the FPS toggle button */
    HOTKEY_CHECK(RARCH_FPS_TOGGLE, CMD_EVENT_FPS_TOGGLE, true, NULL);
@@ -7099,47 +7101,6 @@ static enum runloop_state_enum runloop_check_state(
 
    /* Check if we have pressed the netplay host toggle button */
    HOTKEY_CHECK(RARCH_NETPLAY_HOST_TOGGLE, CMD_EVENT_NETPLAY_HOST_TOGGLE, true, NULL);
-
-   if (menu_st->alive)
-   {
-      float fastforward_ratio = runloop_get_fastforward_ratio(settings,
-            &runloop_st->fastmotion_override.current);
-
-      if (!settings->bools.menu_throttle_framerate && !fastforward_ratio)
-         return RUNLOOP_STATE_MENU_ITERATE;
-
-      return RUNLOOP_STATE_END;
-   }
-#endif
-
-#ifdef HAVE_NETWORKING
-   if (netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_PAUSE, NULL))
-#endif
-   if (pause_nonactive)
-      focused                = is_focused;
-
-#ifdef HAVE_SCREENSHOTS
-   /* Check if we have pressed the screenshot toggle button */
-   HOTKEY_CHECK(RARCH_SCREENSHOT, CMD_EVENT_TAKE_SCREENSHOT, true, NULL);
-#endif
-
-   /* Check if we have pressed the audio mute toggle button */
-   HOTKEY_CHECK(RARCH_MUTE, CMD_EVENT_AUDIO_MUTE_TOGGLE, true, NULL);
-
-   /* Check if we have pressed the OSK toggle button */
-   HOTKEY_CHECK(RARCH_OSK, CMD_EVENT_OSK_TOGGLE, true, NULL);
-
-   /* Check if we have pressed the recording toggle button */
-   HOTKEY_CHECK(RARCH_RECORDING_TOGGLE, CMD_EVENT_RECORDING_TOGGLE, true, NULL);
-
-   /* Check if we have pressed the streaming toggle button */
-   HOTKEY_CHECK(RARCH_STREAMING_TOGGLE, CMD_EVENT_STREAMING_TOGGLE, true, NULL);
-
-   /* Check if we have pressed the Run-Ahead toggle button */
-   HOTKEY_CHECK(RARCH_RUNAHEAD_TOGGLE, CMD_EVENT_RUNAHEAD_TOGGLE, true, NULL);
-
-   /* Check if we have pressed the AI Service toggle button */
-   HOTKEY_CHECK(RARCH_AI_SERVICE, CMD_EVENT_AI_SERVICE_TOGGLE, true, NULL);
 
    /* Volume stepping + acceleration */
    {
@@ -7174,6 +7135,49 @@ static enum runloop_state_enum runloop_check_state(
          volume_hotkey_delay_active = volume_hotkey_delay_default;
       }
    }
+
+   /* Check if we have pressed the audio mute toggle button */
+   HOTKEY_CHECK(RARCH_MUTE, CMD_EVENT_AUDIO_MUTE_TOGGLE, true, NULL);
+
+#ifdef HAVE_MENU
+   if (menu_st->alive)
+   {
+      float fastforward_ratio = runloop_get_fastforward_ratio(settings,
+            &runloop_st->fastmotion_override.current);
+
+      if (!settings->bools.menu_throttle_framerate && !fastforward_ratio)
+         return RUNLOOP_STATE_MENU_ITERATE;
+
+      return RUNLOOP_STATE_END;
+   }
+#endif
+
+#ifdef HAVE_NETWORKING
+   if (netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_PAUSE, NULL))
+#endif
+   if (pause_nonactive)
+      focused                = is_focused;
+
+#ifdef HAVE_SCREENSHOTS
+   /* Check if we have pressed the screenshot toggle button */
+   HOTKEY_CHECK(RARCH_SCREENSHOT, CMD_EVENT_TAKE_SCREENSHOT, true, NULL);
+#endif
+
+   /* Check if we have pressed the OSK toggle button */
+   HOTKEY_CHECK(RARCH_OSK, CMD_EVENT_OSK_TOGGLE, true, NULL);
+
+   /* Check if we have pressed the recording toggle button */
+   HOTKEY_CHECK(RARCH_RECORDING_TOGGLE, CMD_EVENT_RECORDING_TOGGLE, true, NULL);
+
+   /* Check if we have pressed the streaming toggle button */
+   HOTKEY_CHECK(RARCH_STREAMING_TOGGLE, CMD_EVENT_STREAMING_TOGGLE, true, NULL);
+
+   /* Check if we have pressed the Run-Ahead toggle button */
+   HOTKEY_CHECK(RARCH_RUNAHEAD_TOGGLE, CMD_EVENT_RUNAHEAD_TOGGLE, true, NULL);
+
+   /* Check if we have pressed the AI Service toggle button */
+   HOTKEY_CHECK(RARCH_AI_SERVICE, CMD_EVENT_AI_SERVICE_TOGGLE, true, NULL);
+
 
 #ifdef HAVE_NETWORKING
    /* Check Netplay */
@@ -7397,15 +7401,17 @@ static enum runloop_state_enum runloop_check_state(
        * for this frame. */
       if (check2)
       {
+         size_t _len;
          char msg[128];
          int cur_state_slot                = state_slot;
          if (check1)
             configuration_set_int(settings, settings->ints.state_slot,
                   cur_state_slot + addition);
-         msg[0] = '\0';
-         snprintf(msg, sizeof(msg), "%s: %d",
-               msg_hash_to_str(MSG_STATE_SLOT),
-               settings->ints.state_slot);
+         _len = strlcpy(msg, msg_hash_to_str(MSG_STATE_SLOT), sizeof(msg));
+         snprintf(msg         + _len,
+                  sizeof(msg) - _len,
+                  ": %d",
+                  settings->ints.state_slot);
          runloop_msg_queue_push(msg, 2, 180, true, NULL,
                MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
          RARCH_LOG("[State]: %s\n", msg);
@@ -8191,6 +8197,7 @@ bool retroarch_get_current_savestate_path(char *path, size_t len)
 
 bool retroarch_get_entry_state_path(char *path, size_t len, unsigned slot)
 {
+   size_t _len;
    runloop_state_t *runloop_st = &runloop_state;
    const char *name_savestate  = NULL;
 
@@ -8201,8 +8208,8 @@ bool retroarch_get_entry_state_path(char *path, size_t len, unsigned slot)
    if (string_is_empty(name_savestate))
       return false;
 
-   snprintf(path, len, "%s%d", name_savestate, slot);
-   strlcat(path, ".entry", len);
+   _len = strlcpy(path, name_savestate, len);
+   snprintf(path + _len, len - _len, "%d.entry", slot);
 
    return true;
 }

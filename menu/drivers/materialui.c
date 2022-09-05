@@ -49,7 +49,6 @@
 
 #include "../../core_info.h"
 #include "../../configuration.h"
-#include "../../verbosity.h"
 #include "../../tasks/tasks_internal.h"
 #include "../../runtime_file.h"
 #include "../../file_path_special.h"
@@ -2404,11 +2403,7 @@ static void materialui_context_reset_textures(materialui_handle_t *mui)
       if (!gfx_display_reset_textures_list(
             materialui_texture_path(i), mui->icons_path, &mui->textures.list[i],
             TEXTURE_FILTER_MIPMAP_LINEAR, NULL, NULL))
-      {
-         RARCH_WARN("[GLUI]: Asset missing: \"%s%s%s\".\n", mui->icons_path,
-               PATH_DEFAULT_SLASH(), materialui_texture_path(i));
          has_all_assets = false;
-      }
    }
 
    /* Warn user if assets are missing */
@@ -2665,7 +2660,7 @@ static void materialui_render_messagebox(
       if (!string_is_empty(line))
       {
          int width     = font_driver_get_message_width(
-               mui->font_data.list.font, line, (unsigned)strlen(line), 1.0f);
+               mui->font_data.list.font, line, strlen(line), 1.0f);
          longest_width = (width > longest_width) ?
                width : longest_width;
       }
@@ -4043,9 +4038,11 @@ static void materialui_render_menu_entry_default(
          if (!entry->checked)
             icon_texture = mui->textures.list[node->icon_texture_index];
          break;
+#if defined(HAVE_LIBRETRODB)
       case MUI_ICON_TYPE_MENU_EXPLORE:
          icon_texture = menu_explore_get_entry_icon(entry_type);
          break;
+#endif
       case MUI_ICON_TYPE_MENU_CONTENTLESS_CORE:
          icon_texture = menu_contentless_cores_get_entry_icon(entry->label);
          break;
@@ -5660,7 +5657,7 @@ static void materialui_render_header(
                font_driver_get_message_width(
                   mui->font_data.hint.font,
                   mui->sys_bar_cache.battery_percent_str,
-                  (unsigned)strlen(mui->sys_bar_cache.battery_percent_str),
+                  strlen(mui->sys_bar_cache.battery_percent_str),
                   1.0f);
          }
 
@@ -5753,7 +5750,7 @@ static void materialui_render_header(
             = font_driver_get_message_width(
                mui->font_data.hint.font,
                mui->sys_bar_cache.timedate_str,
-               (unsigned)strlen(mui->sys_bar_cache.timedate_str),
+               strlen(mui->sys_bar_cache.timedate_str),
                1.0f);
       }
 
@@ -7819,7 +7816,7 @@ static void materialui_init_font(
       if (wideglyph_str)
       {
          int wideglyph_width =
-            font_driver_get_message_width(font_data->font, wideglyph_str, (unsigned)strlen(wideglyph_str), 1.0f);
+            font_driver_get_message_width(font_data->font, wideglyph_str, strlen(wideglyph_str), 1.0f);
 
          if (wideglyph_width > 0 && char_width > 0) 
             font_data->wideglyph_width = wideglyph_width * 100 / char_width;
@@ -10154,10 +10151,7 @@ static void materialui_list_insert(
    }
 
    if (!node)
-   {
-      RARCH_ERR("GLUI node could not be allocated.\n");
       return;
-   }
 
    node->icon_type          = MUI_ICON_TYPE_NONE;
    node->icon_texture_index = 0;

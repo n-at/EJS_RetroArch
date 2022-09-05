@@ -2058,7 +2058,6 @@ static struct config_float_setting *populate_settings_float(
       return NULL;
 
    SETTING_FLOAT("video_aspect_ratio",       &settings->floats.video_aspect_ratio, true, DEFAULT_ASPECT_RATIO, false);
-   SETTING_FLOAT("video_scale",              &settings->floats.video_scale, false, 0.0f, false);
    SETTING_FLOAT("crt_video_refresh_rate",   &settings->floats.crt_video_refresh_rate, true, DEFAULT_CRT_REFRESH_RATE, false);
    SETTING_FLOAT("video_refresh_rate",       &settings->floats.video_refresh_rate, true, DEFAULT_REFRESH_RATE, false);
    SETTING_FLOAT("audio_rate_control_delta", audio_get_float_ptr(AUDIO_ACTION_RATE_CONTROL_DELTA), true, DEFAULT_RATE_CONTROL_DELTA, false);
@@ -2178,6 +2177,7 @@ static struct config_uint_setting *populate_settings_uint(
    SETTING_UINT("video_fullscreen_x", &settings->uints.video_fullscreen_x, true, DEFAULT_FULLSCREEN_X, false);
    SETTING_UINT("video_fullscreen_y", &settings->uints.video_fullscreen_y, true, DEFAULT_FULLSCREEN_Y, false);
 #endif
+   SETTING_UINT("video_scale",                  &settings->uints.video_scale, true, DEFAULT_SCALE, false);
    SETTING_UINT("video_window_opacity",         &settings->uints.video_window_opacity, true, DEFAULT_WINDOW_OPACITY, false);
 #ifdef HAVE_VIDEO_LAYOUT
    SETTING_UINT("video_layout_selected_view",   &settings->uints.video_layout_selected_view, true, 0, false);
@@ -2622,7 +2622,7 @@ void config_set_defaults(void *data)
 #endif
 #endif
 
-   settings->floats.video_scale                = DEFAULT_SCALE;
+   settings->uints.video_scale                 = DEFAULT_SCALE;
 
    video_driver_set_threaded(DEFAULT_VIDEO_THREADED);
 
@@ -3648,6 +3648,12 @@ static bool config_load_file(global_t *global,
       *settings->paths.directory_core_assets = '\0';
    if (string_is_equal(settings->paths.directory_assets, "default"))
       *settings->paths.directory_assets = '\0';
+#ifdef _3DS
+   if (string_is_equal(settings->paths.directory_bottom_assets, "default"))
+         configuration_set_string(settings,
+               settings->paths.directory_bottom_assets,
+               g_defaults.dirs[DEFAULT_DIR_BOTTOM_ASSETS]);
+#endif
    if (string_is_equal(settings->paths.directory_dynamic_wallpapers, "default"))
       *settings->paths.directory_dynamic_wallpapers = '\0';
    if (string_is_equal(settings->paths.directory_thumbnails, "default"))
@@ -3900,7 +3906,7 @@ bool config_load_override(void *data)
 
    /* per-core overrides */
    /* Create a new config file from core_path */
-   if (config_file_exists(core_path))
+   if (path_is_valid(core_path))
    {
       RARCH_LOG("[Overrides]: Core-specific overrides found at \"%s\".\n",
             core_path);
@@ -3914,7 +3920,7 @@ bool config_load_override(void *data)
    {
       /* per-content-dir overrides */
       /* Create a new config file from content_path */
-      if (config_file_exists(content_path))
+      if (path_is_valid(content_path))
       {
          char tmp_path[PATH_MAX_LENGTH + 1];
 
@@ -3941,7 +3947,7 @@ bool config_load_override(void *data)
 
       /* per-game overrides */
       /* Create a new config file from game_path */
-      if (config_file_exists(game_path))
+      if (path_is_valid(game_path))
       {
          char tmp_path[PATH_MAX_LENGTH + 1];
 
@@ -4208,7 +4214,6 @@ static void save_keybind_hat(config_file_t *conf, const char *key,
 {
    char config[16];
    unsigned hat     = (unsigned)GET_HAT(bind->joykey);
-   const char *dir  = NULL;
 
    config[0]        = 'h';
    config[1]        = '\0';
@@ -4706,7 +4711,7 @@ bool config_save_file(const char *path)
       char cfg[64];
       char formatted_number[4];
 
-      cfg[0] = formatted_number[0] = '\0';
+      formatted_number[0] = '\0';
 
       snprintf(formatted_number, sizeof(formatted_number), "%u", i + 1);
 
@@ -4741,14 +4746,16 @@ bool config_save_file(const char *path)
    }
 
 #ifdef HAVE_NETWORKGAMEPAD
-   for (i = 0; i < MAX_USERS; i++)
    {
       char tmp[64];
       size_t _len = strlcpy(tmp, "network_remote_enable_user_p", sizeof(tmp));
-      snprintf(tmp + _len, sizeof(tmp) - _len, "%u", i + 1);
-      config_set_string(conf, tmp,
-            settings->bools.network_remote_enable_user[i]
-            ? "true" : "false");
+      for (i = 0; i < MAX_USERS; i++)
+      {
+         snprintf(tmp + _len, sizeof(tmp) - _len, "%u", i + 1);
+         config_set_string(conf, tmp,
+               settings->bools.network_remote_enable_user[i]
+               ? "true" : "false");
+      }
    }
 #endif
 
@@ -5139,13 +5146,7 @@ bool input_remapping_load_file(void *data, const char *path)
       char prefix[16];
       char s1[32], s2[32], s3[32];
       char formatted_number[4];
-
-      prefix[0]  = '\0';
-      s1[0]      = '\0';
-      s2[0]      = '\0';
-      s3[0]      = '\0';
       formatted_number[0] = '\0';
-
       snprintf(formatted_number, sizeof(formatted_number), "%u", i + 1);
       strlcpy(prefix, "input_player",   sizeof(prefix));
       strlcat(prefix, formatted_number, sizeof(prefix));
@@ -5229,8 +5230,7 @@ bool input_remapping_load_file(void *data, const char *path)
          }
       }
 
-      strlcpy(s1, "input_player",             sizeof(s1));
-      strlcat(s1, formatted_number,           sizeof(s1));
+      strlcpy(s1, prefix,                     sizeof(s1));
       strlcat(s1, "_analog_dpad_mode",        sizeof(s1));
       CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], s1);
 
@@ -5303,10 +5303,6 @@ bool input_remapping_save_file(const char *path)
       char s3[32];
 
       formatted_number[0] = '\0';
-      prefix[0] = '\0';
-      s1[0]     = '\0';
-      s2[0]     = '\0';
-      s3[0]     = '\0';
 
       /* We must include all mapped ports + all those
        * with an index less than max_users */
@@ -5421,8 +5417,7 @@ bool input_remapping_save_file(const char *path)
       strlcat(s1, formatted_number,          sizeof(s1));
       config_set_int(conf, s1, input_config_get_device(i));
 
-      strlcpy(s1, "input_player",            sizeof(s1));
-      strlcat(s1, formatted_number,          sizeof(s1));
+      strlcpy(s1, prefix,                    sizeof(s1));
       strlcat(s1, "_analog_dpad_mode",       sizeof(s1));
       config_set_int(conf, s1, settings->uints.input_analog_dpad_mode[i]);
 
