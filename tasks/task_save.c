@@ -1304,7 +1304,6 @@ error:
  *
  * Called after the save state is done. Takes a screenshot if needed.
  **/
- /*
 static void save_state_cb(retro_task_t *task,
       void *task_data,
       void *user_data, const char *error)
@@ -1323,7 +1322,6 @@ static void save_state_cb(retro_task_t *task,
 
    free(state);
 }
-*/
 
 /**
  * task_push_save_state:
@@ -1333,7 +1331,6 @@ static void save_state_cb(retro_task_t *task,
  *
  * Create a new task to save the content state.
  **/
- /*
 static void task_push_save_state(const char *path, void *data, size_t size, bool autosave)
 {
    retro_task_t       *task        = task_init();
@@ -1354,7 +1351,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
    state->data                   = data;
    state->size                   = size;
    state->autosave               = autosave;
-   state->mute                   = autosave;
+   state->mute                   = autosave; /* don't show OSD messages if we are auto-saving */
    state->thumbnail_enable       = savestate_thumbnail_enable;
    state->state_slot             = state_slot;
    state->has_valid_framebuffer  = video_driver_cached_frame_has_valid_framebuffer();
@@ -1369,6 +1366,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
 
    if (!task_queue_push(task))
    {
+       /* Another blocking task is already active. */
       if (data)
          free(data);
       if (task->title)
@@ -1391,7 +1389,6 @@ error:
       free(task);
    }
 }
-*/
 
 /**
  * content_load_and_save_state_cb:
@@ -1399,7 +1396,6 @@ error:
  * Load then save a state.
  *
  **/
- /*
 static void content_load_and_save_state_cb(retro_task_t *task,
       void *task_data,
       void *user_data, const char *error)
@@ -1416,7 +1412,6 @@ static void content_load_and_save_state_cb(retro_task_t *task,
 
    free(path);
 }
-*/
 
 /**
  * task_push_load_and_save_state:
@@ -1428,7 +1423,6 @@ static void content_load_and_save_state_cb(retro_task_t *task,
  * Create a new task to load current state first into a backup buffer (for undo)
  * and then save the content state.
  **/
- /*
 static void task_push_load_and_save_state(const char *path, void *data,
       size_t size, bool load_to_backup_buffer, bool autosave)
 {
@@ -1460,7 +1454,8 @@ static void task_push_load_and_save_state(const char *path, void *data,
    state->undo_size  = size;
    state->undo_data  = data;
    state->autosave   = autosave;
-   state->mute       = autosave;
+   state->mute       = autosave; /* don't show OSD messages if we 
+                                    are auto-saving */
    if (load_to_backup_buffer)
       state->mute                = true;
    state->state_slot             = state_slot;
@@ -1477,6 +1472,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
 
    if (!task_queue_push(task))
    {
+       /* Another blocking task is already active. */
       if (data)
          free(data);
       if (task->title)
@@ -1485,7 +1481,6 @@ static void task_push_load_and_save_state(const char *path, void *data,
       free(state);
    }
 }
-*/
 
 void* state_data;
 char myString[200];
@@ -1539,8 +1534,6 @@ char* get_state_info(void) {
  **/
 bool content_save_state(const char *path, bool save_to_disk, bool autosave)
 {
-   /*
-   const char *paath = "/save.state";
    retro_ctx_size_info_t info;
    void *data  = NULL;
    size_t serial_size;
@@ -1566,28 +1559,28 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
       {
          RARCH_ERR("[State]: %s \"%s\".\n",
                msg_hash_to_str(MSG_FAILED_TO_SAVE_STATE_TO),
-               paath);
+               path);
          return false;
       }
 
       RARCH_LOG("[State]: %s \"%s\", %u %s.\n",
             msg_hash_to_str(MSG_SAVING_STATE),
-            paath,
+            path,
             (unsigned)serial_size,
             msg_hash_to_str(MSG_BYTES));
    }
 
    if (save_to_disk)
    {
-      if (path_is_valid(paath) && !autosave)
+      if (path_is_valid(path) && !autosave)
       {
          RARCH_LOG("[State]: %s ...\n",
                msg_hash_to_str(MSG_FILE_ALREADY_EXISTS_SAVING_TO_BACKUP_BUFFER));
 
-         task_push_load_and_save_state(paath, data, serial_size, true, autosave);
+         task_push_load_and_save_state(path, data, serial_size, true, autosave);
       }
       else
-         task_push_save_state(paath, data, serial_size, autosave);
+         task_push_save_state(path, data, serial_size, autosave);
    }
    else
    {
@@ -1601,6 +1594,10 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
                path);
          return false;
       }
+      /* save_to_disk is false, which means we are saving the state
+      in undo_load_buf to allow content_undo_load_state() to restore it */
+
+      /* If we were holding onto an old state already, clean it up first */
       if (undo_load_buf.data)
       {
          free(undo_load_buf.data);
@@ -1618,7 +1615,7 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
       free(data);
       undo_load_buf.size = serial_size;
       strlcpy(undo_load_buf.path, path, sizeof(undo_load_buf.path));
-   }*/
+   }
 
    return true;
 }
@@ -1681,7 +1678,11 @@ bool content_load_state(const char *path,
    save_task_state_t *state     = NULL;
    settings_t *settings         = config_get_ptr();
    int state_slot               = settings->ints.state_slot;
+#if defined(HAVE_ZLIB)
+   bool compress_files          = settings->bools.savestate_file_compression;
+#else
    bool compress_files          = false;
+#endif
 
    if (!core_info_current_supports_savestate())
    {
