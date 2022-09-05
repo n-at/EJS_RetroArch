@@ -1632,7 +1632,7 @@ void gfx_widgets_frame(void *data)
       int text_width        = font_driver_get_message_width(
             p_dispwidget->gfx_widget_fonts.regular.font,
             text,
-            strlen(text), 1.0f);
+            strlen(text), 1.5f);
       int total_width       = text_width
          + p_dispwidget->simple_widget_padding * 2;
 

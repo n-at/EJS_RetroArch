@@ -355,6 +355,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mkdir -p ../../emulatorjs/data/cores/
       
       core=""
+      out_dir="../../emulatorjs"
       if [ $name = "fceumm" ]; then
         core="nes"
       elif [ $name = "desmume2015" ]; then
@@ -380,10 +381,10 @@ for f in `ls -v *_${platform}.${EXT}`; do
       fi
       
       if [ $wasm = 0 ]; then
-        7z a ../../emulatorjs/data/cores/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
+        7z a ${out_dir}/data/cores/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
         rm ../${name}_libretro.js.mem
       else
-        7z a ../../emulatorjs/data/cores/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
+        7z a ${out_dir}/data/cores/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
         rm ../${name}_libretro.wasm
       fi
       rm ../${name}_libretro.js
