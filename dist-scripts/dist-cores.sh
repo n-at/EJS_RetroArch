@@ -234,9 +234,38 @@ for f in `ls -v *_${platform}.${EXT}`; do
       if [ $wasm = 0 ]; then
         continue;
       fi
+   elif [ $name = "fbalpha2012_cps1" ] ; then
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "fbalpha2012_cps2" ] ; then
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "mednafen_psx_hw" ] ; then
+      gles3=1
+      heap_mem=536870912
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "mednafen_psx" ] ; then
+      gles3=1
+      heap_mem=536870912
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "melonds" ] ; then
+      pthread=0
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
    elif [ $name = "parallel_n64" ] ; then
       gles3=1
       async=1
+#   elif [ $name = "ppsspp" ] ; then
+#      gles3=1
+#      async=1
+      heap_mem=536870912
    elif [ $name = "mednafen_psx" ] ; then
       heap_mem=536870912
    elif [ $name = "mednafen_psx_hw" ] ; then
@@ -354,37 +383,19 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mkdir -p ../pkg/emscripten/
       mkdir -p ../../emulatorjs/data/cores/
       
+      out_dir="../../emulatorjs/data/cores"
       core=""
-      out_dir="../../emulatorjs"
-      if [ $name = "fceumm" ]; then
-        core="nes"
-      elif [ $name = "desmume2015" ]; then
-        core="nds"
-      elif [ $name = "a5200" ]; then
-        core="a5200"
-      elif [ $name = "gambatte" ]; then
-        core="gb"
-      elif [ $name = "mednafen_vb" ]; then
-        core="vb"
-      elif [ $name = "mgba" ]; then
-        core="gba"
-      elif [ $name = "mame2003" ]; then
-        core="mame2003"
-      elif [ $name = "mupen64plus_next" ]; then
-        core="n64"
-      elif [ $name = "snes9x" ]; then
-        core="snes"
-      elif [ $name = "fbalpha2012_cps1" ]; then
-        core="arcade"
+      if [ $name = "mednafen_vb" ]; then
+        core = "beetle_vb"
       else
-        core=${name}
+         core=${name}
       fi
       
       if [ $wasm = 0 ]; then
-        7z a ${out_dir}/data/cores/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
+        7z a ${out_dir}/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
         rm ../${name}_libretro.js.mem
       else
-        7z a ${out_dir}/data/cores/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
+        7z a ${out_dir}/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
         rm ../${name}_libretro.wasm
       fi
       rm ../${name}_libretro.js
