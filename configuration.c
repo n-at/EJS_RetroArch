@@ -1770,6 +1770,8 @@ static struct config_bool_setting *populate_settings_bool(
 #endif
 #ifdef HAVE_MENU
    SETTING_BOOL("menu_unified_controls",         &settings->bools.menu_unified_controls, true, false, false);
+   SETTING_BOOL("menu_disable_info_button",      &settings->bools.menu_disable_info_button, true, false, false);
+   SETTING_BOOL("menu_disable_search_button",    &settings->bools.menu_disable_search_button, true, false, false);
    SETTING_BOOL("menu_throttle_framerate",       &settings->bools.menu_throttle_framerate, true, true, false);
    SETTING_BOOL("menu_linear_filter",            &settings->bools.menu_linear_filter, true, DEFAULT_VIDEO_SMOOTH, false);
    SETTING_BOOL("menu_horizontal_animation",     &settings->bools.menu_horizontal_animation, true, DEFAULT_MENU_HORIZONTAL_ANIMATION, false);
@@ -2002,9 +2004,9 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("sustained_performance_mode",    &settings->bools.sustained_performance_mode, true, sustained_performance_mode, false);
 
 #ifdef _3DS
-   SETTING_BOOL("new3ds_speedup_enable",         &settings->bools.new3ds_speedup_enable, true, new3ds_speedup_enable, false);
-   SETTING_BOOL("video_3ds_lcd_bottom",          &settings->bools.video_3ds_lcd_bottom,  true, video_3ds_lcd_bottom,  false);
-   SETTING_BOOL("bottom_font_enable",            &settings->bools.bottom_font_enable,    true, bottom_font_enable,    false);
+   SETTING_BOOL("new3ds_speedup_enable",         &settings->bools.new3ds_speedup_enable, true, new3ds_speedup_enable,      false);
+   SETTING_BOOL("video_3ds_lcd_bottom",          &settings->bools.video_3ds_lcd_bottom,  true, video_3ds_lcd_bottom,       false);
+   SETTING_BOOL("bottom_font_enable",            &settings->bools.bottom_font_enable,    true, DEFAULT_BOTTOM_FONT_ENABLE, false);
 #endif
 
 #ifdef WIIU
@@ -2423,10 +2425,10 @@ static struct config_int_setting *populate_settings_int(
 #endif
    SETTING_INT("content_favorites_size",       &settings->ints.content_favorites_size, true, default_content_favorites_size, false);
 #ifdef _3DS
-   SETTING_INT("bottom_font_color_red",        &settings->ints.bottom_font_color_red,     true, bottom_font_color_red,     false);
-   SETTING_INT("bottom_font_color_green",      &settings->ints.bottom_font_color_green,   true, bottom_font_color_green,   false);
-   SETTING_INT("bottom_font_color_blue",       &settings->ints.bottom_font_color_blue,    true, bottom_font_color_blue,    false);
-   SETTING_INT("bottom_font_color_opacity",    &settings->ints.bottom_font_color_opacity, true, bottom_font_color_opacity, false);
+   SETTING_INT("bottom_font_color_red",        &settings->ints.bottom_font_color_red,     true, DEFAULT_BOTTOM_FONT_COLOR, false);
+   SETTING_INT("bottom_font_color_green",      &settings->ints.bottom_font_color_green,   true, DEFAULT_BOTTOM_FONT_COLOR, false);
+   SETTING_INT("bottom_font_color_blue",       &settings->ints.bottom_font_color_blue,    true, DEFAULT_BOTTOM_FONT_COLOR, false);
+   SETTING_INT("bottom_font_color_opacity",    &settings->ints.bottom_font_color_opacity, true, DEFAULT_BOTTOM_FONT_COLOR, false);
 #endif
    *size = count;
 
