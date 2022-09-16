@@ -17,6 +17,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #ifdef _WIN32
 #ifdef _XBOX
 #include <xtl.h>
@@ -1872,11 +1873,10 @@ bool command_event(enum event_command cmd, void *data)
       case CMD_EVENT_TAKE_SCREENSHOT:
 #ifdef HAVE_SCREENSHOTS
          {
-            const char *dir_screenshot = "/";
-            const char *name = "screenshot.png";
+            const char *dir_screenshot = settings->paths.directory_screenshot;
             if (!take_screenshot(dir_screenshot,
-                     name, false,
-                     video_driver_cached_frame_has_valid_framebuffer(), true, false))
+                     path_get(RARCH_PATH_BASENAME), false,
+                     video_driver_cached_frame_has_valid_framebuffer(), false, true))
                return false;
          }
 #endif
@@ -3431,11 +3431,6 @@ bool command_event(enum event_command cmd, void *data)
    return true;
 }
 
-void toggleMainLoop(int running) {
-    runloop_state_t *runloop_st     = runloop_state_get_ptr();
-    runloop_st->paused = (running==0);
-}
-
 /* FRONTEND */
 
 void retroarch_override_setting_set(
@@ -3897,9 +3892,10 @@ int rarch_main(int argc, char *argv[], void *data)
 #if defined(EMSCRIPTEN)
 #include "gfx/common/gl_common.h"
 
-void RWebAudioRecalibrateTime(void);
-
 static unsigned emscripten_frame_count = 0;
+
+void RWebAudioRecalibrateTime(void);
+void savestateinfo(void);
 
 void emscripten_mainloop(void)
 {
@@ -3915,8 +3911,6 @@ void emscripten_mainloop(void)
 
    RWebAudioRecalibrateTime();
 
-   emscripten_frame_count++;
-
    /* Disable BFI during fast forward, slow-motion,
     * and pause to prevent flicker. */
    if (
@@ -3925,6 +3919,7 @@ void emscripten_mainloop(void)
          && !runloop_is_slowmotion
          && !runloop_is_paused)
    {
+      emscripten_frame_count++;
       if ((emscripten_frame_count % (black_frame_insertion+1)) != 0)
       {
          gl_clear();
@@ -3934,6 +3929,7 @@ void emscripten_mainloop(void)
          return;
       }
    }
+   printf("%i\n", emscripten_frame_count);
 
    ret = runloop_iterate();
 
@@ -3946,9 +3942,42 @@ void emscripten_mainloop(void)
    emscripten_force_exit(0);
 }
 
-int get_current_frame_count(void)
+unsigned get_current_frame_count(void)
 {
     return emscripten_frame_count;
+}
+
+void toggleMainLoop(int running) {
+    runloop_state_t *runloop_st     = runloop_state_get_ptr();
+    runloop_st->paused = (running==0);
+}
+
+void cmd_load_state(void)
+{
+   emscripten_frame_count = 0;
+   command_event(CMD_EVENT_LOAD_STATE, NULL);//done
+}
+
+void system_restart(void)
+{
+    emscripten_frame_count = 0;
+    command_event(CMD_EVENT_RESET, NULL);//done
+}
+
+void save_state_info(void)
+{
+    emscripten_frame_count = 0;
+    savestateinfo();
+}
+
+void cmd_take_screenshot(void)
+{
+    const char *dir_screenshot = "/";
+    const char *name = "screenshot.png";
+    if (!take_screenshot(dir_screenshot,
+             name, true,
+             video_driver_cached_frame_has_valid_framebuffer(), true, false))
+       printf("Error taking screenshot");
 }
 
 #endif

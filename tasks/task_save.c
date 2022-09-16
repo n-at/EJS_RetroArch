@@ -320,6 +320,7 @@ bool autosave_init(void)
 #else
    bool compress_files        = false;
 #endif
+   compress_files = false;
 
    if (autosave_interval < 1 || !task_save_files)
       return false;
@@ -848,6 +849,7 @@ static bool task_push_undo_save_state(const char *path, void *data, size_t size)
 #else
    state->compress_files         = false;
 #endif
+   state->compress_files = false;
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -933,19 +935,21 @@ static void task_load_handler(retro_task_t *task)
 
    if (!state->file)
    {
+/*
 #if defined(HAVE_ZLIB)
-      /* Always use RZIP interface when reading state
+      * Always use RZIP interface when reading state
        * files - this will automatically handle uncompressed
-       * data */
+       * data *
       if (!(state->file = intfstream_open_rzip_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ)))
          goto end;
 #else
+    */
       if (!(state->file = intfstream_open_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ,
                   RETRO_VFS_FILE_ACCESS_HINT_NONE)))
          goto end;
-#endif
+//#endif
 
       if ((state->size = intfstream_get_size(state->file)) < 0)
          goto end;
@@ -1322,7 +1326,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
 #else
    state->compress_files         = false;
 #endif
-
+   state->compress_files = false;
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -1425,6 +1429,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
    state->compress_files         = false;
 #endif
 
+   state->compress_files = false;
    task->state                   = state;
    task->type                    = TASK_TYPE_BLOCKING;
    task->handler                 = task_load_handler;
@@ -1447,7 +1452,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
 void* state_data;
 char myString[200];
 
-void save_state_info(void)
+void savestateinfo(void)
 {
     memset(myString, '\0', sizeof(myString));
     if (state_data) 
@@ -1652,6 +1657,7 @@ bool content_load_state(const char *path,
    state->compress_files        = false;
 #endif
 
+   state->compress_files = false;
    task->type                   = TASK_TYPE_BLOCKING;
    task->state                  = state;
    task->handler                = task_load_handler;
@@ -1785,7 +1791,8 @@ bool content_load_ram_file(unsigned slot)
    /* Always use RZIP interface when reading SRAM
     * files - this will automatically handle uncompressed
     * data */
-   if (!rzipstream_read_file(ram.path, &buf, &rc))
+   //if (!rzipstream_read_file(ram.path, &buf, &rc))
+   if (!filestream_read_file(ram.path, &buf, &rc))
 #else
    if (!filestream_read_file(ram.path, &buf, &rc))
 #endif
@@ -2003,6 +2010,7 @@ bool content_ram_state_to_file(const char *path)
          && ram_buf.state_buf.data
          && ram_buf.to_write_file)
    {
+       /*
 #if defined(HAVE_ZLIB)
       settings_t *settings = config_get_ptr();
       if (settings->bools.save_file_compression)
@@ -2013,6 +2021,7 @@ bool content_ram_state_to_file(const char *path)
       }
       else
 #endif
+*/
       {
          if (filestream_write_file(
                path, ram_buf.state_buf.data, ram_buf.state_buf.size))
@@ -2048,7 +2057,7 @@ bool content_save_ram_file(unsigned slot, bool compress)
          ram.type,
          msg_hash_to_str(MSG_TO),
          ram.path);
-
+/*
 #if defined(HAVE_ZLIB)
    if (compress)
    {
@@ -2058,6 +2067,7 @@ bool content_save_ram_file(unsigned slot, bool compress)
    }
    else
 #endif
+*/
    {
       if (!filestream_write_file(
             ram.path, mem_info.data, mem_info.size))
@@ -2094,6 +2104,7 @@ bool event_save_files(bool is_sram_used)
 #if defined(HAVE_ZLIB)
    bool compress_files             = settings->bools.save_file_compression;
 #endif
+   compress_files = false;
 
 #ifdef HAVE_CHEATS
    cheat_manager_save_game_specific_cheats(

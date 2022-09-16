@@ -15,6 +15,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 #include <string.h>
@@ -60,16 +61,6 @@ void cmd_save_state(void)
    command_event(CMD_EVENT_SAVE_STATE, NULL);//done
 }
 
-void cmd_load_state(void)
-{
-   command_event(CMD_EVENT_LOAD_STATE, NULL);//done
-}
-
-void cmd_take_screenshot(void)
-{
-   command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);//done
-}
-
 void set_cheat(unsigned index, bool enabled, const char *code)
 {
     retro_cheat_set(index, enabled, code);//done
@@ -78,11 +69,6 @@ void set_cheat(unsigned index, bool enabled, const char *code)
 void reset_cheat(void)
 {
     retro_cheat_reset();//done
-}
-
-void system_restart(void)
-{
-    command_event(CMD_EVENT_RESET, NULL);//done
 }
 
 

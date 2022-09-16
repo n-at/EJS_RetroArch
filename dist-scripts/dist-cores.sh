@@ -383,7 +383,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mkdir -p ../pkg/emscripten/
       mkdir -p ../../emulatorjs/data/cores/
       
-      out_dir="../../emulatorjs/data/cores"
+      out_dir="../../emulatorjs-beta/data/cores"
       core=""
       if [ $name = "mednafen_vb" ]; then
         core = "beetle_vb"

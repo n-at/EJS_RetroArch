@@ -31,7 +31,7 @@ HAVE_GFX_WIDGETS = 1
 HAVE_RGUI = 1
 HAVE_SDL = 0
 HAVE_SDL2 = 0
-HAVE_ZLIB = 0
+HAVE_ZLIB = 1
 HAVE_SHADERPIPELINE = 1
 HAVE_STATIC_VIDEO_FILTERS = 1
 HAVE_STATIC_AUDIO_FILTERS = 1
@@ -181,7 +181,7 @@ else
    CFLAGS += -O3
 endif
 
-CFLAGS += -Wall -Wno-unused-command-line-argument -I. -Ilibretro-common/include -std=gnu99 $(LIBS) -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
+CFLAGS += -Wall -Wunused-function -Wno-unused-command-line-argument -I. -Ilibretro-common/include -std=gnu99 $(LIBS) -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
 
 RARCH_OBJ := $(addprefix $(OBJDIR)/,$(OBJ))
 
