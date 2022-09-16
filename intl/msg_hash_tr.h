@@ -334,6 +334,10 @@ MSG_HASH(
    "İçerik İndirici"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_DOWNLOAD_CORE_CONTENT,
+   "Seçili çekirdek için ücretsiz içerik indirin."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOAD_CORE_SYSTEM_FILES,
    "Çekirdek Sistem Dosyaları İndirici"
    )
@@ -5485,7 +5489,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CHEEVOS_HARDCORE_MODE_ENABLE,
-   "Kazanılan puanların iki katı. Oyunlar için kaydetme, hileler, geri sarma, duraklatma ve yavaş çekim devre dışı bırakır. Çalışma zamanında bu ayarın değiştirilmesi oyununuzu yeniden başlatacaktır."
+   "Hileleri, geri sarma, duraklatma, ağır çekim ve durum kaydı yüklenmesini devre dışı bırakır. Zorlu kipte kazanılan başarılar benzersiz bir şekilde işaretlenir, böylece başkalarına yardım özellikleri olmadan neler başardığınızı gösterebilirsiniz. Çalışma zamanında bu ayarı değiştirmek, oyunu yeniden başlatır."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_LEADERBOARDS_ENABLE,
@@ -5501,7 +5505,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CHEEVOS_RICHPRESENCE_ENABLE,
-   "Ayrıntılı oyun durumunu RetroAchievements sitesine gönderin."
+   "Bağlamsal oyun bilgilerini düzenli olarak RetroAchievements web sitesine gönderir. 'Zorlu Kip' etkinleştirildiğinde hiçbir etkisi yoktur."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_BADGES_ENABLE,

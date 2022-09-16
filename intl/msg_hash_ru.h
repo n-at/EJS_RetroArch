@@ -342,6 +342,10 @@ MSG_HASH(
    "Скачать контент"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_DOWNLOAD_CORE_CONTENT,
+   "Загрузка бесплатного контента для выбранного ядра."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOAD_CORE_SYSTEM_FILES,
    "Скачать системные файлы ядер"
    )
@@ -5504,10 +5508,6 @@ MSG_HASH(
    "Режим хардкора"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_HARDCORE_MODE_ENABLE,
-   "Удваивает количество заработанных очков. Отключает для всех игр сохранения, чит-коды, перемотку, паузу и замедление. Включение настройки при работе ядра перезапустит игру."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_LEADERBOARDS_ENABLE,
    "Списки лидеров"
    )
@@ -5518,10 +5518,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_RICHPRESENCE_ENABLE,
    "Расширенный статус"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_RICHPRESENCE_ENABLE,
-   "Отправлять подробный статус по игре на сайт RetroAchievements."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_BADGES_ENABLE,
