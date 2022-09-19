@@ -3895,7 +3895,6 @@ int rarch_main(int argc, char *argv[], void *data)
 static unsigned emscripten_frame_count = 0;
 
 void RWebAudioRecalibrateTime(void);
-void savestateinfo(void);
 
 void emscripten_mainloop(void)
 {
@@ -3910,6 +3909,10 @@ void emscripten_mainloop(void)
    bool runloop_is_paused                 = runloop_st->paused;
 
    RWebAudioRecalibrateTime();
+   
+   if (!runloop_is_paused) {
+       emscripten_frame_count++;
+   }
 
    /* Disable BFI during fast forward, slow-motion,
     * and pause to prevent flicker. */
@@ -3919,7 +3922,6 @@ void emscripten_mainloop(void)
          && !runloop_is_slowmotion
          && !runloop_is_paused)
    {
-      emscripten_frame_count++;
       if ((emscripten_frame_count % (black_frame_insertion+1)) != 0)
       {
          gl_clear();
@@ -3929,7 +3931,6 @@ void emscripten_mainloop(void)
          return;
       }
    }
-   printf("%i\n", emscripten_frame_count);
 
    ret = runloop_iterate();
 
@@ -3958,16 +3959,16 @@ void cmd_load_state(void)
    command_event(CMD_EVENT_LOAD_STATE, NULL);//done
 }
 
-void system_restart(void)
+int load_state(char *path, int rv)
 {
-    emscripten_frame_count = 0;
-    command_event(CMD_EVENT_RESET, NULL);//done
+    content_load_state(path, false, false);
+    return rv;
 }
 
-void save_state_info(void)
+void system_restart(void)
 {
+    command_event(CMD_EVENT_RESET, NULL);//done
     emscripten_frame_count = 0;
-    savestateinfo();
 }
 
 void cmd_take_screenshot(void)

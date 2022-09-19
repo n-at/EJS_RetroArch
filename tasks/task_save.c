@@ -1452,7 +1452,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
 void* state_data;
 char myString[200];
 
-void savestateinfo(void)
+void save_state_info(void)
 {
     memset(myString, '\0', sizeof(myString));
     if (state_data) 
@@ -1675,12 +1675,6 @@ error:
       free(task);
 
    return false;
-}
-
-int load_state(char *path, int rv)
-{
-    content_load_state(path, false, false);
-    return rv;
 }
 
 bool supports_states(void)
