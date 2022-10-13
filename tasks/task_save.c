@@ -855,7 +855,7 @@ static bool task_push_undo_save_state(const char *path, void *data, size_t size)
    if (settings->bools.savestate_file_compression)
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
-   state->compress_files = false;
+   
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -1336,7 +1336,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
    if (settings->bools.savestate_file_compression)
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
-   state->compress_files = false;
+   
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -1440,7 +1440,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
 
-   state->compress_files = false;
+   
    task->state                   = state;
    task->type                    = TASK_TYPE_BLOCKING;
    task->handler                 = task_load_handler;
@@ -1669,7 +1669,6 @@ bool content_load_state(const char *path,
       state->flags             |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
 
-   state->compress_files = false;
    task->type                   = TASK_TYPE_BLOCKING;
    task->state                  = state;
    task->handler                = task_load_handler;

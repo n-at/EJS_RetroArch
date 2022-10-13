@@ -91,6 +91,7 @@ static void task_queue_msg_push(retro_task_t *task,
 
 static void task_queue_push_progress(retro_task_t *task)
 {
+   task->mute = true;
 #ifdef HAVE_THREADS
    /* msg_push callback interacts directly with the task properties (particularly title).
     * make sure another thread doesn't modify them while rendering

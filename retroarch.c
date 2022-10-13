@@ -3954,7 +3954,11 @@ unsigned get_current_frame_count(void)
 
 void toggleMainLoop(int running) {
     runloop_state_t *runloop_st     = runloop_state_get_ptr();
-    runloop_st->paused = (running==0);
+    if (running == 0) {
+        runloop_st->flags |=  RUNLOOP_FLAG_PAUSED;
+    } else {
+        runloop_st->flags &=  RUNLOOP_FLAG_PAUSED;
+    }
 }
 
 void cmd_load_state(void)
