@@ -379,7 +379,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       out_dir="../../emulatorjs-beta/data/cores"
       core=""
       if [ $name = "mednafen_vb" ]; then
-        core = "beetle_vb"
+        core="beetle_vb"
       else
          core=${name}
       fi
