@@ -6960,6 +6960,10 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_EXPLORE_BY_SYSTEM_NAME,
    "Sistem Adı"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_EXPLORE_VIEW,
+   "Görünüm"
+   )
 
 /* Playlist > Playlist Item */
 
@@ -9246,8 +9250,16 @@ MSG_HASH(
    "Dikey Solma Etkeni"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_XMB_SHOW_TITLE_HEADER,
+   "Başlığı Göster"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_XMB_TITLE_MARGIN,
    "Başlık Payı"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_XMB_TITLE_MARGIN_HORIZONTAL_OFFSET,
+   "Başlık Payı Yatay Ofset"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_MAIN_MENU_ENABLE_SETTINGS,
@@ -11022,6 +11034,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_PUBLIC_ADDRESS,
    "Netplay Port Eşlemesi Başarılı"
+   )
+MSG_HASH(
+   MSG_PRIVATE_OR_SHARED_ADDRESS,
+   "Harici ağın özel veya paylaşılan bir adresi var. Bir geçiş sunucusu kullanmayı düşünün."
    )
 MSG_HASH(
    MSG_UPNP_FAILED,

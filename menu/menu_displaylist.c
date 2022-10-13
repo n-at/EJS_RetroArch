@@ -98,6 +98,7 @@
 #include "../core_option_manager.h"
 #include "../paths.h"
 #include "../retroarch.h"
+#include "../runloop.h"
 #include "../core.h"
 #include "../frontend/frontend_driver.h"
 #include "../ui/ui_companion_driver.h"
@@ -1235,10 +1236,11 @@ static unsigned menu_displaylist_parse_core_option_override_list(
       menu_displaylist_info_t *info, settings_t *settings)
 {
    unsigned count               = 0;
+   uint32_t flags               = runloop_get_flags();
    bool core_has_options        = !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL) &&
          retroarch_ctl(RARCH_CTL_HAS_CORE_OPTIONS, NULL);
-   bool game_options_active     = retroarch_ctl(RARCH_CTL_IS_GAME_OPTIONS_ACTIVE, NULL);
-   bool folder_options_active   = retroarch_ctl(RARCH_CTL_IS_FOLDER_OPTIONS_ACTIVE, NULL);
+   bool game_options_active     = flags & RUNLOOP_FLAG_GAME_OPTIONS_ACTIVE;
+   bool folder_options_active   = flags & RUNLOOP_FLAG_FOLDER_OPTIONS_ACTIVE;
    bool show_core_options_flush = settings ?
          settings->bools.quick_menu_show_core_options_flush : false;
 
@@ -1332,16 +1334,17 @@ static unsigned menu_displaylist_parse_remap_file_manager_list(
       menu_displaylist_info_t *info, settings_t *settings)
 {
    unsigned count                = 0;
+   uint32_t flags                = runloop_get_flags();
    bool has_content              = !string_is_empty(path_get(RARCH_PATH_CONTENT));
-   bool core_remap_active        = retroarch_ctl(RARCH_CTL_IS_REMAPS_CORE_ACTIVE, NULL);
-   bool content_dir_remap_active = retroarch_ctl(RARCH_CTL_IS_REMAPS_CONTENT_DIR_ACTIVE, NULL);
-   bool game_remap_active        = retroarch_ctl(RARCH_CTL_IS_REMAPS_GAME_ACTIVE, NULL);
+   bool core_remap_active        = flags & RUNLOOP_FLAG_REMAPS_CORE_ACTIVE;
+   bool content_dir_remap_active = flags & RUNLOOP_FLAG_REMAPS_CONTENT_DIR_ACTIVE;
+   bool game_remap_active        = flags & RUNLOOP_FLAG_REMAPS_GAME_ACTIVE;
    bool remap_save_on_exit       = settings->bools.remap_save_on_exit;
 
    /* Sanity check - cannot handle remap files
     * unless a valid core is running */
-   if (!retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL) ||
-       retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
+   if ( !(flags & RUNLOOP_FLAG_CORE_RUNNING)
+       || retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
       goto end;
 
    /* Show currently 'active' remap file */
@@ -1635,7 +1638,7 @@ static unsigned menu_displaylist_parse_supported_cores(menu_displaylist_info_t *
                0, 0, 0, NULL))
             count++;
 
-         info->download_core = true;
+         info->flags |= MD_FLAG_DOWNLOAD_CORE;
       }
    }
 
@@ -2352,7 +2355,7 @@ static int menu_displaylist_parse_playlist(menu_displaylist_info_t *info,
    return 0;
 
 error:
-   info->need_push_no_playlist_entries = true;
+   info->flags |= MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
    return 0;
 }
 
@@ -3071,7 +3074,7 @@ static int menu_displaylist_parse_database_entry(menu_handle_t *menu,
    }
 
    if (db_info->count < 1)
-      info->need_push_no_playlist_entries = true;
+      info->flags |= MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
 
    playlist_free(playlist);
    database_info_list_free(db_info);
@@ -3119,7 +3122,7 @@ int menu_displaylist_parse_settings_enum(
       ST_NONE,                   /* PARSE_SUB_GROUP           */
       ST_SIZE,                   /* PARSE_ONLY_SIZE           */
    };
-   uint64_t flags;
+   uint32_t flags;
    enum setting_type precond   = precond_lut[parse_type];
    size_t             count    = 0;
 
@@ -3351,6 +3354,13 @@ static int menu_displaylist_parse_horizontal_list(
 
    if (!item)
       return -1;
+
+   if (item->type == MENU_EXPLORE_TAB)
+   {
+      /* when opening a saved view the explore menu will handle the list */
+      menu_displaylist_ctl(DISPLAYLIST_EXPLORE, info, settings);
+      return 0;
+   }
 
    if (!string_is_empty(item->path))
    {
@@ -4039,6 +4049,7 @@ static unsigned menu_displaylist_parse_playlists(
    size_t i, list_size;
    struct string_list str_list  = {0};
    unsigned count               = 0;
+   unsigned content_count       = 0;
    const char *path             = info->path;
    bool show_hidden_files       = settings->bools.show_hidden_files;
 
@@ -4136,9 +4147,39 @@ static unsigned menu_displaylist_parse_playlists(
          show_hidden_files, true, false))
       return count;
 
+   content_count = count;
+
    dir_list_sort(&str_list, true);
 
    list_size = str_list.size;
+
+#if defined(HAVE_LIBRETRODB)
+   if (settings->bools.menu_content_show_explore)
+   {
+      /* list any custom explore views above playlists */
+      for (i = 0; i < list_size; i++)
+      {
+         char label[512];
+         const char *path = str_list.elems[i].data;
+         const char *fname = path_basename(path);
+         const char *fext = path_get_extension(fname);
+         if (!string_is_equal_noncase(fext, "lvw"))
+            continue;
+
+         snprintf(label, sizeof(label), "%s: %.*s",
+               msg_hash_to_str(MENU_ENUM_LABEL_EXPLORE_VIEW),
+               (int)(fext - 1 - fname), fname);
+         if (menu_entries_append(info->list, label, path,
+               MENU_ENUM_LABEL_GOTO_EXPLORE,
+               MENU_EXPLORE_TAB, 0, (count - content_count), NULL))
+         {
+            menu_file_list_cbs_t *cbs = ((menu_file_list_cbs_t*)info->list->list[info->list->size-1].actiondata);
+            cbs->action_sublabel = NULL;
+            count++;
+         }
+      }
+   }
+#endif
 
    for (i = 0; i < list_size; i++)
    {
@@ -4188,7 +4229,7 @@ static unsigned menu_displaylist_parse_playlists(
 
       if (menu_entries_append(info->list, path, "",
             MENU_ENUM_LABEL_PLAYLIST_COLLECTION_ENTRY,
-            file_type, 0, 0, NULL))
+            file_type, 0, (count - content_count), NULL))
          count++;
    }
 
@@ -4263,7 +4304,7 @@ static unsigned menu_displaylist_parse_cores(
    }
 
    if (string_is_equal(info->label, msg_hash_to_str(MENU_ENUM_LABEL_CORE_LIST)))
-      info->download_core = true;
+      info->flags |= MD_FLAG_DOWNLOAD_CORE;
 
    dir_list_sort(str_list, true);
 
@@ -4372,7 +4413,7 @@ static unsigned menu_displaylist_parse_cores(
                file_list_set_alt_at_offset(info->list, i, display_name);
          }
       }
-      info->need_sort = true;
+      info->flags |= MD_FLAG_NEED_SORT;
    }
 
    return items_found;
@@ -5605,30 +5646,29 @@ static void wifi_scan_callback(retro_task_t *task,
 
 bool menu_displaylist_process(menu_displaylist_info_t *info)
 {
-   size_t                              idx   = 0;
 #ifdef HAVE_NETWORKING
    settings_t              *settings         = config_get_ptr();
 #endif
 
-   if (info->need_navigation_clear)
+   if (info->flags & MD_FLAG_NEED_NAVIGATION_CLEAR)
    {
       bool pending_push = true;
       menu_driver_ctl(MENU_NAVIGATION_CTL_CLEAR, &pending_push);
    }
 
-   if (info->need_entries_refresh)
+   if (info->flags & MD_FLAG_NEED_ENTRIES_REFRESH)
    {
       bool refresh = false;
       menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
    }
 
-   if (info->need_sort)
+   if (info->flags & MD_FLAG_NEED_SORT)
       file_list_sort_on_alt(info->list);
 
 #ifdef HAVE_NETWORKING
    if (settings->bools.menu_show_core_updater && !settings->bools.kiosk_mode_enable)
    {
-      if (info->download_core)
+      if (info->flags & MD_FLAG_DOWNLOAD_CORE)
       {
 #ifdef HAVE_UPDATE_CORES
          menu_entries_append(info->list,
@@ -5647,7 +5687,7 @@ bool menu_displaylist_process(menu_displaylist_info_t *info)
    }
 #endif
 
-   if (info->push_builtin_cores)
+   if (info->flags & MD_FLAG_PUSH_BUILTIN_CORES)
    {
 #if defined(HAVE_VIDEOPROCESSOR)
       menu_entries_append(info->list,
@@ -5666,15 +5706,15 @@ bool menu_displaylist_process(menu_displaylist_info_t *info)
 #endif
    }
 
-   if (info->need_refresh)
+   if (info->flags & MD_FLAG_NEED_REFRESH)
       menu_entries_ctl(MENU_ENTRIES_CTL_REFRESH, info->list);
 
-   if (info->need_clear)
-      menu_navigation_set_selection(idx);
+   if (info->flags & MD_FLAG_NEED_CLEAR)
+      menu_navigation_set_selection(0);
 
-   if (info->need_push)
+   if (info->flags & MD_FLAG_NEED_PUSH)
    {
-      if (info->need_push_no_playlist_entries)
+      if (info->flags & MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES)
          menu_entries_append(info->list,
                msg_hash_to_str(
                   MENU_ENUM_LABEL_VALUE_NO_PLAYLIST_ENTRIES_AVAILABLE),
@@ -5716,15 +5756,6 @@ void menu_displaylist_info_init(menu_displaylist_info_t *info)
       return;
 
    info->enum_idx                 = MSG_UNKNOWN;
-   info->need_sort                = false;
-   info->need_refresh             = false;
-   info->need_entries_refresh     = false;
-   info->need_push_no_playlist_entries = false;
-   info->need_push                = false;
-   info->need_clear               = false;
-   info->push_builtin_cores       = false;
-   info->download_core            = false;
-   info->need_navigation_clear    = false;
    info->type                     = 0;
    info->type_default             = 0;
    info->flags                    = 0;
@@ -6112,6 +6143,7 @@ unsigned menu_displaylist_build_list(
 {
    unsigned i;
    unsigned count = 0;
+   uint32_t flags = runloop_get_flags();
 
    switch (type)
    {
@@ -9175,8 +9207,8 @@ unsigned menu_displaylist_build_list(
             }
 
 #ifdef HAVE_RUNAHEAD
-            if (retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL) &&
-                !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
+            if (  (flags & RUNLOOP_FLAG_CORE_RUNNING)
+                && !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
                runahead_supported = core_info_current_supports_runahead();
 
             if (runahead_supported)
@@ -10166,8 +10198,8 @@ unsigned menu_displaylist_build_list(
             };
 
 #ifdef HAVE_REWIND
-            if (retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL) &&
-                !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
+            if (  (flags & RUNLOOP_FLAG_CORE_RUNNING)
+                && !retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
                rewind_supported = core_info_current_supports_rewind();
 
             if (rewind_supported)
@@ -10230,8 +10262,10 @@ unsigned menu_displaylist_build_list(
                {MENU_ENUM_LABEL_MENU_RGUI_PARTICLE_EFFECT,                    PARSE_ONLY_UINT,   true},
                {MENU_ENUM_LABEL_MENU_RGUI_PARTICLE_EFFECT_SPEED,              PARSE_ONLY_FLOAT,  false},
                {MENU_ENUM_LABEL_MENU_RGUI_PARTICLE_EFFECT_SCREENSAVER,        PARSE_ONLY_BOOL,   false},
+               {MENU_ENUM_LABEL_MENU_XMB_SHOW_TITLE_HEADER,                   PARSE_ONLY_BOOL,   true},
+               {MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN,                        PARSE_ONLY_INT,    true},
+               {MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN_HORIZONTAL_OFFSET,      PARSE_ONLY_INT,    true},
                {MENU_ENUM_LABEL_MENU_XMB_VERTICAL_FADE_FACTOR,                PARSE_ONLY_UINT,   true},
-               {MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN,                        PARSE_ONLY_UINT,   true},
                {MENU_ENUM_LABEL_XMB_ALPHA_FACTOR,                             PARSE_ONLY_UINT,   true},
                {MENU_ENUM_LABEL_XMB_FONT,                                     PARSE_ONLY_PATH,   true},
                {MENU_ENUM_LABEL_MENU_FONT_COLOR_RED,                          PARSE_ONLY_UINT,   true},
@@ -10969,24 +11003,24 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             }
          }
 #endif
-         info->need_push    = true;
-         info->need_refresh = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_NETPLAY_KICK_LIST:
 #ifdef HAVE_NETWORKING
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count = menu_displaylist_netplay_kick(info->list);
 #endif
-         info->need_push    = true;
-         info->need_refresh = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_NETPLAY_BAN_LIST:
 #ifdef HAVE_NETWORKING
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count = menu_displaylist_netplay_ban(info->list);
 #endif
-         info->need_push    = true;
-         info->need_refresh = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_OPTIONS_REMAPPINGS_PORT:
          {
@@ -11145,10 +11179,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                }
             }
 
-            info->need_push     = true;
-            info->need_refresh  = true;
+            info->flags       |= MD_FLAG_NEED_REFRESH
+                               | MD_FLAG_NEED_PUSH;
             if (selection >= count)
-               info->need_clear = true;
+               info->flags    |= MD_FLAG_NEED_CLEAR;
          }
          break;
 #ifdef HAVE_CDROM
@@ -11392,9 +11426,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       }
       case DISPLAYLIST_LOAD_DISC:
@@ -11409,9 +11443,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
 #else
       case DISPLAYLIST_CDROM_DETAIL_INFO:
@@ -11442,10 +11476,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             MENU_ENUM_LABEL_CPU_POLICY_GOVERNOR,
             MENU_SETTINGS_CPU_POLICY_SET_GOVERNOR, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
-
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       case DISPLAYLIST_CPU_PERFPOWER_LIST:
       {
@@ -11516,9 +11549,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             };
          }
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       }
 #endif
@@ -11582,10 +11615,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
 
          }
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
-
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       }
 #if defined(HAVE_LAKKA_SWITCH)
@@ -11624,10 +11656,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                count++;
          }
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
-
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       }
 #endif /* HAVE_LAKKA_SWITCH */
@@ -11687,9 +11718,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   msg_hash_to_str(MENU_ENUM_LABEL_NO_ITEMS),
                   MENU_ENUM_LABEL_NO_ITEMS,
                   MENU_SETTING_NO_ITEM, 0, 0, NULL);
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       case DISPLAYLIST_MIXER_STREAM_SETTINGS_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -11766,9 +11798,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
          break;
       case DISPLAYLIST_NETPLAY_LAN_SCAN_SETTINGS_LIST:
          /* TODO/FIXME ? */
@@ -11778,7 +11810,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          break;
       case DISPLAYLIST_NETPLAY:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-         info->need_push    = true;
+         info->flags |= MD_FLAG_NEED_PUSH;
          /* TODO/FIXME ? */
          break;
       case DISPLAYLIST_INFORMATION:
@@ -11794,8 +11826,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DATABASE_ENTRY:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -11840,14 +11872,14 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                ret = menu_displaylist_parse_database_entry(menu, settings,
                      info);
             else
-               info->need_push_no_playlist_entries = true;
+               info->flags       |= MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
 #else
-            ret = 0;
-            info->need_push_no_playlist_entries = true;
+            ret                   = 0;
+            info->flags          |= MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
 #endif
          }
 
-         info->need_push    = true;
+         info->flags |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DATABASE_QUERY:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -11883,9 +11915,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_sort    = true;
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_SORT
+                            | MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_OPTIONS_SHADERS:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12019,7 +12051,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
+         info->flags |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_CORE_CONTENT:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12035,9 +12067,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
 #endif
          break;
       case DISPLAYLIST_CORE_CONTENT_DIRS_SUBDIR:
@@ -12066,9 +12098,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                      FILE_TYPE_NONE, 0, 0, NULL);
 
-            info->need_push    = true;
-            info->need_refresh = true;
-            info->need_clear   = true;
+            info->flags       |= MD_FLAG_NEED_REFRESH
+                               | MD_FLAG_NEED_PUSH
+                               | MD_FLAG_NEED_CLEAR;
 
             string_list_deinitialize(&str_list);
 #endif
@@ -12094,9 +12126,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                      FILE_TYPE_NONE, 0, 0, NULL);
 
-            info->need_push    = true;
-            info->need_refresh = true;
-            info->need_clear   = true;
+            info->flags       |= MD_FLAG_NEED_REFRESH
+                               | MD_FLAG_NEED_PUSH
+                               | MD_FLAG_NEED_CLEAR;
 #endif
          }
          break;
@@ -12114,9 +12146,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
 #endif
          break;
       case DISPLAYLIST_CORES_UPDATER:
@@ -12189,7 +12221,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             }
 
             if (selection >= count)
-               info->need_clear = true;
+               info->flags |= MD_FLAG_NEED_CLEAR;
          }
 #endif
          if (count == 0)
@@ -12199,9 +12231,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_THUMBNAILS_UPDATER:
 #ifdef HAVE_NETWORKING
@@ -12217,9 +12248,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
 #endif
          break;
       case DISPLAYLIST_PL_THUMBNAILS_UPDATER:
@@ -12235,9 +12266,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
 #endif
          break;
       case DISPLAYLIST_LAKKA:
@@ -12254,9 +12285,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-         info->need_refresh = true;
-         info->need_clear   = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH
+                            | MD_FLAG_NEED_CLEAR;
 #endif
          break;
       case DISPLAYLIST_PLAYLIST_COLLECTION:
@@ -12312,9 +12343,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                /* Playlists themselves are sorted
                 * > Display lists generated from playlists
                 *   must never be sorted */
-               info->need_sort    = false;
-               info->need_refresh = true;
-               info->need_push    = true;
+               info->flags &= ~MD_FLAG_NEED_SORT;
+               info->flags |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
             }
          }
          break;
@@ -12345,11 +12376,11 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          /* Playlists themselves are sorted
           * > Display lists generated from playlists
           *   must never be sorted */
-         info->need_sort             = false;
-         info->need_refresh          = true;
-         info->need_push             = true;
-         info->need_navigation_clear =
-               history_needs_navigation_clear(menu, g_defaults.content_history);
+         info->flags    &= ~MD_FLAG_NEED_SORT;
+         info->flags    |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
+         if (history_needs_navigation_clear(menu, g_defaults.content_history))
+            info->flags |= MD_FLAG_NEED_NAVIGATION_CLEAR;
          break;
       case DISPLAYLIST_FAVORITES:
          {
@@ -12373,17 +12404,17 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      msg_hash_to_str(MENU_ENUM_LABEL_NO_FAVORITES_AVAILABLE),
                      MENU_ENUM_LABEL_NO_FAVORITES_AVAILABLE,
                      MENU_INFO_MESSAGE, 0, 0, NULL);
-               info->need_push_no_playlist_entries = false;
-               ret = 0;
+               info->flags       &= ~MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
+               ret                = 0;
             }
 
             ret                   = 0;
             /* Playlists themselves are sorted
              * > Display lists generated from playlists
              *   must never be sorted */
-            info->need_sort       = false;
-            info->need_refresh    = true;
-            info->need_push       = true;
+            info->flags &= ~MD_FLAG_NEED_SORT;
+            info->flags |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_MUSIC_HISTORY:
@@ -12410,8 +12441,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      msg_hash_to_str(MENU_ENUM_LABEL_NO_MUSIC_AVAILABLE),
                      MENU_ENUM_LABEL_NO_MUSIC_AVAILABLE,
                      MENU_INFO_MESSAGE, 0, 0, NULL);
-               info->need_push_no_playlist_entries = false;
-               ret = 0;
+               info->flags &=  ~MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
+               ret          = 0;
             }
          }
 
@@ -12420,11 +12451,11 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             /* Playlists themselves are sorted
              * > Display lists generated from playlists
              *   must never be sorted */
-            info->need_sort             = false;
-            info->need_refresh          = true;
-            info->need_push             = true;
-            info->need_navigation_clear =
-                  history_needs_navigation_clear(menu, g_defaults.music_history);
+            info->flags    &=  ~MD_FLAG_NEED_SORT;
+            info->flags    |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
+            if (history_needs_navigation_clear(menu, g_defaults.music_history))
+               info->flags |= MD_FLAG_NEED_NAVIGATION_CLEAR;
          }
          break;
       case DISPLAYLIST_VIDEO_HISTORY:
@@ -12458,8 +12489,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   msg_hash_to_str(MENU_ENUM_LABEL_NO_VIDEOS_AVAILABLE),
                   MENU_ENUM_LABEL_NO_VIDEOS_AVAILABLE,
                   MENU_INFO_MESSAGE, 0, 0, NULL);
-            info->need_push_no_playlist_entries = false;
-            ret = 0;
+            info->flags    &= ~MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
+            ret             =  0;
          }
 
          if (ret == 0)
@@ -12467,12 +12498,12 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             /* Playlists themselves are sorted
              * > Display lists generated from playlists
              *   must never be sorted */
-            info->need_sort             = false;
-            info->need_refresh          = true;
-            info->need_push             = true;
+            info->flags    &= ~MD_FLAG_NEED_SORT;
+            info->flags    |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
 #if (defined(HAVE_FFMPEG) || defined(HAVE_MPV))
-            info->need_navigation_clear =
-                  history_needs_navigation_clear(menu, g_defaults.video_history);
+            if (history_needs_navigation_clear(menu, g_defaults.video_history))
+               info->flags |=  MD_FLAG_NEED_NAVIGATION_CLEAR;
 #endif
          }
          break;
@@ -12481,16 +12512,16 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          rcheevos_menu_populate_hardcore_pause_submenu(info);
 #endif
-         info->need_push = true;
-         info->need_refresh = true;
+         info->flags    |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_ACHIEVEMENT_LIST:
 #ifdef HAVE_CHEEVOS
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          rcheevos_menu_populate(info);
 #endif
-         info->need_push    = true;
-         info->need_refresh = true;
+         info->flags    |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_CORES_SUPPORTED:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12500,9 +12531,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                MENU_ENUM_LABEL_DETECT_CORE_LIST_OK,
                MENU_ENUM_LABEL_DETECT_CORE_LIST_OK_CURRENT_CORE);
 
-         info->need_sort    = false;
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags &= ~MD_FLAG_NEED_SORT;
+         info->flags |= MD_FLAG_NEED_REFRESH
+                      | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_CORES_COLLECTION_SUPPORTED:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12512,9 +12543,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                MENU_ENUM_LABEL_FILE_BROWSER_CORE_SELECT_FROM_COLLECTION,
                MENU_ENUM_LABEL_FILE_BROWSER_CORE_SELECT_FROM_COLLECTION_CURRENT_CORE);
 
-         info->need_sort    = false;
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       &= ~MD_FLAG_NEED_SORT;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          core_selected      = true;
          break;
       case DISPLAYLIST_CORE_INFO:
@@ -12532,37 +12563,31 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
              * current selection index is less than the current
              * number of menu entries - if not, we reset the
              * navigation pointer */
-            size_t selection     = menu_navigation_get_selection();
+            size_t selection = menu_navigation_get_selection();
 
             menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
             count            = menu_displaylist_parse_core_info(info, settings);
 
             if (selection >= count)
-            {
-               info->need_refresh          = true;
-               info->need_navigation_clear = true;
-            }
-            info->need_push                = true;
+               info->flags  |= MD_FLAG_NEED_REFRESH
+                             | MD_FLAG_NEED_NAVIGATION_CLEAR;
+            info->flags     |= MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_CORE_RESTORE_BACKUP_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-         {
-            count              = menu_displaylist_parse_core_backup_list(
-                  info, settings, true);
-         }
-         info->need_refresh = true;
-         info->need_push    = true;
+         count                = menu_displaylist_parse_core_backup_list(
+               info, settings, true);
+         info->flags         |= MD_FLAG_NEED_REFRESH
+                              | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_CORE_DELETE_BACKUP_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-         {
-            count                  = menu_displaylist_parse_core_backup_list(
-                  info, settings, false);
-         }
-         info->need_navigation_clear = true;
-         info->need_refresh          = true;
-         info->need_push             = true;
+         count                = menu_displaylist_parse_core_backup_list(
+               info, settings, false);
+         info->flags         |= MD_FLAG_NEED_REFRESH
+                              | MD_FLAG_NEED_PUSH
+                              | MD_FLAG_NEED_NAVIGATION_CLEAR;
          break;
       case DISPLAYLIST_CORE_MANAGER_LIST:
          {
@@ -12574,12 +12599,13 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             static size_t prev_count = 0;
             size_t selection         = menu_navigation_get_selection();
             menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-            count           = menu_displaylist_parse_core_manager_list(info,
-                  settings);
+            count                    = menu_displaylist_parse_core_manager_list
+               (info, settings);
 
             if (count == 0)
                menu_entries_append(info->list,
-                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_ENTRIES_TO_DISPLAY),
+                     msg_hash_to_str(
+                        MENU_ENUM_LABEL_VALUE_NO_ENTRIES_TO_DISPLAY),
                      msg_hash_to_str(MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY),
                      MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                      FILE_TYPE_NONE, 0, 0, NULL);
@@ -12587,20 +12613,20 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             if ((count != prev_count) ||
                 (selection >= count))
             {
-               info->need_refresh          = true;
-               info->need_navigation_clear = true;
-               prev_count                  = count;
+               info->flags |= MD_FLAG_NEED_REFRESH 
+                            | MD_FLAG_NEED_NAVIGATION_CLEAR;
+               prev_count   = count;
             }
-            info->need_push = true;
+            info->flags    |=  MD_FLAG_NEED_PUSH;
          }
          break;
 #ifdef HAVE_MIST
       case DISPLAYLIST_CORE_MANAGER_STEAM_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count = menu_displaylist_parse_core_manager_steam_list(info, settings);
-         info->need_navigation_clear = true;
-         info->need_refresh          = false;
-         info->need_push             = true;
+         info->flags       &= ~MD_FLAG_NEED_REFRESH;
+         info->flags       |=  MD_FLAG_NEED_PUSH 
+                            |  MD_FLAG_NEED_NAVIGATION_CLEAR;
          
          /* No core dlcs were found */
          if (count == 0)
@@ -12615,10 +12641,11 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
       case DISPLAYLIST_CORE_INFORMATION_STEAM_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
       
-         info->need_navigation_clear = true;
-         info->need_refresh          = false;
-         info->need_push             = true;
-               count = menu_displaylist_parse_core_information_steam(info, settings);
+         info->flags                &= ~MD_FLAG_NEED_REFRESH;
+         info->flags                |=  MD_FLAG_NEED_PUSH 
+                                     |  MD_FLAG_NEED_NAVIGATION_CLEAR;
+         count                       = 
+            menu_displaylist_parse_core_information_steam(info, settings);
       
          if (count == 0)
             if (menu_entries_append(info->list,
@@ -12650,8 +12677,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             if (contentless_core_ptr < count)
                menu_navigation_set_selection(contentless_core_ptr);
 
-            info->need_sort = false;
-            info->need_push = true;
+            info->flags    &= ~MD_FLAG_NEED_SORT;
+            info->flags    |=  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_SAVESTATE_LIST:
@@ -12713,7 +12740,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                      FILE_TYPE_NONE, 0, 0, NULL);
 
-            info->need_push                = true;
+            info->flags    |=  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_CORE_OPTIONS:
@@ -12824,11 +12851,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      MENU_SETTINGS_CORE_OPTION_NONE, 0, 0, NULL);
 
             if (selection >= count)
-            {
-               info->need_refresh          = true;
-               info->need_navigation_clear = true;
-            }
-            info->need_push                = true;
+               info->flags                |=  MD_FLAG_NEED_REFRESH
+                                           |  MD_FLAG_NEED_NAVIGATION_CLEAR;
+            info->flags                   |=  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_CORE_OPTION_OVERRIDE_LIST:
@@ -12847,11 +12872,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             count = menu_displaylist_parse_core_option_override_list(info, settings);
 
             if (selection >= count)
-            {
-               info->need_refresh          = true;
-               info->need_navigation_clear = true;
-            }
-            info->need_push                = true;
+               info->flags                |= MD_FLAG_NEED_REFRESH
+                                           | MD_FLAG_NEED_NAVIGATION_CLEAR;
+            info->flags                   |= MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_REMAP_FILE_MANAGER:
@@ -12870,11 +12893,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             count = menu_displaylist_parse_remap_file_manager_list(info, settings);
 
             if (selection >= count)
-            {
-               info->need_refresh          = true;
-               info->need_navigation_clear = true;
-            }
-            info->need_push                = true;
+               info->flags                |= MD_FLAG_NEED_REFRESH
+                                           | MD_FLAG_NEED_NAVIGATION_CLEAR;
+            info->flags                   |= MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_ARCHIVE_ACTION:
@@ -12894,7 +12915,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                0, 0, 0, NULL))
             count++;
 
-         info->need_push = true;
+         info->flags    |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_ARCHIVE_ACTION_DETECT_CORE:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12913,9 +12934,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                0, 0, 0, NULL))
             count++;
 
-         info->need_push = true;
+         info->flags    |= MD_FLAG_NEED_PUSH;
          break;
-
       case DISPLAYLIST_PLAYLIST_MANAGER_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count = menu_displaylist_parse_playlist_manager_list(info, settings);
@@ -12927,8 +12947,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-
+         info->flags    |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_PLAYLIST_MANAGER_SETTINGS:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12941,8 +12960,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
-
+         info->flags    |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_PARAMETER:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -12952,49 +12970,49 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                MENU_SETTINGS_SHADER_PARAMETER_0,
                MENU_SETTING_DROPDOWN_ITEM_VIDEO_SHADER_PARAM);
 
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_PRESET_PARAMETER:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
 
-         count = menu_displaylist_build_shader_parameter(
+         count              = menu_displaylist_build_shader_parameter(
                info, info->list, info->type,
                MENU_SETTINGS_SHADER_PRESET_PARAMETER_0,
                MENU_SETTING_DROPDOWN_ITEM_VIDEO_SHADER_PRESET_PARAM);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_INPUT_DEVICE_TYPE:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count              = menu_displaylist_parse_input_device_type_list(info, settings);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_INPUT_DEVICE_INDEX:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count              = menu_displaylist_parse_input_device_index_list(info, settings);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count              = menu_displaylist_parse_input_description_list(info, settings);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST_INPUT_DESCRIPTION_KBD:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count              = menu_displaylist_parse_input_description_kbd_list(info, settings);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
 #ifdef HAVE_NETWORKING
       case DISPLAYLIST_DROPDOWN_LIST_NETPLAY_MITM_SERVER:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
          count              = menu_displaylist_parse_netplay_mitm_server_list(info, settings);
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
          break;
 #endif
       case DISPLAYLIST_SAVING_SETTINGS_LIST:
@@ -13182,6 +13200,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             }
          }
 
+         info->flags       |= MD_FLAG_NEED_REFRESH
+                            | MD_FLAG_NEED_PUSH;
+
          /* Special pass */
          switch (type)
          {
@@ -13190,14 +13211,11 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
 #ifdef HAVE_LAKKA
             case DISPLAYLIST_EJECT_DISC:
 #endif
-               info->need_clear   = true;
+               info->flags       |= MD_FLAG_NEED_CLEAR;
                break;
             default:
                break;
          }
-
-         info->need_refresh = true;
-         info->need_push    = true;
          break;
       case DISPLAYLIST_HORIZONTAL:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -13206,23 +13224,22 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          /* Playlists themselves are sorted
           * > Display lists generated from playlists
           *   must never be sorted */
-         info->need_sort    = false;
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       &= ~MD_FLAG_NEED_SORT;
+         info->flags       |=  MD_FLAG_NEED_REFRESH
+                            |  MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_HORIZONTAL_CONTENT_ACTIONS:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
-         ret = menu_displaylist_parse_horizontal_content_actions(menu,
-               settings, info);
-         info->need_refresh  = true;
-         info->need_push     = true;
+         ret                = menu_displaylist_parse_horizontal_content_actions
+            (menu, settings, info);
+         info->flags       |=  MD_FLAG_NEED_REFRESH
+                            |  MD_FLAG_NEED_PUSH;
 
          if (core_selected)
          {
-            info->need_clear = true;
+            info->flags     |=  MD_FLAG_NEED_CLEAR;
             core_selected    = false;
          }
-
          break;
       case DISPLAYLIST_OPTIONS:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -13439,7 +13456,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_SETTING_NO_ITEM, 0, 0, NULL);
 
          ret                = 0;
-         info->need_push    = true;
+         info->flags       |=  MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_OPTIONS_OVERRIDES:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -13489,7 +13506,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_SETTINGS_FOUND,
                   0, 0, 0, NULL);
 
-         info->need_push = true;
+         info->flags    |=  MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_SHADER_PARAMETERS:
       case DISPLAYLIST_SHADER_PARAMETERS_PRESET:
@@ -13524,8 +13541,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   0, 0, 0, NULL);
 
          ret                = 0;
-         info->need_refresh = true;
-         info->need_push    = true;
+         info->flags       |=  MD_FLAG_NEED_REFRESH
+                            |  MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_MAIN_MENU:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -13535,8 +13552,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
 #if defined(HAVE_RGUI) || defined(HAVE_MATERIALUI) || defined(HAVE_OZONE) || defined(HAVE_XMB)
             const char *menu_ident         = menu_driver_ident();
 #endif
+            uint32_t flags                 = runloop_get_flags();
 
-            if (retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL))
+            if (flags & RUNLOOP_FLAG_CORE_RUNNING)
             {
                if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
                   if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(info->list,
@@ -13709,7 +13727,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      PARSE_ACTION, false) == 0)
                   count++;
 
-            info->need_push    = true;
+            info->flags       |=  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_HELP:
@@ -13731,7 +13749,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
       case DISPLAYLIST_FILE_BROWSER_SELECT_CORE:
       case DISPLAYLIST_FILE_BROWSER_SELECT_COLLECTION:
       case DISPLAYLIST_GENERIC:
-         info->need_navigation_clear = true;
+         info->flags         |=  MD_FLAG_NEED_NAVIGATION_CLEAR;
          /* fall-through */
       case DISPLAYLIST_PENDING_CLEAR:
          {
@@ -13747,7 +13765,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   NULL))
                count++;
 
-            info->need_entries_refresh = true;
+            info->flags      |=  MD_FLAG_NEED_ENTRIES_REFRESH;
          }
          break;
       case DISPLAYLIST_USER_BINDS_LIST:
@@ -13758,10 +13776,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             const char *temp_val      = msg_hash_to_str(
                   (enum msg_hash_enums)(MENU_ENUM_LABEL_INPUT_USER_1_BINDS + (val-1)));
             strlcpy(lbl, temp_val, sizeof(lbl));
-            ret = MENU_DISPLAYLIST_PARSE_SETTINGS(info->list,
+            ret                = MENU_DISPLAYLIST_PARSE_SETTINGS(info->list,
                   lbl, PARSE_NONE, true, MENU_SETTINGS_INPUT_BEGIN);
-            info->need_refresh = true;
-            info->need_push    = true;
+            info->flags       |=  MD_FLAG_NEED_REFRESH
+                               |  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_DATABASES:
@@ -13901,9 +13919,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             /* Playlists themselves are sorted
              * > Display lists generated from playlists
              *   must never be sorted */
-            info->need_sort    = false;
-            info->need_refresh = true;
-            info->need_push    = true;
+            info->flags       &= ~MD_FLAG_NEED_SORT;
+            info->flags       |=  MD_FLAG_NEED_REFRESH
+                               |  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_IMAGES_HISTORY:
@@ -13934,22 +13952,21 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   msg_hash_to_str(MENU_ENUM_LABEL_NO_IMAGES_AVAILABLE),
                   MENU_ENUM_LABEL_NO_IMAGES_AVAILABLE,
                   MENU_INFO_MESSAGE, 0, 0, NULL);
-            info->need_push_no_playlist_entries = false;
-            ret = 0;
+            info->flags             &= ~MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
+            ret                      = 0;
          }
 
          ret                         = 0;
          /* Playlists themselves are sorted
           * > Display lists generated from playlists
           *   must never be sorted */
-         info->need_sort             = false;
-         info->need_refresh          = true;
-         info->need_push             = true;
+         info->flags                &= ~MD_FLAG_NEED_SORT;
+         info->flags                |=  MD_FLAG_NEED_REFRESH
+                                     |  MD_FLAG_NEED_PUSH;
 #if defined(HAVE_IMAGEVIEWER)
-         info->need_navigation_clear =
-               history_needs_navigation_clear(menu, g_defaults.image_history);
+         if (history_needs_navigation_clear(menu, g_defaults.image_history))
+            info->flags             |=  MD_FLAG_NEED_NAVIGATION_CLEAR;
 #endif
-
          break;
       case DISPLAYLIST_VIDEO_FILTERS:
       case DISPLAYLIST_CONFIG_FILES:
@@ -14080,8 +14097,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                      MENU_ENUM_LABEL_NO_PLAYLISTS,
                      MENU_SETTING_NO_ITEM, 0, 0, NULL);
 
-            info->need_refresh = true;
-            info->need_push    = true;
+            info->flags       |=  MD_FLAG_NEED_REFRESH
+                               |  MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_CORES:
@@ -14111,11 +14128,11 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ITEMS,
                   MENU_SETTING_NO_ITEM, 0, 0, NULL);
 
-         info->need_refresh       = true;
-         info->need_push          = true;
+         info->flags    |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          if (string_is_equal(info->label,
                   msg_hash_to_str(MENU_ENUM_LABEL_CORE_LIST)))
-            info->push_builtin_cores = true;
+            info->flags |= MD_FLAG_PUSH_BUILTIN_CORES;
          break;
       case DISPLAYLIST_DEFAULT:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -14136,7 +14153,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                   MENU_ENUM_LABEL_NO_ENTRIES_TO_DISPLAY,
                   FILE_TYPE_NONE, 0, 0, NULL);
 
-         info->need_push    = true;
+         info->flags |= MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_DROPDOWN_LIST:
          menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
@@ -14225,8 +14242,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                            int32_t orig_value     = *setting->value.target.integer;
                            unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_INT_ITEM;
                            float step             = setting->step;
-                           double min             = setting->enforce_minrange ? setting->min : 0.00;
-                           double max             = setting->enforce_maxrange ? setting->max : 99999.00;
+                           float  min             = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ? setting->min : 0.00f;
+                           float  max             = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ? setting->max : 99999.00f;
                            bool checked_found     = false;
                            unsigned checked       = 0;
                            unsigned entry_index   = 0;
@@ -14302,8 +14319,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                            unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_FLOAT_ITEM;
                            float step             = setting->step;
                            float half_step        = step * 0.5f;
-                           double min             = setting->enforce_minrange ? setting->min : 0.00;
-                           double max             = setting->enforce_maxrange ? setting->max : 9999.00;
+                           float min              = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ?
+setting->min : 0.00f;
+                           float max              = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ?
+setting->max : 9999.00f;
                            bool checked_found     = false;
                            unsigned checked       = 0;
                            unsigned entry_index   = 0;
@@ -14376,8 +14395,10 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                            unsigned orig_value    = *setting->value.target.unsigned_integer;
                            unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_UINT_ITEM;
                            float step             = setting->step;
-                           double min             = setting->enforce_minrange ? setting->min : 0.00;
-                           double max             = setting->enforce_maxrange ? setting->max : 9999.00;
+                           float min              = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ?
+                              setting->min : 0.00f;
+                           float max              = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ?
+                              setting->max : 9999.00f;
                            bool checked_found     = false;
                            unsigned checked       = 0;
                            unsigned entry_index   = 0;
@@ -14450,8 +14471,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                }
             }
 
-            info->need_refresh       = true;
-            info->need_push          = true;
+            info->flags |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          }
          break;
       case DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_NUM_PASSES:
@@ -14484,8 +14505,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                }
             }
 
-            info->need_refresh       = true;
-            info->need_push          = true;
+            info->flags |= MD_FLAG_NEED_REFRESH
+                         | MD_FLAG_NEED_PUSH;
          }
 #endif
          break;
@@ -14558,8 +14579,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         int32_t orig_value     = *setting->value.target.integer;
                         unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_INT_ITEM_SPECIAL;
                         float step             = setting->step;
-                        double min             = setting->enforce_minrange ? setting->min : 0.00;
-                        double max             = setting->enforce_maxrange ? setting->max : 9999.00;
+                        float min              = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ? setting->min : 0.00f;
+                        float max              = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ? setting->max : 9999.00f;
                         bool checked_found     = false;
                         unsigned checked       = 0;
                         unsigned entry_index   = 0;
@@ -14634,8 +14655,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_FLOAT_ITEM_SPECIAL;
                         float step             = setting->step;
                         float half_step        = step * 0.5f;
-                        double min             = setting->enforce_minrange ? setting->min : 0.00;
-                        double max             = setting->enforce_maxrange ? setting->max : 9999.00;
+                        float min              = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ? setting->min : 0.00f;
+                        float max              = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ? setting->max : 9999.00f;
                         bool checked_found     = false;
                         unsigned checked       = 0;
                         unsigned entry_index   = 0;
@@ -14707,8 +14728,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         unsigned orig_value    = *setting->value.target.unsigned_integer;
                         unsigned setting_type  = MENU_SETTING_DROPDOWN_SETTING_UINT_ITEM_SPECIAL;
                         float step             = setting->step;
-                        double min             = setting->enforce_minrange ? setting->min : 0.00;
-                        double max             = setting->enforce_maxrange ? setting->max : 9999.00;
+                        float min              = (setting->flags & SD_FLAG_ENFORCE_MINRANGE) ? setting->min : 0.00f;
+                        float max              = (setting->flags & SD_FLAG_ENFORCE_MAXRANGE) ? setting->max : 9999.00f;
                         bool checked_found     = false;
                         unsigned checked       = 0;
                         unsigned entry_index   = 0;
@@ -14781,8 +14802,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             }
          }
 
-         info->need_refresh       = true;
-         info->need_push          = true;
+         info->flags |= MD_FLAG_NEED_REFRESH
+                      | MD_FLAG_NEED_PUSH;
          break;
       case DISPLAYLIST_NONE:
          break;
@@ -14830,8 +14851,8 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          }
       }
 
-      info->need_refresh = true;
-      info->need_push    = true;
+      info->flags |= MD_FLAG_NEED_REFRESH
+                   | MD_FLAG_NEED_PUSH;
    }
 
    if (ret != 0)

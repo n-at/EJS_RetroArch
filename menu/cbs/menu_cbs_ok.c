@@ -77,6 +77,7 @@
 #include "../../paths.h"
 #include "../../playlist.h"
 #include "../../retroarch.h"
+#include "../../runloop.h"
 #include "../../verbosity.h"
 #include "../../lakka.h"
 #ifdef HAVE_BLUETOOTH
@@ -2024,7 +2025,7 @@ static int generic_action_ok(const char *path,
             bool config_save_on_exit        = settings->bools.config_save_on_exit;
             flush_type                      = MENU_SETTINGS;
 
-            disp_get_ptr()->msg_force       = true;
+            disp_get_ptr()->flags          |= GFX_DISP_FLAG_MSG_FORCE;
 
             if (config_replace(config_save_on_exit, action_path))
             {
@@ -3556,24 +3557,25 @@ static int generic_action_ok_remap_file_operation(const char *path,
       if (!string_is_empty(remap_file_path) &&
           (filestream_delete(remap_file_path) == 0))
       {
+         uint32_t flags = runloop_get_flags();
          switch (action_type)
          {
             case ACTION_OK_REMAP_FILE_REMOVE_CORE:
-               if (retroarch_ctl(RARCH_CTL_IS_REMAPS_CORE_ACTIVE, NULL))
+               if (flags & RUNLOOP_FLAG_REMAPS_CORE_ACTIVE)
                {
                   input_remapping_deinit(false);
                   input_remapping_set_defaults(false);
                }
                break;
             case ACTION_OK_REMAP_FILE_REMOVE_GAME:
-               if (retroarch_ctl(RARCH_CTL_IS_REMAPS_GAME_ACTIVE, NULL))
+               if (flags & RUNLOOP_FLAG_REMAPS_GAME_ACTIVE)
                {
                   input_remapping_deinit(false);
                   input_remapping_set_defaults(false);
                }
                break;
             case ACTION_OK_REMAP_FILE_REMOVE_CONTENT_DIR:
-               if (retroarch_ctl(RARCH_CTL_IS_REMAPS_CONTENT_DIR_ACTIVE, NULL))
+               if (flags & RUNLOOP_FLAG_REMAPS_CONTENT_DIR_ACTIVE)
                {
                   input_remapping_deinit(false);
                   input_remapping_set_defaults(false);
@@ -6117,7 +6119,7 @@ static void netplay_refresh_lan_cb(const void *data)
       (struct netplay_room*)calloc(hosts->size, sizeof(*net_st->room_list));
    if (!net_st->room_list)
       goto done;
-   net_st->room_count = hosts->size;
+   net_st->room_count = (int)hosts->size;
 
    for (i = 0; i < net_st->room_count; i++)
    {
@@ -6458,7 +6460,7 @@ int action_cb_push_dropdown_item_resolution(const char *path,
       float num            = refreshrate / 60.0f;
       unsigned refresh_mod = num > 0 ? (unsigned)(floorf(num + 0.5f)) : (unsigned)(ceilf(num - 0.5f));
 #else
-      unsigned refresh_mod = lroundf((float)(refreshrate / 60.0f));
+      unsigned refresh_mod = (unsigned)lroundf((float)(refreshrate / 60.0f));
 #endif
       float refresh_exact  = refreshrate;
 
@@ -6922,13 +6924,14 @@ static int action_ok_contentless_core_run(const char *path,
     * the current selection here, and reapply it manually
     * when building the contentless cores list... */
    size_t selection      = menu_navigation_get_selection();
+   uint32_t flags        = runloop_get_flags();
 
    if (string_is_empty(core_path))
       return menu_cbs_exit();
 
    /* If core is already running, open quick menu */
-   if (retroarch_ctl(RARCH_CTL_IS_CORE_LOADED, (void*)core_path) &&
-       retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL))
+   if (   retroarch_ctl(RARCH_CTL_IS_CORE_LOADED, (void*)core_path)
+       && (flags & RUNLOOP_FLAG_CORE_RUNNING))
    {
       bool flush_menu = false;
       menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, &flush_menu);

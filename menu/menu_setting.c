@@ -36,6 +36,10 @@
 #include "../config.h"
 #endif
 
+#if defined(HAVE_STEAM) && defined(HAVE_MIST)
+#include <mist.h>
+#endif
+
 #ifdef HAVE_CDROM
 #include <vfs/vfs_implementation_cdrom.h>
 #endif
@@ -619,7 +623,7 @@ static int setting_bind_action_ok(
 static int setting_int_action_right_default(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
-   double               max = 0.0f;
+   float max = 0.0f;
 
    if (!setting)
       return -1;
@@ -631,12 +635,12 @@ static int setting_int_action_right_default(
    *setting->value.target.integer =
       *setting->value.target.integer + setting->step;
 
-   if (setting->enforce_maxrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MAXRANGE)
    {
       if (*setting->value.target.integer > max)
       {
          settings_t *settings = config_get_ptr();
-         double          min  = setting->min;
+         float          min   = setting->min;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.integer = min;
@@ -782,9 +786,9 @@ int setting_uint_action_left_default(
       *setting->value.target.unsigned_integer =
          *setting->value.target.unsigned_integer - step;
 
-   if (setting->enforce_minrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MINRANGE)
    {
-      double min = setting->min;
+      float min = setting->min;
       if (overflowed || *setting->value.target.unsigned_integer < min)
       {
          settings_t *settings = config_get_ptr();
@@ -792,7 +796,7 @@ int setting_uint_action_left_default(
          if (settings && 
              settings->bools.menu_navigation_wraparound_enable)
          {
-            double max = setting->max;
+            float max = setting->max;
             *setting->value.target.unsigned_integer = max;
          }
          else
@@ -817,13 +821,13 @@ int setting_uint_action_right_default(
    *setting->value.target.unsigned_integer =
       *setting->value.target.unsigned_integer + step;
 
-   if (setting->enforce_maxrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MAXRANGE)
    {
-      double max = setting->max;
+      float max = setting->max;
       if (*setting->value.target.unsigned_integer > max)
       {
          settings_t *settings = config_get_ptr();
-         double           min = setting->min;
+         float           min  = setting->min;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.unsigned_integer = min;
@@ -903,13 +907,13 @@ static int setting_size_action_left_default(
    if (!(overflowed = step > *setting->value.target.sizet))
       *setting->value.target.sizet = *setting->value.target.sizet - step;
 
-   if (setting->enforce_minrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MINRANGE)
    {
-      double min = setting->min;
+      float min = setting->min;
       if (overflowed || *setting->value.target.sizet < min)
       {
          settings_t *settings = config_get_ptr();
-         double           max = setting->max;
+         float           max  = setting->max;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.sizet = max;
@@ -934,13 +938,13 @@ static int setting_size_action_right_default(
    *setting->value.target.sizet =
       *setting->value.target.sizet + step;
 
-   if (setting->enforce_maxrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MAXRANGE)
    {
-      double max = setting->max;
+      float max = setting->max;
       if (*setting->value.target.sizet > max)
       {
          settings_t *settings = config_get_ptr();
-         double           min = setting->min;
+         float           min  = setting->min;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.sizet = min;
@@ -959,7 +963,7 @@ int setting_generic_action_ok_default(
       return -1;
 
    if (setting->cmd_trigger_idx != CMD_EVENT_NONE)
-      setting->cmd_trigger_event_triggered = true;
+      setting->flags |= SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED;
 
    return 0;
 }
@@ -972,7 +976,8 @@ void setting_generic_handle_change(rarch_setting_t *setting)
    if (setting->change_handler)
       setting->change_handler(setting);
 
-   if (setting->cmd_trigger_idx && !setting->cmd_trigger_event_triggered)
+   if (       setting->cmd_trigger_idx 
+         && !(setting->flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
       command_event(setting->cmd_trigger_idx, NULL);
 }
 
@@ -1013,8 +1018,8 @@ int setting_set_with_string_representation(rarch_setting_t* setting,
       const char* value)
 {
    char *ptr;
-   double min, max;
-   uint64_t flags;
+   float min, max;
+   uint32_t flags;
    if (!setting || !value)
       return -1;
 
@@ -1028,9 +1033,9 @@ int setting_set_with_string_representation(rarch_setting_t* setting,
          *setting->value.target.integer = (int)strtol(value, &ptr, 10);
          if (flags & SD_FLAG_HAS_RANGE)
          {
-            if (setting->enforce_minrange && *setting->value.target.integer < min)
+            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.integer < min)
                *setting->value.target.integer = min;
-            if (setting->enforce_maxrange && *setting->value.target.integer > max)
+            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.integer > max)
             {
                settings_t *settings = config_get_ptr();
                if (settings && settings->bools.menu_navigation_wraparound_enable)
@@ -1044,9 +1049,9 @@ int setting_set_with_string_representation(rarch_setting_t* setting,
          *setting->value.target.unsigned_integer = (unsigned int)strtoul(value, &ptr, 10);
          if (flags & SD_FLAG_HAS_RANGE)
          {
-            if (setting->enforce_minrange && *setting->value.target.unsigned_integer < min)
+            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.unsigned_integer < min)
                *setting->value.target.unsigned_integer = min;
-            if (setting->enforce_maxrange && *setting->value.target.unsigned_integer > max)
+            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.unsigned_integer > max)
             {
                settings_t *settings = config_get_ptr();
                if (settings && settings->bools.menu_navigation_wraparound_enable)
@@ -1060,9 +1065,9 @@ int setting_set_with_string_representation(rarch_setting_t* setting,
          sscanf(value, "%" PRI_SIZET, setting->value.target.sizet);
          if (flags & SD_FLAG_HAS_RANGE)
          {
-            if (setting->enforce_minrange && *setting->value.target.sizet < min)
+            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.sizet < min)
                *setting->value.target.sizet = min;
-            if (setting->enforce_maxrange && *setting->value.target.sizet > max)
+            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.sizet > max)
             {
                settings_t *settings = config_get_ptr();
                if (settings && settings->bools.menu_navigation_wraparound_enable)
@@ -1077,9 +1082,9 @@ int setting_set_with_string_representation(rarch_setting_t* setting,
          *setting->value.target.fraction = (float)strtod(value, &ptr);
          if (flags & SD_FLAG_HAS_RANGE)
          {
-            if (setting->enforce_minrange && *setting->value.target.fraction < min)
+            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.fraction < min)
                *setting->value.target.fraction = min;
-            if (setting->enforce_maxrange && *setting->value.target.fraction > max)
+            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.fraction > max)
             {
                settings_t *settings = config_get_ptr();
                if (settings && settings->bools.menu_navigation_wraparound_enable)
@@ -1122,13 +1127,13 @@ static int setting_fraction_action_left_default(
    *setting->value.target.fraction = 
       *setting->value.target.fraction - setting->step;
 
-   if (setting->enforce_minrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MINRANGE)
    {
-      double min = setting->min;
+      float min = setting->min;
       if (*setting->value.target.fraction < min)
       {
          settings_t *settings = config_get_ptr();
-         double           max = setting->max;
+         float           max  = setting->max;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.fraction = max;
@@ -1149,13 +1154,13 @@ static int setting_fraction_action_right_default(
    *setting->value.target.fraction =
       *setting->value.target.fraction + setting->step;
 
-   if (setting->enforce_maxrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MAXRANGE)
    {
-      double max = setting->max;
+      float max = setting->max;
       if (*setting->value.target.fraction > max)
       {
          settings_t *settings = config_get_ptr();
-         double          min  = setting->min;
+         float          min   = setting->min;
 
          if (settings && settings->bools.menu_navigation_wraparound_enable)
             *setting->value.target.fraction = min;
@@ -1389,13 +1394,11 @@ static rarch_setting_t setting_action_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1453,13 +1456,8 @@ static rarch_setting_t setting_group_setting(
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
-
-   result.dont_use_enum_idx_representation = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
    return result;
 }
@@ -1527,17 +1525,15 @@ static rarch_setting_t setting_float_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = rounding;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.fraction     = target;
    result.original_value.fraction   = *target;
    result.default_value.fraction    = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1604,17 +1600,15 @@ static rarch_setting_t setting_uint_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.unsigned_integer   = target;
    result.original_value.unsigned_integer = *target;
    result.default_value.unsigned_integer  = default_value;
 
    result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1683,17 +1677,15 @@ static rarch_setting_t setting_size_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
-   result.value.target.sizet   = target;
-   result.original_value.sizet = *target;
-   result.default_value.sizet  = default_value;
+   result.value.target.sizet        = target;
+   result.original_value.sizet      = *target;
+   result.default_value.sizet       = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1761,17 +1753,15 @@ static rarch_setting_t setting_hex_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.unsigned_integer   = target;
    result.original_value.unsigned_integer = *target;
    result.default_value.unsigned_integer  = default_value;
 
    result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1840,16 +1830,14 @@ static rarch_setting_t setting_bind_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.keybind      = target;
    result.default_value.keybind     = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -1862,13 +1850,13 @@ static int setting_int_action_left_default(
 
    *setting->value.target.integer = *setting->value.target.integer - setting->step;
 
-   if (setting->enforce_minrange)
+   if (setting->flags & SD_FLAG_ENFORCE_MINRANGE)
    {
-      double min = setting->min;
+      float min = setting->min;
       if (*setting->value.target.integer < min)
       {
          settings_t *settings = config_get_ptr();
-         double           max = setting->max;
+         float           max  = setting->max;
 
          if (   settings
              && settings->bools.menu_navigation_wraparound_enable)
@@ -1971,15 +1959,12 @@ static rarch_setting_t setting_string_setting(enum setting_type type,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.dir.empty_path            = empty;
    result.value.target.string       = target;
    result.default_value.string      = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
    switch (type)
    {
@@ -1997,7 +1982,8 @@ static rarch_setting_t setting_string_setting(enum setting_type type,
          break;
    }
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -2095,13 +2081,11 @@ static rarch_setting_t setting_subgroup_setting(enum setting_type type,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -2170,8 +2154,6 @@ static rarch_setting_t setting_bool_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.boolean      = target;
    result.original_value.boolean    = *target;
@@ -2179,10 +2161,10 @@ static rarch_setting_t setting_bool_setting(const char* name,
    result.boolean.off_label         = off;
    result.boolean.on_label          = on;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -2249,17 +2231,15 @@ static rarch_setting_t setting_int_setting(const char* name,
    result.browser_selection_type    = ST_NONE;
    result.step                      = 0.0f;
    result.rounding_fraction         = NULL;
-   result.enforce_minrange          = false;
-   result.enforce_maxrange          = false;
 
    result.value.target.integer      = target;
    result.original_value.integer    = *target;
    result.default_value.integer     = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
-   result.cmd_trigger_event_triggered      = false;
+   result.cmd_trigger_idx           = CMD_EVENT_NONE;
 
-   result.dont_use_enum_idx_representation = dont_use_enum_idx;
+   if (dont_use_enum_idx)
+      result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
 
    return result;
 }
@@ -6864,6 +6844,7 @@ static void setting_get_string_representation_uint_user_language(
    modes[RETRO_LANGUAGE_CZECH]                  = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CZECH);
    modes[RETRO_LANGUAGE_CATALAN_VALENCIA]       = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CATALAN_VALENCIA);
    modes[RETRO_LANGUAGE_CATALAN]                = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_CATALAN);
+   modes[RETRO_LANGUAGE_BRITISH_ENGLISH]        = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LANG_BRITISH_ENGLISH);
    strlcpy(s, modes[*msg_hash_get_uint(MSG_HASH_USER_LANGUAGE)], len);
 }
 #endif
@@ -7033,30 +7014,30 @@ static void menu_settings_list_current_add_range(
    unsigned idx                   = list_info->index - 1;
 
    if ((*list)[idx].type == ST_FLOAT)
-      (*list)[list_info->index - 1].ui_type
-                                  = ST_UI_TYPE_FLOAT_SLIDER_AND_SPINBOX;
-
+      (*list)[idx].ui_type        = ST_UI_TYPE_FLOAT_SLIDER_AND_SPINBOX;
+                                  
    (*list)[idx].min               = min;
    (*list)[idx].step              = step;
    (*list)[idx].max               = max;
-   (*list)[idx].enforce_minrange  = enforce_minrange_enable;
-   (*list)[idx].enforce_maxrange  = enforce_maxrange_enable;
-
-   (*list)[list_info->index - 1].flags |= SD_FLAG_HAS_RANGE;
+   if (enforce_minrange_enable)
+      (*list)[idx].flags         |= SD_FLAG_ENFORCE_MINRANGE;
+   if (enforce_maxrange_enable)
+      (*list)[idx].flags         |= SD_FLAG_ENFORCE_MAXRANGE;
+   (*list)[idx].flags            |= SD_FLAG_HAS_RANGE;
 }
 
 int menu_setting_generic(rarch_setting_t *setting, size_t idx, bool wraparound)
 {
-   uint64_t flags = setting->flags;
+   uint32_t flags = setting->flags;
    if (setting_generic_action_ok_default(setting, idx, wraparound) != 0)
       return -1;
 
    if (setting->change_handler)
       setting->change_handler(setting);
 
-   if ((flags & SD_FLAG_EXIT) && setting->cmd_trigger_event_triggered)
+   if ((flags & SD_FLAG_EXIT) && (flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
    {
-      setting->cmd_trigger_event_triggered = false;
+      setting->flags &= ~SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED;
       return -1;
    }
 
@@ -7742,12 +7723,13 @@ static enum event_command write_handler_get_cmd(rarch_setting_t *setting)
 {
    if (setting && setting->cmd_trigger_idx != CMD_EVENT_NONE)
    {
-      if (setting->flags & SD_FLAG_EXIT)
+      uint32_t flags = setting->flags;
+      if (flags & SD_FLAG_EXIT)
          if (*setting->value.target.boolean)
             *setting->value.target.boolean = false;
 
-      if (setting->cmd_trigger_event_triggered ||
-            (setting->flags & SD_FLAG_CMD_APPLY_AUTO))
+      if (  (flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED) ||
+            (flags & SD_FLAG_CMD_APPLY_AUTO))
          return setting->cmd_trigger_idx;
    }
    return CMD_EVENT_NONE;
@@ -7775,7 +7757,7 @@ static void write_handler_audio_rate_control_delta(rarch_setting_t *setting)
       audio_set_float(AUDIO_ACTION_RATE_CONTROL_DELTA, *setting->value.target.fraction);
    }
 
-   if (rarch_cmd || setting->cmd_trigger_event_triggered)
+   if (rarch_cmd || (setting->flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
       command_event(rarch_cmd, NULL);
 }
 
@@ -7804,7 +7786,7 @@ static void write_handler_logging_verbosity(rarch_setting_t *setting)
    }
    retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_VERBOSITY, NULL);
 
-   if (rarch_cmd || setting->cmd_trigger_event_triggered)
+   if (rarch_cmd || (setting->flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
       command_event(rarch_cmd, NULL);
 }
 
@@ -8548,7 +8530,7 @@ static void general_write_handler(rarch_setting_t *setting)
          break;
    }
 
-   if (rarch_cmd || setting->cmd_trigger_event_triggered)
+   if (rarch_cmd || (setting->flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
       command_event(rarch_cmd, NULL);
 }
 
@@ -12767,23 +12749,33 @@ static bool setting_append_list(
                   );
 
 #if !defined(RARCH_MOBILE)
-            if (video_driver_test_all_flags(GFX_CTX_FLAGS_BLACK_FRAME_INSERTION))
             {
+#if defined(HAVE_STEAM) && defined(HAVE_MIST)
+               bool on_deck = false;
+               mist_steam_utils_is_steam_running_on_steam_deck(&on_deck);
+               /* We want to not expose Black Frame Insertion on Steam Deck
+                * for safety reasons */
+               if (!on_deck && video_driver_test_all_flags(GFX_CTX_FLAGS_BLACK_FRAME_INSERTION))
+#else
+               if (video_driver_test_all_flags(GFX_CTX_FLAGS_BLACK_FRAME_INSERTION))
+#endif
+               {
 
-               CONFIG_UINT(
-                     list, list_info,
-                     &settings->uints.video_black_frame_insertion,
-                     MENU_ENUM_LABEL_VIDEO_BLACK_FRAME_INSERTION,
-                     MENU_ENUM_LABEL_VALUE_VIDEO_BLACK_FRAME_INSERTION,
-                     DEFAULT_BLACK_FRAME_INSERTION,
-                     &group_info,
-                     &subgroup_info,
-                     parent_group,
-                     general_write_handler,
-                     general_read_handler);
-               (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
-               menu_settings_list_current_add_range(list, list_info, 0, 5, 1, true, true);
-            }  
+                  CONFIG_UINT(
+                        list, list_info,
+                        &settings->uints.video_black_frame_insertion,
+                        MENU_ENUM_LABEL_VIDEO_BLACK_FRAME_INSERTION,
+                        MENU_ENUM_LABEL_VALUE_VIDEO_BLACK_FRAME_INSERTION,
+                        DEFAULT_BLACK_FRAME_INSERTION,
+                        &group_info,
+                        &subgroup_info,
+                        parent_group,
+                        general_write_handler,
+                        general_read_handler);
+                  (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+                  menu_settings_list_current_add_range(list, list_info, 0, 5, 1, true, true);
+               }  
+            }
 #endif
             END_SUB_GROUP(list, list_info, parent_group);
             START_SUB_GROUP(
@@ -16522,9 +16514,24 @@ static bool setting_append_list(
             menu_settings_list_current_add_range(list, list_info, 0, 500, 1, true, true);
             SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
 
-            CONFIG_UINT(
+            CONFIG_BOOL(
                   list, list_info,
-                  &settings->uints.menu_xmb_title_margin,
+                  &settings->bools.menu_xmb_show_title_header,
+                  MENU_ENUM_LABEL_MENU_XMB_SHOW_TITLE_HEADER,
+                  MENU_ENUM_LABEL_VALUE_MENU_XMB_SHOW_TITLE_HEADER,
+                  DEFAULT_XMB_SHOW_TITLE_HEADER,
+                  MENU_ENUM_LABEL_VALUE_OFF,
+                  MENU_ENUM_LABEL_VALUE_ON,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler,
+                  SD_FLAG_NONE);
+
+            CONFIG_INT(
+                  list, list_info,
+                  &settings->ints.menu_xmb_title_margin,
                   MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN,
                   MENU_ENUM_LABEL_VALUE_MENU_XMB_TITLE_MARGIN,
                   DEFAULT_XMB_TITLE_MARGIN,
@@ -16534,7 +16541,23 @@ static bool setting_append_list(
                   general_write_handler,
                   general_read_handler);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
-            menu_settings_list_current_add_range(list, list_info, 0, 12, 1, true, true);
+            (*list)[list_info->index - 1].offset_by = -MAXIMUM_XMB_TITLE_MARGIN;
+            menu_settings_list_current_add_range(list, list_info, -MAXIMUM_XMB_TITLE_MARGIN, MAXIMUM_XMB_TITLE_MARGIN, 1, true, true);
+
+            CONFIG_INT(
+                  list, list_info,
+                  &settings->ints.menu_xmb_title_margin_horizontal_offset,
+                  MENU_ENUM_LABEL_MENU_XMB_TITLE_MARGIN_HORIZONTAL_OFFSET,
+                  MENU_ENUM_LABEL_VALUE_MENU_XMB_TITLE_MARGIN_HORIZONTAL_OFFSET,
+                  DEFAULT_XMB_TITLE_MARGIN_HORIZONTAL_OFFSET,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler);
+            (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+            (*list)[list_info->index - 1].offset_by = -MAXIMUM_XMB_TITLE_MARGIN;
+            menu_settings_list_current_add_range(list, list_info, -MAXIMUM_XMB_TITLE_MARGIN, MAXIMUM_XMB_TITLE_MARGIN, 1, true, true);
 
             CONFIG_PATH(
                   list, list_info,
@@ -21684,7 +21707,7 @@ void menu_setting_free(rarch_setting_t *setting)
 
    /* Free data which was previously tagged */
    for (; setting->type != ST_NONE; (*list = *list + 1))
-      for (values = (unsigned)setting->free_flags, n = 0; values != 0; values >>= 1, n++)
+      for (values = setting->free_flags, n = 0; values != 0; values >>= 1, n++)
          if (values & 1)
             switch (1 << n)
             {
@@ -21716,9 +21739,6 @@ void menu_setting_free(rarch_setting_t *setting)
    (*&list)[pos].enum_idx                         = MSG_UNKNOWN; \
    (*&list)[pos].enum_value_idx                   = MSG_UNKNOWN; \
    (*&list)[pos].type                             = ST_NONE; \
-   (*&list)[pos].dont_use_enum_idx_representation = false; \
-   (*&list)[pos].enforce_minrange                 = false; \
-   (*&list)[pos].enforce_maxrange                 = false; \
    (*&list)[pos].index                            = 0; \
    (*&list)[pos].index_offset                     = 0; \
    (*&list)[pos].offset_by                        = 0; \
@@ -21752,7 +21772,6 @@ void menu_setting_free(rarch_setting_t *setting)
    (*&list)[pos].original_value.fraction          = 0.0f; \
    (*&list)[pos].dir.empty_path                   = NULL; \
    (*&list)[pos].cmd_trigger_idx                  = CMD_EVENT_NONE; \
-   (*&list)[pos].cmd_trigger_event_triggered      = false; \
    (*&list)[pos].boolean.off_label                = NULL; \
    (*&list)[pos].boolean.on_label                 = NULL; \
 }

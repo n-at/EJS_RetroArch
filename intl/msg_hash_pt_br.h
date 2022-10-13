@@ -338,6 +338,10 @@ MSG_HASH(
    "Baixar conteúdo"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_DOWNLOAD_CORE_CONTENT,
+   "Baixe conteúdos gratuitos para o núcleo selecionado."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOAD_CORE_SYSTEM_FILES,
    "Baixar arquivos de sistema do núcleo"
    )
@@ -6903,6 +6907,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_EXPLORE_BY_SYSTEM_NAME,
    "Por nome do sistema"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_EXPLORE_VIEW,
+   "Visualização"
    )
 
 /* Playlist > Playlist Item */

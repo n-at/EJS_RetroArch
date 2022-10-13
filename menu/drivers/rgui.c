@@ -1458,6 +1458,7 @@ static bool rgui_fonts_init(rgui_t *rgui)
    switch (language)
    {
       case RETRO_LANGUAGE_ENGLISH:
+      case RETRO_LANGUAGE_BRITISH_ENGLISH:
          goto english;
 
       case RETRO_LANGUAGE_FRENCH:
@@ -4870,7 +4871,7 @@ static void rgui_render(void *data,
 
    if (!rgui->force_redraw)
    {
-      msg_force = p_disp->msg_force;
+      msg_force = p_disp->flags & GFX_DISP_FLAG_MSG_FORCE;
 
       if (menu_entries_ctl(MENU_ENTRIES_CTL_NEEDS_REFRESH, NULL)
             && !msg_force)
@@ -4920,7 +4921,7 @@ static void rgui_render(void *data,
    if (rgui->bg_modified)
       rgui->bg_modified      = false;
 
-   p_disp->framebuf_dirty    = true;
+   p_disp->flags            |= GFX_DISP_FLAG_FB_DIRTY;
    GFX_ANIMATION_CLEAR_ACTIVE(p_anim);
 
    rgui->force_redraw        = false;
@@ -6373,13 +6374,13 @@ static void rgui_set_texture(void *data)
    rgui_t *rgui                    = (rgui_t*)data;
 
    /* Framebuffer is dirty and needs to be updated? */
-   if (!rgui || !p_disp->framebuf_dirty)
+   if (!rgui || !(p_disp->flags & GFX_DISP_FLAG_FB_DIRTY))
       return;
 
    fb_width               = p_disp->framebuf_width;
    fb_height              = p_disp->framebuf_height;
 
-   p_disp->framebuf_dirty = false;
+   p_disp->flags         &= ~GFX_DISP_FLAG_FB_DIRTY;
 
    if (internal_upscale_level == RGUI_UPSCALE_NONE)
       video_driver_set_texture_frame(rgui->frame_buf.data,
@@ -6736,47 +6737,19 @@ static void rgui_scan_selected_entry_thumbnail(rgui_t *rgui, bool force_load)
       {
          /* Get playlist index corresponding
           * to the selected entry */
-         if (list &&
-             (selection < list_size))
+         if (list && selection < list_size)
          {
+            /* Selected entry */
             menu_entry_t entry;
-
             MENU_ENTRY_INIT(entry);
             entry.label_enabled      = false;
             entry.rich_label_enabled = false;
             entry.value_enabled      = false;
             entry.sublabel_enabled   = false;
-
-            /* First entry */
-            menu_entry_get(&entry, 0, 0, NULL, true);
-            if (string_is_empty(entry.path))
-               return;
-
-            /* No thumbnails for intermediate lists without playlist items */
-            if (!string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_ADD_ADDITIONAL_FILTER)) &&
-                !string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_SEARCH_NAME)))
-            {
-               gfx_thumbnail_set_content_playlist(rgui->thumbnail_path_data, NULL, 0);
-               return;
-            }
-
-            /* Selected entry */
             menu_entry_get(&entry, 0, selection, NULL, true);
-            if (string_is_empty(entry.path))
-               return;
 
-            /* No thumbnails for header non-items */
-            if (string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_ADD_ADDITIONAL_FILTER)) ||
-                string_is_equal(entry.path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_EXPLORE_SEARCH_NAME)))
-            {
-               gfx_thumbnail_set_content_playlist(rgui->thumbnail_path_data, NULL, 0);
-               return;
-            }
-            else
-            {
-               rgui->playlist_index =
-                     menu_explore_set_entry_playlist_index(entry.type, rgui->thumbnail_path_data);
-            }
+            rgui->playlist_index =
+                  menu_explore_set_playlist_thumbnail(entry.type, rgui->thumbnail_path_data);
          }
       }
 #endif
@@ -6796,7 +6769,7 @@ static void rgui_scan_selected_entry_thumbnail(rgui_t *rgui, bool force_load)
 
       if (selection < list_size)
       {
-         rgui_update_savestate_thumbnail_path(rgui, selection);
+         rgui_update_savestate_thumbnail_path(rgui, (unsigned)selection);
          rgui_update_savestate_thumbnail_image(rgui);
       }
    }
@@ -7123,11 +7096,11 @@ static int rgui_environ(enum menu_environ_cb type,
    {
       case MENU_ENVIRON_ENABLE_MOUSE_CURSOR:
          rgui->show_mouse          = true;
-         p_disp->framebuf_dirty    = true;
+         p_disp->flags            |= GFX_DISP_FLAG_FB_DIRTY;
          break;
       case MENU_ENVIRON_DISABLE_MOUSE_CURSOR:
          rgui->show_mouse          = false;
-         p_disp->framebuf_dirty    = false;
+         p_disp->flags            &= ~GFX_DISP_FLAG_FB_DIRTY;
          break;
       case MENU_ENVIRON_ENABLE_SCREENSAVER:
          rgui->show_screensaver    = true;

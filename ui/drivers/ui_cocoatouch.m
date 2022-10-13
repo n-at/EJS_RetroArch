@@ -81,6 +81,7 @@ static void ui_companion_cocoatouch_event_command(
 static void rarch_draw_observer(CFRunLoopObserverRef observer,
     CFRunLoopActivity activity, void *info)
 {
+   uint32_t runloop_flags;
    int          ret   = runloop_iterate();
 
    task_queue_check();
@@ -93,9 +94,9 @@ static void rarch_draw_observer(CFRunLoopObserverRef observer,
       return;
    }
 
-   if (retroarch_ctl(RARCH_CTL_IS_IDLE, NULL))
-      return;
-   CFRunLoopWakeUp(CFRunLoopGetMain());
+   runloop_flags = runloop_get_flags();
+   if (!(runloop_flags & RUNLOOP_FLAG_IDLE))
+      CFRunLoopWakeUp(CFRunLoopGetMain());
 }
 
 apple_frontend_settings_t apple_frontend_settings;
@@ -310,9 +311,9 @@ enum
          /* Keyboard event hack for iOS versions prior to iOS 7.
           *
           * Derived from:
-                  * http://nacho4d-nacho4d.blogspot.com/2012/01/
-                  * catching-keyboard-events-in-ios.html
-                  */
+	  * http://nacho4d-nacho4d.blogspot.com/2012/01/
+	  * catching-keyboard-events-in-ios.html
+	  */
          const uint8_t *eventMem = objc_unretainedPointer([event performSelector:@selector(_gsEvent)]);
          int           eventType = eventMem ? *(int*)&eventMem[8] : 0;
 
@@ -471,8 +472,8 @@ enum
    NSString     *filename = (NSString*)url.path.lastPathComponent;
    NSError         *error = nil;
    NSString  *destination = [self.documentsDirectory stringByAppendingPathComponent:filename];
-   
-   // copy file to documents directory if its not already inside of documents directory
+   /* Copy file to documents directory if it's not already 
+    * inside Documents directory */
    if ([url startAccessingSecurityScopedResource]) {
       if (![[url path] containsString: self.documentsDirectory])
          if (![manager fileExistsAtPath:destination])

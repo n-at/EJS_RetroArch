@@ -2760,10 +2760,10 @@ static void materialui_scrollbar_init(
 /* Utility functions */
 
 /* > Returns number of lines in a string */
-static unsigned materialui_count_lines(const char *str)
+static uint8_t materialui_count_lines(const char *str)
 {
    unsigned c     = 0;
-   unsigned lines = 1;
+   uint8_t lines  = 1;
 
    for (c = 0; str[c]; c++)
       lines += (str[c] == '\n');
@@ -2772,7 +2772,7 @@ static unsigned materialui_count_lines(const char *str)
 
 /* > Returns number of lines required to display
  *   the sublabel of entry 'entry_idx' */
-static unsigned materialui_count_sublabel_lines(
+static uint8_t materialui_count_sublabel_lines(
       materialui_handle_t* mui, int usable_width,
       size_t entry_idx, bool has_icon)
 {
@@ -2831,7 +2831,7 @@ static void materialui_compute_entries_box_default(
 
    for (i = 0; i < entries_end; i++)
    {
-      unsigned num_sublabel_lines = 0;
+      uint8_t num_sublabel_lines  = 0;
       materialui_node_t *node     = (materialui_node_t*)list->list[i].userdata;
       bool has_icon               = false;
 
@@ -2931,7 +2931,7 @@ static void materialui_compute_entries_box_playlist_list(
 
    for (i = 0; i < entries_end; i++)
    {
-      unsigned num_sublabel_lines = 0;
+      uint8_t num_sublabel_lines  = 0;
       materialui_node_t *node     = (materialui_node_t*)list->list[i].userdata;
 
       if (!node)
@@ -4244,14 +4244,14 @@ static void materialui_render_menu_entry_default(
                      (size_t)(entry_value_width_max / mui->font_data.list.glyph_width);
 
                /* Limit length of value string */
-               entry_value_len_max = (entry_value_len_max > 0) ?
-                     entry_value_len_max - 1 : entry_value_len_max;
-               entry_value_len = (entry_value_len > entry_value_len_max) ?
-                     entry_value_len_max : entry_value_len;
+               if (entry_value_len_max > 0)
+                  entry_value_len_max  = entry_value_len_max - 1;
+               if (entry_value_len > entry_value_len_max)
+                  entry_value_len      = entry_value_len_max;
 
-               mui->ticker.s        = value_buf;
-               mui->ticker.len      = entry_value_len;
-               mui->ticker.str      = entry_value;
+               mui->ticker.s           = value_buf;
+               mui->ticker.len         = entry_value_len;
+               mui->ticker.str         = entry_value;
 
                gfx_animation_ticker(&mui->ticker);
 
@@ -9404,15 +9404,15 @@ static int materialui_list_push(void *data, void *userdata,
                   MENU_ENUM_LABEL_MENU_FILE_BROWSER_SETTINGS,
                   MENU_SETTING_ACTION, 0, 0, NULL);
 
-            info->need_push    = true;
-            info->need_refresh = true;
-            ret = 0;
+            info->flags |= MD_FLAG_NEED_PUSH | MD_FLAG_NEED_REFRESH;
+            ret          = 0;
          }
          break;
       case DISPLAYLIST_MAIN_MENU:
          {
             settings_t   *settings      = config_get_ptr();
             rarch_system_info_t *system = &runloop_state_get_ptr()->system;
+            uint32_t flags              = runloop_get_flags();
 
             /* If navigation bar is hidden, use default
              * main menu */
@@ -9421,7 +9421,7 @@ static int materialui_list_push(void *data, void *userdata,
 
             menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
 
-            if (retroarch_ctl(RARCH_CTL_CORE_IS_RUNNING, NULL))
+            if (flags & RUNLOOP_FLAG_CORE_RUNNING)
             {
                if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
                {
@@ -9616,8 +9616,8 @@ static int materialui_list_push(void *data, void *userdata,
                      false);
             }
 #endif
-            info->need_push    = true;
-            ret = 0;
+            info->flags |= MD_FLAG_NEED_PUSH;
+            ret          = 0;
          }
          break;
    }
@@ -10186,7 +10186,7 @@ static void materialui_list_insert(
       node->thumbnails.primary.height        = 0;
       node->thumbnails.primary.alpha         = 0.0f;
       node->thumbnails.primary.delay_timer   = 0.0f;
-      node->thumbnails.primary.fade_active   = false;
+      node->thumbnails.primary.flags        &= ~GFX_THUMB_FLAG_FADE_ACTIVE;
 
       node->thumbnails.secondary.status      = GFX_THUMBNAIL_STATUS_UNKNOWN;
       node->thumbnails.secondary.texture     = 0;
@@ -10194,7 +10194,7 @@ static void materialui_list_insert(
       node->thumbnails.secondary.height      = 0;
       node->thumbnails.secondary.alpha       = 0.0f;
       node->thumbnails.secondary.delay_timer = 0.0f;
-      node->thumbnails.secondary.fade_active = false;
+      node->thumbnails.secondary.flags      &= ~GFX_THUMB_FLAG_FADE_ACTIVE;
    }
    else
    {

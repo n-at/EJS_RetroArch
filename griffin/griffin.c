@@ -1273,6 +1273,7 @@ RETROARCH
 #include "../intl/msg_hash_cs.c"
 #include "../intl/msg_hash_val.c"
 #include "../intl/msg_hash_ca.c"
+#include "../intl/msg_hash_en.c"
 #endif
 
 #include "../intl/msg_hash_us.c"

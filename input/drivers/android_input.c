@@ -44,6 +44,7 @@
 
 #include "../../configuration.h"
 #include "../../retroarch.h"
+#include "../../runloop.h"
 
 #define MAX_TOUCH 16
 #define MAX_NUM_KEYBOARDS 3
@@ -1491,7 +1492,8 @@ static void android_input_poll(void *data)
 
       if (android_app->reinitRequested != 0)
       {
-         if (retroarch_ctl(RARCH_CTL_IS_PAUSED, NULL))
+         uint32_t runloop_flags = runloop_get_flags();
+         if (runloop_flags & RUNLOOP_FLAG_PAUSED)
             command_event(CMD_EVENT_REINIT, NULL);
          android_app_write_cmd(android_app, APP_CMD_REINIT_DONE);
          return;
@@ -1515,7 +1517,8 @@ bool android_run_events(void *data)
 
    if (android_app->reinitRequested != 0)
    {
-      if (retroarch_ctl(RARCH_CTL_IS_PAUSED, NULL))
+      uint32_t runloop_flags = runloop_get_flags();
+      if (runloop_flags & RUNLOOP_FLAG_PAUSED)
          command_event(CMD_EVENT_REINIT, NULL);
       android_app_write_cmd(android_app, APP_CMD_REINIT_DONE);
    }
@@ -1694,11 +1697,11 @@ static void android_input_free_input(void *data)
 static uint64_t android_input_get_capabilities(void *data)
 {
    return
-      (1 << RETRO_DEVICE_JOYPAD)  |
-      (1 << RETRO_DEVICE_POINTER) |
-      (1 << RETRO_DEVICE_KEYBOARD)  |
-      (1 << RETRO_DEVICE_LIGHTGUN)  |
-      (1 << RETRO_DEVICE_ANALOG);
+        (1 << RETRO_DEVICE_JOYPAD)
+      | (1 << RETRO_DEVICE_POINTER)
+      | (1 << RETRO_DEVICE_KEYBOARD)
+      | (1 << RETRO_DEVICE_LIGHTGUN)
+      | (1 << RETRO_DEVICE_ANALOG);
 }
 
 static void android_input_enable_sensor_manager(struct android_app *android_app)
