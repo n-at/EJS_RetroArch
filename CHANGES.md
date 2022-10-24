@@ -1,14 +1,54 @@
 # Future
+- ANDROID: Enable 'Vibrate On Key Press' by default
+- COMPILATION: Fixed compiling with --disable-menu
+- DATABASE/PLAYLISTS: Playlist + database changes - Cleanup 'entry_slot', fallback label + logging
+- INPUT: Fixed the way devices were previously indexed. Input devices were only being indexed in order and would stop at the first time an input has no device connected to it. The problem is when a device gets disconnected, that input will have no devices connected to it, but the next input may still have a device connected. So, that makes changing the port of the currently connected devices impossible.
+- LOCALIZATION: Updates
+- MENU: Thumbnail fullscreen toggle behavior correction
+- MENU/OZONE: Footer improvements - Add "Cycle thumbnails" helper when suitable
+- MENU/OZONE: Footer improvements - Show "Search" helper only when search function is enabled
+- MENU/OZONE: Footer improvements - Fix "Thumbnails available" helper for save states
+- MENU/OZONE: Footer improvements - Tighten padding between icon and title, and widen between helpers
+- MENU/OZONE: Remember selection per main tabs
+- MENU/OZONE: Remove incomplete assets warning
+- MENU/XMB: Remove incomplete assets warning
+- MENU/MATERIALUI: Remove incomplete assets warning
+- OSX: Fixed Z/X keys not working on the macOS port
+- OSX: Fixed RETROK_LMETA not working on macOS port. The RETROK_LMETA key was not defined in the rarch_key_map_apple_hid
+- THREADED VIDEO/GLCORE: Fix regression 'Shader presets dont load, when video driver is set to glcore'
+
+# 1.12.0
+- CONFIG/CLI: Allow use of --appendconfig with override cfgs instead of getting ignored
+- CONFIG/LOGGING: No more console startup logging if logging to file
+- CONFIG: Saves config on exit only once instead of (worst case scenario) 3 times
+- DATABASE/EXPLORE/VIEW: Add View feature - Add saving of a filter set in the Explore menu into a so called "View" file which then gets listed alongside playlists. This also adds the ability to filter a category by range in the Explore menu and not just filter on exact matches.
 - FILEBROWSER: Fix regression - certain extensions keep disappearing
+- IOS: New modern iOS version (targeting iOS 13 and up), leverages Swift
+- IOS: Fixes to iOS toolbar
+- IOS16: Add iOS 16 lock screen widget
+- IOS13+: Added emulator keyboard
+- IOS13+: Add JIT support for non-jailbroken devices
+- IOS13+: Added support for touch mouse handler
+- IOS13+: Changed click-and-drag behavior to double tap hold and drag
+- INPUT/HAPTIC/OVERLAYS/ANDROID: Improve haptic feedback for input overlays
+- LINUX/MALI FBDEV: Add conditional support for OpenGL ES 3.x
+- LOCALIZATION: Updates
+- LOCALIZATION/ENGLISH: Add British English language option
 - LOGGING/QT: Increase log buffer to 2048 characters - Vulkan validation layer
   messages output correctly now.
+- MENU/XMB: Remember selection per main tabs. Addresses the following : collection playlists can contain hundreds or thousands of items. When scrolling through one, pressing left or right by accident can be common. This resets the playlist to the top
 - MIST/STEAM/STEAMDECK: Don't expose Black Frame Insertion (BFI) if we are running on a Steam Deck
 - NETWORKING/WINDOWS: Disable poll support for MSVC 2010 and earlier. WSAPoll is not supported on Windows XP and earlier.
 - NETWORKING/WIIU: Fix socket_connect_with_timeout for WIIU
 - NETWORKING/WIIU: Fixes RetroAchievements login 
 - NETWORKING/WIIU: Fixes other online updater functionality
+- SAVESTATES/NOTIFICATIONS: Add delay to savestate notifications, so that GPU savestate screenshots stay untouched
+- SAVESTATES/SCREENSHOTS: Avoid 'video_gpu_screenshot' with savestates. Allow GPU screenshots with savestates only when there is no other way of getting a screenshot.
 - SCREENSHOTS/VULKAN: Unload screenshot widget texture early. Fixes Vulkan crash when closing content while a screenshot widget is still on-screen
 - SCREENSHOTS/VULKAN: Fix screenshot widget crash when ticker animating
+- WAYLAND: Set correct app ID
+- WIIU: Add some missing default directories
+- WIIU: Get mkdir working on WiiU (directory creation)
 
 # 1.11.1
 - GENERAL: Fix DEFAULT_FILL_TITLE_MACRO

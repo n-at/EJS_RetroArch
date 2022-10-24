@@ -162,7 +162,9 @@ enum runloop_flags
    RUNLOOP_FLAG_FASTMOTION                        = (1 << 26),
    RUNLOOP_FLAG_PAUSED                            = (1 << 27),
    RUNLOOP_FLAG_IDLE                              = (1 << 28),
-   RUNLOOP_FLAG_FOCUSED                           = (1 << 29)
+   RUNLOOP_FLAG_FOCUSED                           = (1 << 29),
+   RUNLOOP_FLAG_FORCE_NONBLOCK                    = (1 << 30),
+   RUNLOOP_FLAG_IS_INITED                         = (1 << 31)
 };
 
 struct runloop
@@ -246,6 +248,7 @@ struct runloop
 
    runloop_core_status_msg_t core_status_msg;
 
+   unsigned msg_queue_delay;
    unsigned pending_windowed_scale;
    unsigned max_frames;
    unsigned audio_latency;
@@ -296,17 +299,14 @@ struct runloop
       char label[8192];
    } name;
 
-   bool is_inited;
    bool missing_bios;
-   bool force_nonblock;
    bool perfcnt_enable;
 };
 
 typedef struct runloop runloop_state_t;
 
 #ifdef HAVE_BSV_MOVIE
-#define BSV_MOVIE_IS_EOF() || (input_st->bsv_movie_state.movie_end && \
-input_st->bsv_movie_state.eof_exit)
+#define BSV_MOVIE_IS_EOF() || (((input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_END) && (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_EOF_EXIT)))
 #else
 #define BSV_MOVIE_IS_EOF()
 #endif
