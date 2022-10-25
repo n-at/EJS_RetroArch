@@ -2091,8 +2091,6 @@ static uintptr_t ozone_entries_icon_get_texture(ozone_handle_t *ozone,
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_RDB];
       case FILE_TYPE_RDB_ENTRY:
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_FILE];
-      case FILE_TYPE_CURSOR:
-         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_CURSOR];
       case FILE_TYPE_PLAYLIST_ENTRY:
       case MENU_SETTING_ACTION_RUN:
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_RUN];
@@ -3389,10 +3387,9 @@ static bool ozone_is_load_content_playlist(void *userdata)
    if (ozone->depth != 4 || ozone->is_db_manager_list || ozone->is_file_list)
       return false;
 
-   MENU_ENTRY_INIT(entry);
-   entry.path_enabled     = false;
-   entry.value_enabled    = false;
-   entry.sublabel_enabled = false;
+   MENU_ENTRY_INITIALIZE(entry);
+   entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED
+                | MENU_ENTRY_FLAG_RICH_LABEL_ENABLED;
    menu_entry_get(&entry, 0, 0, NULL, true);
 
    return entry.type == FILE_TYPE_RPL_ENTRY;
@@ -3430,11 +3427,8 @@ static void ozone_update_savestate_thumbnail_path(void *data, unsigned i)
    {
       menu_entry_t entry;
 
-      MENU_ENTRY_INIT(entry);
-      entry.path_enabled       = false;
-      entry.rich_label_enabled = false;
-      entry.value_enabled      = false;
-      entry.sublabel_enabled   = false;
+      MENU_ENTRY_INITIALIZE(entry);
+      entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED;
       menu_entry_get(&entry, 0, i, NULL, true);
 
       if (!string_is_empty(entry.label))
@@ -5051,11 +5045,8 @@ static void ozone_compute_entries_position(
       menu_entry_t entry;
       ozone_node_t *node       = NULL;
 
-      MENU_ENTRY_INIT(entry);
-      entry.path_enabled       = false;
-      entry.label_enabled      = false;
-      entry.rich_label_enabled = false;
-      entry.value_enabled      = false;
+      MENU_ENTRY_INITIALIZE(entry);
+      entry.flags |= MENU_ENTRY_FLAG_SUBLABEL_ENABLED;
       menu_entry_get(&entry, 0, (unsigned)i, NULL, true);
 
       /* Empty playlist detection:
@@ -5071,9 +5062,7 @@ static void ozone_compute_entries_position(
          ozone->empty_playlist = false;
 
       /* Cache node */
-      node                     = (ozone_node_t*)selection_buf->list[i].userdata;
-
-      if (!node)
+      if (!(node = (ozone_node_t*)selection_buf->list[i].userdata))
          continue;
 
       node->height             = ozone->dimensions.entry_height;
@@ -5380,9 +5369,12 @@ border_iterate:
 
       entry_selected                 = selection == i;
 
-      MENU_ENTRY_INIT(entry);
-      entry.path_enabled             = false;
-      entry.label_enabled            = ozone->is_contentless_cores;
+      MENU_ENTRY_INITIALIZE(entry);
+      entry.flags    |= MENU_ENTRY_FLAG_RICH_LABEL_ENABLED
+                      | MENU_ENTRY_FLAG_VALUE_ENABLED
+                      | MENU_ENTRY_FLAG_SUBLABEL_ENABLED;
+      if (ozone->is_contentless_cores)
+         entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED;
       menu_entry_get(&entry, 0, (unsigned)i, selection_buf, true);
 
       if (entry.enum_idx == MENU_ENUM_LABEL_CHEEVOS_PASSWORD)
@@ -7112,11 +7104,8 @@ static void ozone_set_thumbnail_content(void *data, const char *s)
          menu_entry_t entry;
          size_t selection         = menu_navigation_get_selection();
 
-         MENU_ENTRY_INIT(entry);
-         entry.label_enabled      = false;
-         entry.rich_label_enabled = false;
-         entry.value_enabled      = false;
-         entry.sublabel_enabled   = false;
+         MENU_ENTRY_INITIALIZE(entry);
+         entry.flags |= MENU_ENTRY_FLAG_PATH_ENABLED;
          menu_entry_get(&entry, 0, selection, NULL, true);
 
          if (!string_is_empty(entry.path))
@@ -7131,11 +7120,8 @@ static void ozone_set_thumbnail_content(void *data, const char *s)
       {
          /* Selected entry */
          menu_entry_t entry;
-         MENU_ENTRY_INIT(entry);
-         entry.label_enabled      = false;
-         entry.rich_label_enabled = false;
-         entry.value_enabled      = false;
-         entry.sublabel_enabled   = false;
+         MENU_ENTRY_INITIALIZE(entry);
+         entry.flags |= MENU_ENTRY_FLAG_PATH_ENABLED;
          menu_entry_get(&entry, 0, menu_navigation_get_selection(), NULL, true);
 
          ozone->want_thumbnail_bar = ozone->fullscreen_thumbnails_available =
@@ -7153,11 +7139,8 @@ static void ozone_set_thumbnail_content(void *data, const char *s)
 
       if (node)
       {
-         MENU_ENTRY_INIT(entry);
-         entry.label_enabled      = false;
-         entry.rich_label_enabled = false;
-         entry.value_enabled      = false;
-         entry.sublabel_enabled   = false;
+         MENU_ENTRY_INITIALIZE(entry);
+         entry.flags |= MENU_ENTRY_FLAG_PATH_ENABLED;
          menu_entry_get(&entry, 0, selection, NULL, true);
 
          if (!string_is_empty(entry.path) && !string_is_empty(node->fullpath))
@@ -7285,11 +7268,8 @@ static bool ozone_is_current_entry_settings(size_t current_selection)
    unsigned entry_type                = 0;
    enum msg_file_type entry_file_type = FILE_TYPE_NONE;
 
-   MENU_ENTRY_INIT(last_entry);
-   last_entry.path_enabled       = false;
-   last_entry.label_enabled      = false;
-   last_entry.rich_label_enabled = false;
-   last_entry.sublabel_enabled   = false;
+   MENU_ENTRY_INITIALIZE(last_entry);
+   last_entry.flags |= MENU_ENTRY_FLAG_VALUE_ENABLED;
 
    menu_entry_get(&last_entry, 0, current_selection, NULL, true);
 
@@ -7326,7 +7306,6 @@ static bool ozone_is_current_entry_settings(size_t current_selection)
             case FILE_TYPE_CORE:
             case FILE_TYPE_DIRECT_LOAD:
             case FILE_TYPE_RDB:
-            case FILE_TYPE_CURSOR:
             case FILE_TYPE_PLAIN:
             case FILE_TYPE_DIRECTORY:
             case FILE_TYPE_MUSIC:
@@ -7810,12 +7789,7 @@ static int ozone_menu_entry_action(
    {
       /* Selection has changed - must update
        * entry pointer */
-      MENU_ENTRY_INIT(new_entry);
-      new_entry.path_enabled       = false;
-      new_entry.label_enabled      = false;
-      new_entry.rich_label_enabled = false;
-      new_entry.value_enabled      = false;
-      new_entry.sublabel_enabled   = false;
+      MENU_ENTRY_INITIALIZE(new_entry);
       menu_entry_get(&new_entry, 0, new_selection, NULL, true);
       entry_ptr                    = &new_entry;
    }
@@ -10156,12 +10130,7 @@ static void ozone_selection_changed(ozone_handle_t *ozone, bool allow_animation)
       uintptr_t tag                = (uintptr_t)selection_buf;
       size_t selection             = menu_navigation_get_selection();
 
-      MENU_ENTRY_INIT(entry);
-      entry.path_enabled           = false;
-      entry.label_enabled          = false;
-      entry.rich_label_enabled     = false;
-      entry.value_enabled          = false;
-      entry.sublabel_enabled       = false;
+      MENU_ENTRY_INITIALIZE(entry);
       menu_entry_get(&entry, 0, selection, NULL, true);
 
       entry_type                   = entry.type;

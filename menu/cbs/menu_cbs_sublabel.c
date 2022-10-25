@@ -1014,7 +1014,6 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_content_video_history_directory,    
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_runtime_log_directory,                 MENU_ENUM_SUBLABEL_RUNTIME_LOG_DIRECTORY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cache_directory,                       MENU_ENUM_SUBLABEL_CACHE_DIRECTORY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_database_directory,                    MENU_ENUM_SUBLABEL_CONTENT_DATABASE_DIRECTORY)
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cursor_directory,                      MENU_ENUM_SUBLABEL_CURSOR_DIRECTORY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_assets_directory,                      MENU_ENUM_SUBLABEL_ASSETS_DIRECTORY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_savefile_directory,                    MENU_ENUM_SUBLABEL_SAVEFILE_DIRECTORY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_savestate_directory,                   MENU_ENUM_SUBLABEL_SAVESTATE_DIRECTORY)
@@ -1470,12 +1469,10 @@ static int action_bind_sublabel_input_remap_port(
    unsigned display_port = 0;
    menu_entry_t entry;
 
-   MENU_ENTRY_INIT(entry);
-   entry.path_enabled       = false;
-   entry.label_enabled      = true;
-   entry.rich_label_enabled = false;
-   entry.value_enabled      = false;
-   entry.sublabel_enabled   = false;
+   MENU_ENTRY_INITIALIZE(entry);
+
+   entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED; 
+
    menu_entry_get(&entry, 0, i, NULL, false);
 
    /* We need the actual frontend port index.
@@ -2500,9 +2497,6 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_CONTENT_DATABASE_DIRECTORY:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_database_directory);
-            break;
-         case MENU_ENUM_LABEL_CURSOR_DIRECTORY:
-            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cursor_directory);
             break;
          case MENU_ENUM_LABEL_CACHE_DIRECTORY:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cache_directory);

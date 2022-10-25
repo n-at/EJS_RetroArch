@@ -1511,8 +1511,6 @@ static struct config_path_setting *populate_settings_path(
          settings->paths.path_stream_url, false, NULL, true);
    SETTING_PATH("video_font_path",
          settings->paths.path_font, false, NULL, true);
-   SETTING_PATH("cursor_directory",
-         settings->paths.directory_cursor, false, NULL, true);
    SETTING_PATH("screenshot_directory",
          settings->paths.directory_screenshot, true, NULL, true);
    SETTING_PATH("system_directory",
@@ -2731,7 +2729,6 @@ void config_set_defaults(void *data)
 
    *settings->paths.path_libretro_info = '\0';
    *settings->paths.directory_libretro = '\0';
-   *settings->paths.directory_cursor = '\0';
    *settings->paths.directory_resampler = '\0';
    *settings->paths.directory_screenshot = '\0';
    *settings->paths.directory_system = '\0';
@@ -2868,10 +2865,6 @@ void config_set_defaults(void *data)
       configuration_set_string(settings,
             settings->paths.path_content_database,
             g_defaults.dirs[DEFAULT_DIR_DATABASE]);
-   if (!string_is_empty(g_defaults.dirs[DEFAULT_DIR_CURSOR]))
-      configuration_set_string(settings,
-            settings->paths.directory_cursor,
-            g_defaults.dirs[DEFAULT_DIR_CURSOR]);
    if (!string_is_empty(g_defaults.dirs[DEFAULT_DIR_CHEATS]))
       configuration_set_string(settings,
             settings->paths.path_cheat_database,
