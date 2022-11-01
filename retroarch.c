@@ -3955,12 +3955,17 @@ unsigned get_current_frame_count(void)
     return emscripten_frame_count;
 }
 
+char* save_file_path() {
+   runloop_state_t *runloop_st     = runloop_state_get_ptr();
+   return runloop_st->name.savefile;
+}
+
 void toggleMainLoop(int running) {
     runloop_state_t *runloop_st     = runloop_state_get_ptr();
     if (running == 0) {
         runloop_st->flags |=  RUNLOOP_FLAG_PAUSED;
     } else {
-        runloop_st->flags &=  RUNLOOP_FLAG_PAUSED;
+        runloop_st->flags &=  ~RUNLOOP_FLAG_PAUSED;
     }
 }
 
