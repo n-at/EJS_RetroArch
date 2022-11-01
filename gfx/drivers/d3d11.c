@@ -751,7 +751,8 @@ error:
 
 static void d3d11_gfx_free(void* data)
 {
-   unsigned       i;
+   int i;
+   uint32_t video_st_flags;
    d3d11_video_t* d3d11 = (d3d11_video_t*)data;
 
    if (!d3d11)
@@ -805,7 +806,8 @@ static void d3d11_gfx_free(void* data)
 
    font_driver_free_osd();
 
-   if (video_driver_is_video_cache_context())
+   video_st_flags = video_driver_get_st_flags();
+   if (video_st_flags & VIDEO_FLAG_CACHE_CONTEXT)
    {
       cached_device_d3d11          = d3d11->device;
       cached_context_d3d11         = d3d11->context;
@@ -1739,7 +1741,7 @@ static void d3d11_init_render_targets(d3d11_video_t* d3d11, unsigned width, unsi
    {
       struct video_shader_pass* pass = &d3d11->shader_preset->pass[i];
 
-      if (pass->fbo.valid)
+      if (pass->fbo.flags & FBO_SCALE_FLAG_VALID)
       {
 
          switch (pass->fbo.type_x)

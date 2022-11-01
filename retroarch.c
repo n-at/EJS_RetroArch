@@ -2464,6 +2464,11 @@ bool command_event(enum event_command cmd, void *data)
          }
 #endif
          break;
+      case CMD_EVENT_OVERLAY_SET_EIGHTWAY_DIAGONAL_SENSITIVITY:
+#ifdef HAVE_OVERLAY
+         input_overlay_set_eightway_diagonal_sensitivity();
+#endif
+         break;
       case CMD_EVENT_AUDIO_REINIT:
          driver_uninit(DRIVER_AUDIO_MASK);
          drivers_init(settings, DRIVER_AUDIO_MASK, verbosity_is_enabled());
@@ -3473,17 +3478,17 @@ void retroarch_override_setting_set(
          p_rarch->flags |= RARCH_FLAGS_HAS_SET_STATE_PATH;
          break;
 #ifdef HAVE_NETWORKING
-      case RARCH_OVERRIDE_SETTING_NETPLAY_MODE:
-         net_st->has_set_netplay_mode = true;
+     case RARCH_OVERRIDE_SETTING_NETPLAY_MODE:
+         net_st->flags |= NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_MODE;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_ADDRESS:
-         net_st->has_set_netplay_ip_address = true;
+         net_st->flags |= NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_ADDRESS;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_PORT:
-         net_st->has_set_netplay_ip_port = true;
+         net_st->flags |= NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_PORT;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_CHECK_FRAMES:
-         net_st->has_set_netplay_check_frames = true;
+         net_st->flags |= NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_CHECK_FRAMES;
          break;
 #endif
       case RARCH_OVERRIDE_SETTING_UPS_PREF:
@@ -3547,17 +3552,17 @@ void retroarch_override_setting_unset(
          p_rarch->flags &= ~RARCH_FLAGS_HAS_SET_STATE_PATH;
          break;
 #ifdef HAVE_NETWORKING
-      case RARCH_OVERRIDE_SETTING_NETPLAY_MODE:
-         net_st->has_set_netplay_mode = false;
+    case RARCH_OVERRIDE_SETTING_NETPLAY_MODE:
+         net_st->flags &= ~NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_MODE;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_ADDRESS:
-         net_st->has_set_netplay_ip_address = false;
+         net_st->flags &= ~NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_ADDRESS;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_PORT:
-         net_st->has_set_netplay_ip_port = false;
+         net_st->flags &= ~NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_PORT;
          break;
       case RARCH_OVERRIDE_SETTING_NETPLAY_CHECK_FRAMES:
-         net_st->has_set_netplay_check_frames = false;
+         net_st->flags &= ~NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_CHECK_FRAMES;
          break;
 #endif
       case RARCH_OVERRIDE_SETTING_UPS_PREF:
@@ -3634,8 +3639,8 @@ static void global_free(struct rarch_state *p_rarch)
                         | RUNLOOP_FLAG_REMAPS_CONTENT_DIR_ACTIVE);
 #endif
 
-   runloop_st->current_core.has_set_input_descriptors = false;
-   runloop_st->current_core.has_set_subsystems        = false;
+   runloop_st->current_core.flags &= ~(RETRO_CORE_FLAG_HAS_SET_INPUT_DESCRIPTORS
+                                     | RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS);
 
    global                                             = global_get_ptr();
    path_clear_all();
@@ -3828,7 +3833,7 @@ int rarch_main(int argc, char *argv[], void *data)
    audio_state_get_ptr()->flags |= AUDIO_FLAG_ACTIVE;
 
    {
-      unsigned i;
+      int i;
       for (i = 0; i < MAX_USERS; i++)
          input_config_set_device(i, RETRO_DEVICE_JOYPAD);
    }
@@ -4780,8 +4785,8 @@ static bool retroarch_parse_input_and_config(
 
    /* Flush out some states that could have been set
     * by core environment variables. */
-   runloop_st->current_core.has_set_input_descriptors = false;
-   runloop_st->current_core.has_set_subsystems        = false;
+   runloop_st->current_core.flags &= ~(RETRO_CORE_FLAG_HAS_SET_INPUT_DESCRIPTORS
+                                     | RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS);
 
    /* Load the config file now that we know what it is */
 #ifdef HAVE_CONFIGFILE
@@ -5628,7 +5633,8 @@ bool retroarch_ctl(enum rarch_ctl_state state, void *data)
    switch(state)
    {
       case RARCH_CTL_HAS_SET_SUBSYSTEMS:
-         return runloop_st->current_core.has_set_subsystems;
+         return ((runloop_st->current_core.flags &
+               RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS) > 0);
 #ifdef HAVE_BSV_MOVIE
       case RARCH_CTL_BSV_MOVIE_IS_INITED:
          return (input_state_get_ptr()->bsv_movie_state_handle != NULL);
@@ -5934,13 +5940,13 @@ bool retroarch_override_setting_is_set(
          return ((p_rarch->flags & RARCH_FLAGS_HAS_SET_STATE_PATH) > 0);
 #ifdef HAVE_NETWORKING
       case RARCH_OVERRIDE_SETTING_NETPLAY_MODE:
-         return net_st->has_set_netplay_mode;
+         return ((net_st->flags & NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_MODE) > 0);
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_ADDRESS:
-         return net_st->has_set_netplay_ip_address;
+         return ((net_st->flags & NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_ADDRESS) > 0);
       case RARCH_OVERRIDE_SETTING_NETPLAY_IP_PORT:
-         return net_st->has_set_netplay_ip_port;
+         return ((net_st->flags & NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_IP_PORT) > 0);
       case RARCH_OVERRIDE_SETTING_NETPLAY_CHECK_FRAMES:
-         return net_st->has_set_netplay_check_frames;
+         return ((net_st->flags & NET_DRIVER_ST_FLAG_HAS_SET_NETPLAY_CHECK_FRAMES) > 0);
 #endif
 #ifdef HAVE_PATCH
       case RARCH_OVERRIDE_SETTING_UPS_PREF:

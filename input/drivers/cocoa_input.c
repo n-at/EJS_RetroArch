@@ -421,11 +421,13 @@ static int16_t cocoa_input_state(
             return ret;
          }
 
-         if (!keyboard_mapping_blocked && binds[port][id].valid)
+         if (binds[port][id].valid)
          {
             if (id < RARCH_BIND_LIST_END)
-               if (apple_key_state[rarch_keysym_lut[binds[port][id].key]])
-                  return 1;
+               if (!keyboard_mapping_blocked || (id == RARCH_GAME_FOCUS_TOGGLE))
+                  if (apple_key_state[rarch_keysym_lut[binds[port][id].key]])
+                     return 1;
+
          }
          break;
       case RETRO_DEVICE_ANALOG:

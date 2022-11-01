@@ -7817,7 +7817,7 @@ static void general_write_handler(rarch_setting_t *setting)
                struct video_shader *shader = menu_shader_get();
 
                shader->passes              = 0;
-               shader->modified            = true;
+               shader->flags              |= SHDR_FLAG_MODIFIED;
 
                menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
                menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
@@ -15432,6 +15432,44 @@ static bool setting_append_list(
          menu_settings_list_current_add_range(list, list_info, 0, 1, 0.01, true, true);
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_CMD_APPLY_AUTO);
 
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.input_overlay_dpad_diagonal_sensitivity,
+               MENU_ENUM_LABEL_INPUT_OVERLAY_DPAD_DIAGONAL_SENSITIVITY,
+               MENU_ENUM_LABEL_VALUE_INPUT_OVERLAY_DPAD_DIAGONAL_SENSITIVITY,
+               DEFAULT_OVERLAY_DPAD_DIAGONAL_SENSITIVITY,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler
+               );
+         (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+         (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_percentage;
+         MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_OVERLAY_SET_EIGHTWAY_DIAGONAL_SENSITIVITY);
+         menu_settings_list_current_add_range(list, list_info, 0, 100, 1, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_CMD_APPLY_AUTO);
+
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.input_overlay_abxy_diagonal_sensitivity,
+               MENU_ENUM_LABEL_INPUT_OVERLAY_ABXY_DIAGONAL_SENSITIVITY,
+               MENU_ENUM_LABEL_VALUE_INPUT_OVERLAY_ABXY_DIAGONAL_SENSITIVITY,
+               DEFAULT_OVERLAY_ABXY_DIAGONAL_SENSITIVITY,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler
+               );
+         (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+         (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_percentage;
+         MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_OVERLAY_SET_EIGHTWAY_DIAGONAL_SENSITIVITY);
+         menu_settings_list_current_add_range(list, list_info, 0, 100, 1, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_CMD_APPLY_AUTO);
+
          CONFIG_FLOAT(
                list, list_info,
                &settings->floats.input_overlay_scale_landscape,
@@ -19523,8 +19561,9 @@ static bool setting_append_list(
                SD_FLAG_NONE
             );
 
-#ifdef HAVE_OZONE
-         if (string_is_equal(settings->arrays.menu_driver, "ozone"))
+#if defined(HAVE_OZONE) || defined(HAVE_XMB)
+         if (string_is_equal(settings->arrays.menu_driver, "ozone") ||
+             string_is_equal(settings->arrays.menu_driver, "xmb"))
          {
             CONFIG_BOOL(
                   list, list_info,
@@ -19540,6 +19579,9 @@ static bool setting_append_list(
                   general_write_handler,
                   general_read_handler,
                   SD_FLAG_NONE);
+            (*list)[list_info->index - 1].action_ok     = setting_bool_action_left_with_refresh;
+            (*list)[list_info->index - 1].action_left   = setting_bool_action_left_with_refresh;
+            (*list)[list_info->index - 1].action_right  = setting_bool_action_right_with_refresh;
 
             CONFIG_BOOL(
                   list, list_info,

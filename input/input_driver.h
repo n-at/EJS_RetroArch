@@ -391,7 +391,8 @@ enum input_driver_state_flags
    INP_FLAG_GRAB_MOUSE_STATE         = (1 << 6),
    INP_FLAG_OLD_ANALOG_DPAD_MODE_SET = (1 << 7),
    INP_FLAG_OLD_LIBRETRO_DEVICE_SET  = (1 << 8),
-   INP_FLAG_REMAPPING_CACHE_ACTIVE   = (1 << 9)
+   INP_FLAG_REMAPPING_CACHE_ACTIVE   = (1 << 9),
+   INP_FLAG_DEFERRED_WAIT_KEYS       = (1 << 10)
 };
 
 typedef struct
@@ -426,6 +427,8 @@ typedef struct
 #ifdef HAVE_OVERLAY
    input_overlay_t *overlay_ptr;
    enum overlay_visibility *overlay_visibility;
+   float overlay_eightway_dpad_slopes[2];
+   float overlay_eightway_abxy_slopes[2];
 #endif
    uint16_t flags;
 #ifdef HAVE_NETWORKGAMEPAD

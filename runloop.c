@@ -2146,7 +2146,8 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                }
             }
 
-            runloop_st->current_core.has_set_input_descriptors = true;
+            runloop_st->current_core.flags |=
+               RETRO_CORE_FLAG_HAS_SET_INPUT_DESCRIPTORS;
          }
 
          break;
@@ -2718,7 +2719,8 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             memcpy(system->subsystem.data, info,
                   i * sizeof(*system->subsystem.data));
             system->subsystem.size                   = i;
-            runloop_st->current_core.has_set_subsystems = true;
+            runloop_st->current_core.flags          |=
+               RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS;
          }
          break;
       }
@@ -4124,16 +4126,19 @@ static bool secondary_core_create(runloop_state_t *runloop_st,
             &runloop_st->secondary_lib_handle))
       return false;
 
-   runloop_st->secondary_core.symbols_inited = true;
+   runloop_st->secondary_core.flags |= RETRO_CORE_FLAG_SYMBOLS_INITED;
    runloop_st->secondary_core.retro_set_environment(
          runloop_environment_secondary_core_hook);
 #ifdef HAVE_RUNAHEAD
-   runloop_st->flags               |= RUNLOOP_FLAG_HAS_VARIABLE_UPDATE;
+   runloop_st->flags                |= RUNLOOP_FLAG_HAS_VARIABLE_UPDATE;
 #endif
 
    runloop_st->secondary_core.retro_init();
 
-   runloop_st->secondary_core.inited = (flags & CONTENT_ST_FLAG_IS_INITED);
+   if (flags & CONTENT_ST_FLAG_IS_INITED)
+      runloop_st->secondary_core.flags |=  RETRO_CORE_FLAG_INITED;
+   else
+      runloop_st->secondary_core.flags &= ~RETRO_CORE_FLAG_INITED;
 
    /* Load Content */
    /* disabled due to crashes */
@@ -4144,23 +4149,29 @@ static bool secondary_core_create(runloop_state_t *runloop_st,
    if ( (runloop_st->load_content_info->content->size > 0) &&
          runloop_st->load_content_info->content->elems[0].data)
    {
-      runloop_st->secondary_core.game_loaded = 
-         runloop_st->secondary_core.retro_load_game(
-               runloop_st->load_content_info->info);
-      if (!runloop_st->secondary_core.game_loaded)
+      if (runloop_st->secondary_core.retro_load_game(
+               runloop_st->load_content_info->info))
+         runloop_st->secondary_core.flags |=  RETRO_CORE_FLAG_GAME_LOADED;
+      else
+      {
+         runloop_st->secondary_core.flags &= ~RETRO_CORE_FLAG_GAME_LOADED;
          goto error;
+      }
    }
    else if (flags & CONTENT_ST_FLAG_CORE_DOES_NOT_NEED_CONTENT)
    {
-      runloop_st->secondary_core.game_loaded = 
-         runloop_st->secondary_core.retro_load_game(NULL);
-      if (!runloop_st->secondary_core.game_loaded)
+      if (runloop_st->secondary_core.retro_load_game(NULL))
+         runloop_st->secondary_core.flags |=  RETRO_CORE_FLAG_GAME_LOADED;
+      else
+      {
+         runloop_st->secondary_core.flags &= ~RETRO_CORE_FLAG_GAME_LOADED;
          goto error;
+      }
    }
    else
-      runloop_st->secondary_core.game_loaded = false;
+      runloop_st->secondary_core.flags    &= ~RETRO_CORE_FLAG_GAME_LOADED;
 
-   if (!runloop_st->secondary_core.inited)
+   if (!(runloop_st->secondary_core.flags & RETRO_CORE_FLAG_INITED))
       goto error;
 
    core_set_default_callbacks(&runloop_st->secondary_callbacks);
@@ -5043,12 +5054,12 @@ static bool core_unload_game(void)
 
    video_driver_set_cached_frame_ptr(NULL);
 
-   if (runloop_st->current_core.game_loaded)
+   if ((runloop_st->current_core.flags & RETRO_CORE_FLAG_GAME_LOADED))
    {
       RARCH_LOG("[Core]: Unloading game..\n");
       runloop_st->current_core.retro_unload_game();
       runloop_st->core_poll_type_override  = POLL_TYPE_OVERRIDE_DONTCARE;
-      runloop_st->current_core.game_loaded = false;
+      runloop_st->current_core.flags      &= ~RETRO_CORE_FLAG_GAME_LOADED;
    }
 
    audio_driver_stop();
@@ -5141,7 +5152,7 @@ void runloop_event_deinit_core(void)
 
    video_driver_set_cached_frame_ptr(NULL);
 
-   if (runloop_st->current_core.inited)
+   if (runloop_st->current_core.flags & RETRO_CORE_FLAG_INITED)
    {
       RARCH_LOG("[Core]: Unloading core..\n");
       runloop_st->current_core.retro_deinit();
@@ -5173,7 +5184,7 @@ void runloop_event_deinit_core(void)
 
    RARCH_LOG("[Core]: Unloading core symbols..\n");
    uninit_libretro_symbols(&runloop_st->current_core);
-   runloop_st->current_core.symbols_inited = false;
+   runloop_st->current_core.flags &= ~RETRO_CORE_FLAG_SYMBOLS_INITED;
 
    /* Restore original refresh rate, if it has been changed
     * automatically in SET_SYSTEM_AV_INFO */
@@ -5442,10 +5453,10 @@ static bool core_verify_api_version(void)
 static int16_t core_input_state_poll_late(unsigned port,
       unsigned device, unsigned idx, unsigned id)
 {
-   runloop_state_t     *runloop_st = &runloop_state;
-   if (!runloop_st->current_core.input_polled)
+   runloop_state_t     *runloop_st       = &runloop_state;
+   if (!(runloop_st->current_core.flags & RETRO_CORE_FLAG_INPUT_POLLED))
       input_driver_poll();
-   runloop_st->current_core.input_polled = true;
+   runloop_st->current_core.flags       |= RETRO_CORE_FLAG_INPUT_POLLED;
 
    return input_driver_state_wrapper(port, device, idx, id);
 }
@@ -5581,7 +5592,7 @@ bool runloop_event_init_core(
       return false;
    if (!runloop_st->current_core.retro_run)
       runloop_st->current_core.retro_run   = retro_run_null;
-   runloop_st->current_core.symbols_inited = true;
+   runloop_st->current_core.flags         |= RETRO_CORE_FLAG_SYMBOLS_INITED;
    runloop_st->current_core.retro_get_system_info(&sys_info->info);
 
    if (!sys_info->info.library_name)
@@ -5667,7 +5678,7 @@ bool runloop_event_init_core(
    video_driver_set_cached_frame_ptr(NULL);
 
    runloop_st->current_core.retro_init();
-   runloop_st->current_core.inited          = true;
+   runloop_st->current_core.flags         |= RETRO_CORE_FLAG_INITED;
 
    /* Attempt to set initial disk index */
    disk_control_set_initial_index(
@@ -6666,7 +6677,6 @@ MENU_ST_FLAG_IS_BINDING;
       unsigned video_driver_width                    = video_st->width;
       unsigned video_driver_height                   = video_st->height;
       bool check_next_rotation                       = true;
-      bool input_overlay_hide_in_menu                = settings->bools.input_overlay_hide_in_menu;
       bool input_overlay_hide_when_gamepad_connected = settings->bools.input_overlay_hide_when_gamepad_connected;
       bool input_overlay_auto_rotate                 = settings->bools.input_overlay_auto_rotate;
 
@@ -6696,8 +6706,7 @@ MENU_ST_FLAG_IS_BINDING;
          prev_overlay_restore = true;
       else if (prev_overlay_restore)
       {
-         if (!input_overlay_hide_in_menu)
-            input_overlay_init();
+         input_overlay_init();
          prev_overlay_restore = false;
       }
 
@@ -8527,7 +8536,10 @@ bool core_load_game(retro_ctx_load_content_info_t *load_info)
    else if (flags & CONTENT_ST_FLAG_CORE_DOES_NOT_NEED_CONTENT)
       game_loaded = runloop_st->current_core.retro_load_game(NULL);
 
-   runloop_st->current_core.game_loaded = game_loaded;
+   if (game_loaded)
+      runloop_st->current_core.flags |=  RETRO_CORE_FLAG_GAME_LOADED;
+   else
+      runloop_st->current_core.flags &= ~RETRO_CORE_FLAG_GAME_LOADED;
 
    /* If 'game_loaded' is true at this point, then
     * core is actually running; register that any
@@ -8672,11 +8684,12 @@ bool core_run(void)
    if (early_polling)
       input_driver_poll();
    else if (late_polling)
-      current_core->input_polled = false;
+      current_core->flags &= ~RETRO_CORE_FLAG_INPUT_POLLED;
 
    current_core->retro_run();
 
-   if (late_polling && !current_core->input_polled)
+   if (      late_polling 
+         && (!(current_core->flags & RETRO_CORE_FLAG_INPUT_POLLED)))
       input_driver_poll();
 
 #ifdef HAVE_NETWORKING
@@ -8689,10 +8702,11 @@ bool core_run(void)
 bool core_has_set_input_descriptor(void)
 {
    runloop_state_t *runloop_st = &runloop_state;
-   return runloop_st->current_core.has_set_input_descriptors;
+   return ((runloop_st->current_core.flags &
+            RETRO_CORE_FLAG_HAS_SET_INPUT_DESCRIPTORS) > 0);
 }
 
-char* crt_switch_core_name(void)
+char *crt_switch_core_name(void)
 {
    return (char*)runloop_state.system.info.library_name;
 }
