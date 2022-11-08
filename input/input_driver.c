@@ -110,7 +110,7 @@ static float input_null_get_sensor_input(void *data, unsigned port, unsigned id)
 static uint64_t input_null_get_capabilities(void *data) { return 0; }
 static void input_null_grab_mouse(void *data, bool state) { }
 static bool input_null_grab_stdin(void *data) { return false; }
-static void input_null_keypress_vibrate() { }
+static void input_null_keypress_vibrate(void) { }
 
 static input_driver_t input_null = {
    input_null_init,
@@ -1166,12 +1166,12 @@ static bool input_overlay_add_inputs_inner(overlay_desc_t *desc,
                      {
                         /* We need ALL of the inputs to be active,
                          * abort. */
-                        desc->updated    = false;
+                        desc->updated    = 0;
                         return false;
                      }
 
                      all_buttons_pressed = true;
-                     desc->updated       = true;
+                     desc->updated       = 1;
                   }
 
                   bank_mask >>= 1;
@@ -1217,20 +1217,24 @@ static bool input_overlay_add_inputs_inner(overlay_desc_t *desc,
             /* Maybe use some option here instead of 0, only display
              * changes greater than some magnitude */
             if ((dx * dx) > 0 || (dy * dy) > 0)
+            {
+               if (ol_state)
+                  desc->updated = 1;
                return true;
+            }
          }
          break;
 
       case OVERLAY_TYPE_DPAD_AREA:
       case OVERLAY_TYPE_ABXY_AREA:
-         return desc->updated;
+         return (desc->updated != 0);
 
       case OVERLAY_TYPE_KEYBOARD:
          if (ol_state ?
                OVERLAY_GET_KEY(ol_state, desc->retro_key_idx) :
                input_state_internal(port, RETRO_DEVICE_KEYBOARD, 0, desc->retro_key_idx))
          {
-            desc->updated  = true;
+            desc->updated = 1;
             return true;
          }
          break;
@@ -1394,16 +1398,16 @@ static bool inside_hitbox(const struct overlay_desc *desc, float x, float y)
    {
       case OVERLAY_HITBOX_RADIAL:
       {
-         /* Ellipsis. */
-         float x_dist  = (x - desc->x_shift) / desc->range_x_mod;
-         float y_dist  = (y - desc->y_shift) / desc->range_y_mod;
+         /* Ellipse. */
+         float x_dist  = (x - desc->x_hitbox) / desc->range_x_mod;
+         float y_dist  = (y - desc->y_hitbox) / desc->range_y_mod;
          float sq_dist = x_dist * x_dist + y_dist * y_dist;
          return (sq_dist <= 1.0f);
       }
       case OVERLAY_HITBOX_RECT:
          return
-            (fabs(x - desc->x_shift) <= desc->range_x_mod) &&
-            (fabs(y - desc->y_shift) <= desc->range_y_mod);
+            (fabs(x - desc->x_hitbox) <= desc->range_x_mod) &&
+            (fabs(y - desc->y_hitbox) <= desc->range_y_mod);
    }
    return false;
 }
@@ -1411,6 +1415,7 @@ static bool inside_hitbox(const struct overlay_desc *desc, float x, float y)
 /**
  * input_overlay_poll:
  * @out                   : Polled output data.
+ * @ptr_idx               : Pointer index
  * @norm_x                : Normalized X coordinate.
  * @norm_y                : Normalized Y coordinate.
  *
@@ -1422,9 +1427,11 @@ static bool inside_hitbox(const struct overlay_desc *desc, float x, float y)
 void input_overlay_poll(
       input_overlay_t *ol,
       input_overlay_state_t *out,
-      int16_t norm_x, int16_t norm_y, float touch_scale)
+      unsigned ptr_idx, int16_t norm_x, int16_t norm_y, float touch_scale)
 {
-   size_t i;
+   size_t i, j;
+   struct overlay_desc *descs = ol->active->descs;
+   unsigned int highest_prio  = 0;
 
    /* norm_x and norm_y is in [-0x7fff, 0x7fff] range,
     * like RETRO_DEVICE_POINTER. */
@@ -1443,14 +1450,34 @@ void input_overlay_poll(
    {
       float x_dist, y_dist;
       unsigned int base         = 0;
-      struct overlay_desc *desc = &ol->active->descs[i];
+      unsigned int desc_prio    = 0;
+      struct overlay_desc *desc = &descs[i];
 
       if (!desc || !inside_hitbox(desc, x, y))
          continue;
 
-      desc->updated = true;
-      x_dist        = x - desc->x_shift;
-      y_dist        = y - desc->y_shift;
+      /* Check for exclusive hitbox, which blocks other input.
+       * range_mod_exclusive has priority over exclusive. */
+      if (desc->range_mod_exclusive
+            && desc->range_x_mod != desc->range_x_hitbox)
+         desc_prio = 2;
+      else if (desc->exclusive)
+         desc_prio = 1;
+
+      if (highest_prio > desc_prio)
+         continue;
+
+      if (desc_prio > highest_prio)
+      {
+         highest_prio = desc_prio;
+         memset(out, 0, sizeof(*out));
+         for (j = 0; j < i; j++)
+            BIT16_CLEAR(descs[j].updated, ptr_idx);
+      }
+
+      BIT16_SET(desc->updated, ptr_idx);
+      x_dist = x - desc->x_shift;
+      y_dist = y - desc->y_shift;
 
       switch (desc->type)
       {
@@ -1538,10 +1565,10 @@ void input_overlay_post_poll(
    {
       struct overlay_desc *desc = &ol->active->descs[i];
 
-      desc->range_x_mod = desc->range_x;
-      desc->range_y_mod = desc->range_y;
+      desc->range_x_mod = desc->range_x_hitbox;
+      desc->range_y_mod = desc->range_y_hitbox;
 
-      if (desc->updated)
+      if (desc->updated != 0)
       {
          /* If pressed this frame, change the hitbox. */
          desc->range_x_mod *= desc->range_mod;
@@ -1556,8 +1583,30 @@ void input_overlay_post_poll(
       }
 
       input_overlay_update_desc_geom(ol, desc);
-      desc->updated = false;
+      desc->updated = 0;
    }
+}
+
+static void input_overlay_desc_init_hitbox(struct overlay_desc *desc)
+{
+   desc->x_hitbox =
+         ((desc->x_shift + desc->range_x * desc->reach_right) +
+          (desc->x_shift - desc->range_x * desc->reach_left)) / 2.0f;
+
+   desc->y_hitbox =
+         ((desc->y_shift + desc->range_y * desc->reach_down) +
+          (desc->y_shift - desc->range_y * desc->reach_up)) / 2.0f;
+
+   desc->range_x_hitbox =
+         (desc->range_x * desc->reach_right +
+          desc->range_x * desc->reach_left) / 2.0f;
+
+   desc->range_y_hitbox =
+         (desc->range_y * desc->reach_down +
+          desc->range_y * desc->reach_up) / 2.0f;
+
+   desc->range_x_mod = desc->range_x_hitbox;
+   desc->range_y_mod = desc->range_y_hitbox;
 }
 
 /**
@@ -1644,6 +1693,8 @@ void input_overlay_scale(struct overlay *ol,
       desc->mod_h       = 2.0f * scale_h;
       desc->mod_x       = adj_center_x - scale_w;
       desc->mod_y       = adj_center_y - scale_h;
+
+      input_overlay_desc_init_hitbox(desc);
    }
 }
 
@@ -1823,9 +1874,9 @@ void input_overlay_poll_clear(
    {
       struct overlay_desc *desc = &ol->active->descs[i];
 
-      desc->range_x_mod = desc->range_x;
-      desc->range_y_mod = desc->range_y;
-      desc->updated     = false;
+      desc->range_x_mod = desc->range_x_hitbox;
+      desc->range_y_mod = desc->range_y_hitbox;
+      desc->updated     = 0;
 
       desc->delta_x     = 0.0f;
       desc->delta_y     = 0.0f;
@@ -2078,7 +2129,7 @@ void input_poll_overlay(
          memset(&polled_data, 0, sizeof(struct input_overlay_state));
 
          if (ol->enable)
-            input_overlay_poll(ol, &polled_data, x, y, touch_scale);
+            input_overlay_poll(ol, &polled_data, i, x, y, touch_scale);
          else
             ol->blocked = false;
 
@@ -2657,6 +2708,8 @@ void joypad_driver_reinit(void *data, const char *joypad_driver_name)
    {
       const input_device_driver_t *tmp  = input_driver_st.primary_joypad;
       input_driver_st.primary_joypad    = NULL;
+      /* Run poll one last time in order to detect disconnections */
+      tmp->poll();
       tmp->destroy();
    }
 #ifdef HAVE_MFI
@@ -2664,6 +2717,7 @@ void joypad_driver_reinit(void *data, const char *joypad_driver_name)
    {
       const input_device_driver_t *tmp  = input_driver_st.secondary_joypad;
       input_driver_st.secondary_joypad  = NULL;
+      tmp->poll();
       tmp->destroy();
    }
 #endif
@@ -3354,59 +3408,65 @@ bool input_keyboard_line_event(
       input_driver_state_t *input_st,
       input_keyboard_line_t *state, uint32_t character)
 {
+   char array[2];
    bool            ret         = false;
-   const char    * word = (char*) &character; 
-   static unsigned composition = 0;		
+   const char            *word = NULL;
+   char            c           = (character >= 128) ? '?' : character;
 
-   /* COMPSTR:0x08000000, RESULTSTR:0x80000000   END:0x01000000*/
-   if (character & 0xFF000000)
-   {	
-      size_t len = strlen((char*)&composition);
-      if (     (len > 0)
-            && (state->ptr >= len)
-            && state->buffer)
-      {
-         memmove(state->buffer + state->ptr-len,
-               state->buffer+state->ptr,  len + 1);
-         state->ptr  -= len; 
-         state->size -= len;
-      }
-      if (character & 0xF0000000)
-         composition = 0;
-      else
-         composition = character &0xffffff; /* GCS_COMPSTR */
-      if (len && composition==0)
-         word	= state->buffer; 
-      character &= 0xffffff;
-   }
+   /* Treat extended chars as ? as we cannot support
+    * printable characters for unicode stuff. */
 
-   /*(c == '\r' || c == '\n')	*/
-   if (character == 0x0000000D || character == 0x0000000A)	
+   if (c == '\r' || c == '\n')
    {
       state->cb(state->userdata, state->buffer);
+
+      array[0] = c;
+      array[1] = 0;
+
       ret      = true;
-   }  else
-   if ( character == 0x00000008 || character == 0x0000007f)    /* c == '\b' || c == '\x7f')  0x7f is ASCII for del */ 
+      word     = array;
+   }
+   else if (c == '\b' || c == '\x7f') /* 0x7f is ASCII for del */
    {
       if (state->ptr)
       {
-        unsigned i;
-        int len = input_st->osk_last_codepoint_len;
-        if (     (len > 0)
-              && (state->ptr >= len)
-              && state->buffer)
-        {
-           memmove(state->buffer + state->ptr-len, state->buffer + state->ptr, (state->size - state->ptr) + 1);
-           state->ptr -=len; 
-           state->size-=len;
-        }
-        word     = state->buffer; /* ?? */
+         unsigned i;
+
+         for (i = 0; i < input_st->osk_last_codepoint_len; i++)
+         {
+            memmove(state->buffer + state->ptr - 1,
+                  state->buffer + state->ptr,
+                  state->size - state->ptr + 1);
+            state->ptr--;
+            state->size--;
+         }
+
+         word     = state->buffer;
       }
-   }  else
-   if (character) 
-	   input_keyboard_line_append(   state, (char*)&character, strlen((char*)&character));
-   else
-	   return false;
+   }
+   else if (ISPRINT(c))
+   {
+      /* Handle left/right here when suitable */
+      char *newbuf = (char*)
+         realloc(state->buffer, state->size + 2);
+      if (!newbuf)
+         return false;
+
+      memmove(newbuf + state->ptr + 1,
+            newbuf + state->ptr,
+            state->size - state->ptr + 1);
+      newbuf[state->ptr] = c;
+      state->ptr++;
+      state->size++;
+      newbuf[state->size] = '\0';
+
+      state->buffer = newbuf;
+
+      array[0] = c;
+      array[1] = 0;
+
+      word     = array;
+   }
 
    /* OSK - update last character */
    if (word)
@@ -3498,8 +3558,11 @@ static void input_overlay_loaded(retro_task_t *task,
       bool refresh               = false;
 
       /* Update menu entries */
-      menu_st->overlay_types     = data->overlay_types;
-      menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+      if (menu_st->overlay_types != data->overlay_types)
+      {
+         menu_st->overlay_types = data->overlay_types;
+         menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+      }
 
       /* We can't display when the menu is up */
       if (      data->hide_in_menu
@@ -5549,10 +5612,7 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
       if (menu_is_alive)
       {
          int k;
-         unsigned x_plus  = RARCH_ANALOG_LEFT_X_PLUS;
-         unsigned y_plus  = RARCH_ANALOG_LEFT_Y_PLUS;
-         unsigned x_minus = RARCH_ANALOG_LEFT_X_MINUS;
-         unsigned y_minus = RARCH_ANALOG_LEFT_Y_MINUS;
+         int s;
 
          /* Push analog to D-Pad mappings to binds. */
          for (k = RETRO_DEVICE_ID_JOYPAD_UP; k <= RETRO_DEVICE_ID_JOYPAD_RIGHT; k++)
@@ -5561,20 +5621,49 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
             (general_binds)[k].orig_joyaxis = (general_binds)[k].joyaxis;
          }
 
-         if (!INHERIT_JOYAXIS(auto_binds))
+         /* Read input from both analog sticks. */
+         for (s = RETRO_DEVICE_INDEX_ANALOG_LEFT; s <= RETRO_DEVICE_INDEX_ANALOG_RIGHT; s++)
          {
-            unsigned j = x_plus + 3;
-            /* Inherit joyaxis from analogs. */
-            for (k = RETRO_DEVICE_ID_JOYPAD_UP; k <= RETRO_DEVICE_ID_JOYPAD_RIGHT; k++)
-               (auto_binds)[k].joyaxis = (auto_binds)[j--].joyaxis;
-         }
+            unsigned x_plus  = RARCH_ANALOG_LEFT_X_PLUS;
+            unsigned y_plus  = RARCH_ANALOG_LEFT_Y_PLUS;
+            unsigned x_minus = RARCH_ANALOG_LEFT_X_MINUS;
+            unsigned y_minus = RARCH_ANALOG_LEFT_Y_MINUS;
 
-         if (!INHERIT_JOYAXIS(general_binds))
-         {
-            unsigned j = x_plus + 3;
-            /* Inherit joyaxis from analogs. */
-            for (k = RETRO_DEVICE_ID_JOYPAD_UP; k <= RETRO_DEVICE_ID_JOYPAD_RIGHT; k++)
-               (general_binds)[k].joyaxis = (general_binds)[j--].joyaxis;
+            if (s == RETRO_DEVICE_INDEX_ANALOG_RIGHT)
+            {
+               x_plus  = RARCH_ANALOG_RIGHT_X_PLUS;
+               y_plus  = RARCH_ANALOG_RIGHT_Y_PLUS;
+               x_minus = RARCH_ANALOG_RIGHT_X_MINUS;
+               y_minus = RARCH_ANALOG_RIGHT_Y_MINUS;
+            }
+
+            if (!INHERIT_JOYAXIS(auto_binds))
+            {
+               unsigned j = x_plus + 3;
+               /* Inherit joyaxis from analogs. */
+               for (k = RETRO_DEVICE_ID_JOYPAD_UP; k <= RETRO_DEVICE_ID_JOYPAD_RIGHT; k++)
+               {
+                  if ((auto_binds)[j].joyaxis != AXIS_NONE &&
+                        ((float)abs(joypad->axis(port, (uint32_t)(auto_binds)[j].joyaxis))
+                         / 0x8000) > joypad_info.axis_threshold)
+                     (auto_binds)[k].joyaxis = (auto_binds)[j].joyaxis;
+                  j--;
+               }
+            }
+
+            if (!INHERIT_JOYAXIS(general_binds))
+            {
+               unsigned j = x_plus + 3;
+               /* Inherit joyaxis from analogs. */
+               for (k = RETRO_DEVICE_ID_JOYPAD_UP; k <= RETRO_DEVICE_ID_JOYPAD_RIGHT; k++)
+               {
+                  if ((general_binds)[j].joyaxis != AXIS_NONE &&
+                        ((float)abs(joypad->axis(port, (uint32_t)(general_binds)[j].joyaxis))
+                         / 0x8000) > joypad_info.axis_threshold)
+                     (general_binds)[k].joyaxis = (general_binds)[j].joyaxis;
+                  j--;
+               }
+            }
          }
       }
 #endif /* HAVE_MENU */

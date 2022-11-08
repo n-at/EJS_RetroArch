@@ -612,6 +612,7 @@ typedef struct settings
       bool input_descriptor_hide_unbound;
       bool input_all_users_control_menu;
       bool input_menu_swap_ok_cancel_buttons;
+      bool input_menu_swap_scroll_buttons;
       bool input_backtouch_enable;
       bool input_backtouch_toggle;
       bool input_small_keyboard_enable;
@@ -867,6 +868,7 @@ typedef struct settings
       bool run_ahead_secondary_instance;
       bool run_ahead_hide_warnings;
       bool pause_nonactive;
+      bool pause_on_disconnect;
       bool block_sram_overwrite;
       bool savestate_auto_index;
       bool savestate_auto_save;

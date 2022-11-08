@@ -1037,6 +1037,7 @@ enum msg_hash_enums
    MENU_LABEL(INPUT_BIND_HOLD),
    MENU_LABEL(INPUT_REMAP_BINDS_ENABLE),
    MENU_LABEL(MENU_INPUT_SWAP_OK_CANCEL),
+   MENU_LABEL(MENU_INPUT_SWAP_SCROLL),
    MENU_LABEL(INPUT_OVERLAY_ENABLE),
    MENU_LABEL(INPUT_OSK_OVERLAY_ENABLE),
    MENU_LABEL(INPUT_MENU_ENUM_TOGGLE_GAMEPAD_COMBO),
@@ -1224,6 +1225,7 @@ enum msg_hash_enums
    MENU_LABEL(MENU_WALLPAPER),
    MENU_LABEL(DYNAMIC_WALLPAPER),
    MENU_LABEL(PAUSE_NONACTIVE),
+   MENU_LABEL(PAUSE_ON_DISCONNECT),
    MENU_LABEL(MENU_SCREENSAVER_TIMEOUT),
    MENU_LABEL(MENU_SCREENSAVER_ANIMATION),
    MENU_LABEL(MENU_SCREENSAVER_ANIMATION_SPEED),
@@ -3642,6 +3644,9 @@ int msg_hash_get_help_ca_enum(enum msg_hash_enums msg, char *s, size_t len);
 
 const char *msg_hash_to_str_en(enum msg_hash_enums msg);
 int msg_hash_get_help_en_enum(enum msg_hash_enums msg, char *s, size_t len);
+
+const char *msg_hash_to_str_hu(enum msg_hash_enums msg);
+int msg_hash_get_help_hu_enum(enum msg_hash_enums msg, char *s, size_t len);
 
 int msg_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len);
 
