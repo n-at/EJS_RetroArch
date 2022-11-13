@@ -2140,14 +2140,14 @@ static uintptr_t ozone_entries_icon_get_texture(
          else if (string_starts_with(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_SETTINGS)) ||
                   string_starts_with(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SOUND_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_AUDIO];
-         else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS)))
+         else if (string_starts_with(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_INPUT_SETTINGS];
          else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ONSCREEN_DISPLAY_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_OSD];
          else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LATENCY_SETTINGS)) ||
                   string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_TIMING_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_LATENCY];
-         else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS)))
+         else if (string_starts_with(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PERFORMANCE_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_FRAMESKIP];
          else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MEDIA_SETTINGS)) ||
                   string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STORAGE_SETTINGS)))
@@ -2155,6 +2155,8 @@ static uintptr_t ozone_entries_icon_get_texture(
          else if (string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SYSTEM_SETTINGS)) ||
                   string_is_equal(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SPECS_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_DRIVERS];
+         else if (strstr(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_HACKS_SETTINGS)))
+            return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_POWER];
          else if (strstr(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MAPPING_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_OVERRIDE];
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_CORE_OPTIONS];
@@ -4143,6 +4145,9 @@ static void ozone_leave_sidebar(
       uintptr_t tag)
 {
    struct gfx_animation_ctx_entry entry;
+   settings_t *settings             = config_get_ptr();
+   unsigned remember_selection_type = settings->uints.menu_remember_selection;
+   bool ozone_main_tab_selected     = false;
 
    ozone_update_content_metadata(ozone);
 
@@ -4154,8 +4159,15 @@ static void ozone_leave_sidebar(
       ozone->flags               &= ~OZONE_FLAG_CURSOR_IN_SIDEBAR_OLD;
    ozone->flags                  &= ~OZONE_FLAG_CURSOR_IN_SIDEBAR;
 
+   if    ((ozone->tabs[ozone->categories_selection_ptr] == OZONE_SYSTEM_TAB_MAIN)
+      || (ozone->tabs[ozone->categories_selection_ptr] == OZONE_SYSTEM_TAB_SETTINGS))
+      ozone_main_tab_selected = true;
+
    /* Restore last selection per tab */
-   ozone_tab_set_selection(ozone);
+   if    ((remember_selection_type == MENU_REMEMBER_SELECTION_ALWAYS)
+      || ((remember_selection_type == MENU_REMEMBER_SELECTION_PLAYLISTS) && (ozone->flags & OZONE_FLAG_IS_PLAYLIST))
+      || ((remember_selection_type == MENU_REMEMBER_SELECTION_MAIN) && (ozone_main_tab_selected)))
+      ozone_tab_set_selection(ozone);
 
    /* Cursor animation */
    ozone->animations.cursor_alpha   = 0.0f;
