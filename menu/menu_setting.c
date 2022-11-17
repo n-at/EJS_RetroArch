@@ -7096,8 +7096,8 @@ int menu_action_handle_setting(rarch_setting_t *setting,
          {
             menu_displaylist_info_t  info;
             settings_t *settings          = config_get_ptr();
-            file_list_t       *menu_stack = menu_entries_get_menu_stack_ptr(0);
-            const char      *name         = setting->name;
+            file_list_t *menu_stack       = menu_entries_get_menu_stack_ptr(0);
+            const char *name              = setting->name;
             size_t selection              = menu_navigation_get_selection();
 
             menu_displaylist_info_init(&info);
@@ -7107,6 +7107,26 @@ int menu_action_handle_setting(rarch_setting_t *setting,
             info.type                     = type;
             info.directory_ptr            = selection;
             info.list                     = menu_stack;
+
+            /* Menu background image */
+            if (string_is_equal(info.label, msg_hash_to_str(MENU_ENUM_LABEL_MENU_WALLPAPER)))
+            {
+               /* Start from current wallpaper instead if available */
+               if (!string_is_empty(settings->paths.path_menu_wallpaper))
+               {
+                  free(info.path);
+                  info.path = strdup(settings->paths.path_menu_wallpaper);
+               }
+            }
+
+            /* Browse basedir instead and set selection to file if available */
+            if (!string_is_empty(info.path) && !path_is_directory(info.path))
+            {
+               const char *selection_path = path_basename(info.path);
+               if (!string_is_empty(selection_path))
+                  menu_driver_set_pending_selection(selection_path);
+               path_basedir(info.path);
+            }
 
             if (menu_displaylist_ctl(DISPLAYLIST_GENERIC, &info, settings))
                menu_displaylist_process(&info);
@@ -7843,26 +7863,8 @@ static void general_write_handler(rarch_setting_t *setting)
       case MENU_ENUM_LABEL_VIDEO_SHADERS_ENABLE:
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
          {
-            if (*setting->value.target.boolean)
-            {
-               bool refresh                = false;
-               menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-               menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
-            }
-            else
-            {
-               bool refresh                = false;
-               settings_t *settings        = config_get_ptr();
-               struct video_shader *shader = menu_shader_get();
-
-               shader->passes              = 0;
-               shader->flags              |= SHDR_FLAG_MODIFIED;
-
-               menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-               menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
-               command_event(CMD_EVENT_SHADERS_APPLY_CHANGES, NULL);
-               configuration_set_bool(settings, settings->bools.video_shader_enable, false);
-            }
+            settings_t *settings        = config_get_ptr();
+            video_shader_toggle(settings);
          }
 #endif
          break;
@@ -15830,7 +15832,7 @@ static bool setting_append_list(
                   sizeof(settings->paths.path_menu_wallpaper),
                   MENU_ENUM_LABEL_MENU_WALLPAPER,
                   MENU_ENUM_LABEL_VALUE_MENU_WALLPAPER,
-                  "",
+                  settings->paths.directory_assets,
                   &group_info,
                   &subgroup_info,
                   parent_group,

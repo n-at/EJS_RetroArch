@@ -330,6 +330,7 @@ const struct input_bind_map input_config_bind_map[RARCH_BIND_LIST_END_NULL] = {
    DECLARE_META_BIND(2, reset,                 RARCH_RESET,                  MENU_ENUM_LABEL_VALUE_INPUT_META_RESET),
    DECLARE_META_BIND(2, shader_next,           RARCH_SHADER_NEXT,            MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_NEXT),
    DECLARE_META_BIND(2, shader_prev,           RARCH_SHADER_PREV,            MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_PREV),
+   DECLARE_META_BIND(2, shader_toggle,         RARCH_SHADER_TOGGLE,          MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_TOGGLE),
    DECLARE_META_BIND(2, cheat_index_plus,      RARCH_CHEAT_INDEX_PLUS,       MENU_ENUM_LABEL_VALUE_INPUT_META_CHEAT_INDEX_PLUS),
    DECLARE_META_BIND(2, cheat_index_minus,     RARCH_CHEAT_INDEX_MINUS,      MENU_ENUM_LABEL_VALUE_INPUT_META_CHEAT_INDEX_MINUS),
    DECLARE_META_BIND(2, cheat_toggle,          RARCH_CHEAT_TOGGLE,           MENU_ENUM_LABEL_VALUE_INPUT_META_CHEAT_TOGGLE),
@@ -3903,6 +3904,7 @@ bool config_load_override(void *data)
    char content_dir_name[PATH_MAX_LENGTH];
    char config_directory[PATH_MAX_LENGTH];
    bool should_append                     = false;
+   bool show_notification                 = true;
    rarch_system_info_t *system            = (rarch_system_info_t*)data;
    const char *core_name                  = system ?
       system->info.library_name : NULL;
@@ -3955,7 +3957,10 @@ bool config_load_override(void *data)
 
    /* Prevent "--appendconfig" from being ignored */
    if (!path_is_empty(RARCH_PATH_CONFIG_APPEND))
-      should_append = true;
+   {
+      should_append     = true;
+      show_notification = false;
+   }
 
    /* per-core overrides */
    /* Create a new config file from core_path */
@@ -3981,7 +3986,8 @@ bool config_load_override(void *data)
 
       path_set(RARCH_PATH_CONFIG_APPEND, tmp_path);
 
-      should_append = true;
+      should_append     = true;
+      show_notification = true;
    }
 
    if (has_content)
@@ -4010,7 +4016,8 @@ bool config_load_override(void *data)
 
          path_set(RARCH_PATH_CONFIG_APPEND, tmp_path);
 
-         should_append = true;
+         should_append     = true;
+         show_notification = true;
       }
 
       /* per-game overrides */
@@ -4037,7 +4044,8 @@ bool config_load_override(void *data)
 
          path_set(RARCH_PATH_CONFIG_APPEND, tmp_path);
 
-         should_append = true;
+         should_append     = true;
+         show_notification = true;
       }
    }
 
@@ -4049,13 +4057,14 @@ bool config_load_override(void *data)
 
    /* Toggle has_save_path to false so it resets */
    retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_STATE_PATH, NULL);
-   retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_SAVE_PATH,  NULL);
+   retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_SAVE_PATH, NULL);
 
    if (!config_load_file(global_get_ptr(),
             path_get(RARCH_PATH_CONFIG), settings))
       return false;
 
-   if (settings->bools.notification_show_config_override_load)
+   if (settings->bools.notification_show_config_override_load
+         && show_notification)
       runloop_msg_queue_push(msg_hash_to_str(MSG_CONFIG_OVERRIDE_LOADED),
             1, 100, false,
             NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
@@ -4083,7 +4092,7 @@ bool config_unload_override(void)
 
    /* Toggle has_save_path to false so it resets */
    retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_STATE_PATH, NULL);
-   retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_SAVE_PATH,  NULL);
+   retroarch_override_setting_unset(RARCH_OVERRIDE_SETTING_SAVE_PATH, NULL);
 
    if (!config_load_file(global_get_ptr(),
             path_get(RARCH_PATH_CONFIG), config_st))

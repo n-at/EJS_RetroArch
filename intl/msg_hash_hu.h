@@ -590,14 +590,6 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CPU_ARCHITECTURE,
    "CPU architektúra"
    )
-MSG_HASH( /* FIXME Colon should be handled in menu_display.c like the rest */
-   MENU_ENUM_LABEL_VALUE_CPU_CORES,
-   "CPU magok:"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_CPU_CORES,
-   "A CPU magjainak száma."
-   )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_FRONTEND_IDENTIFIER,
    "Frontend azonosító"
@@ -5533,7 +5525,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CHEEVOS_HARDCORE_MODE_ENABLE,
-   "Letiltja a csalásokat, a visszatekerést, a leállítást, a lassítást és az állásbetöltést. A hardcore módban begyűjtött trófeáknak egyedi jelzésük van, így megmutathatod másoknak, mit sikerült elérni az emulációs segédletek nélkül. A játék újraindul, ha menet közben változik ez a beállítás."
+   "Letiltja a csalásokat, a visszatekerést, a lassítást és az állásbetöltést. A hardcore módban begyűjtött trófeáknak egyedi jelzésük van, így megmutathatod másoknak, mit sikerült elérni az emulációs segédletek nélkül. A játék újraindul, ha menet közben változik ez a beállítás."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_LEADERBOARDS_ENABLE,
@@ -8045,7 +8037,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACHIEVEMENT_PAUSE,
-   "Szünetelteti a trófeák Hardcore módját, ezáltal ismét elérhető a játékállás mentés, a csalások, visszatekerés, leállítás, és lassítás."
+   "A trófeák Hardcore módjának szüneteltetése erre a menetre. Engedélyezi a játékállás betöltést, a csalásokat, a visszatekerést, a lassítást és az újraindítást."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ACHIEVEMENT_RESUME,
@@ -8053,7 +8045,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME,
-   "Visszaállítja a trófeák Hardcore módját, ezáltal nem elérhető a játékállás mentés, a csalások, visszatekerés, leállítás, lassítás és újraindítás."
+   "A trófeák Hardcore módjának visszaállítása. Ezáltal nem lesz elérhető a játékállás mentés, a csalások, a visszatekerés, a lassítás és az újraindítás."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NOT_LOGGED_IN,

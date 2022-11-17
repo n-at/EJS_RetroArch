@@ -1774,7 +1774,7 @@ static unsigned menu_displaylist_parse_system_info(file_list_t *list)
             sizeof(cpu_str));
       snprintf(cpu_str      + _len,
             sizeof(cpu_str) - _len,
-            " %d\n", amount_cores);
+            ": %d\n", amount_cores);
       if (menu_entries_append(list, cpu_str,
             msg_hash_to_str(MENU_ENUM_LABEL_CPU_CORES),
             MENU_ENUM_LABEL_CPU_CORES, MENU_SETTINGS_CORE_INFO_NONE, 0, 0, NULL))
@@ -4970,6 +4970,7 @@ static unsigned menu_displaylist_parse_content_information(
       tmp[_len  ]                  = ':';
       tmp[_len+1]                  = ' ';
       tmp[_len+2]                  = '\n';
+      tmp[_len+3]                  = '\0';
       strlcat(tmp, rcheevos_get_hash(), sizeof(tmp));
       if (menu_entries_append(info->list, tmp, cheevos_hash_str,
             MENU_ENUM_LABEL_VALUE_CONTENT_INFO_CHEEVOS_HASH,

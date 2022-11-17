@@ -237,12 +237,6 @@ struct key_desc key_descriptors[RARCH_MAX_KEYS] =
    {RETROK_OEM_102,       "OEM-102"}
 };
 
-enum menu_scroll_mode
-{
-   MENU_SCROLL_PAGE = 0,
-   MENU_SCROLL_START_LETTER
-};
-
 static void *null_menu_init(void **userdata, bool video_is_threaded)
 {
    menu_handle_t *menu = (menu_handle_t*)calloc(1, sizeof(*menu));
@@ -1209,17 +1203,17 @@ float menu_input_get_dpi(
     * Note: DPI is a fixed hardware property. To minimise performance
     * overheads we therefore only call video_context_driver_get_metrics()
     * on first run, or when the current video resolution changes */
-   if (!dpi_cached ||
-       (video_width  != last_video_width) ||
-       (video_height != last_video_height))
+   if (   (!dpi_cached)
+       || (video_width  != last_video_width)
+       || (video_height != last_video_height))
    {
       gfx_ctx_metrics_t mets;
       /* Note: If video_context_driver_get_metrics() fails,
        * we don't know what happened to dpi - so ensure it
        * is reset to a sane value */
 
-      mets.type  = DISPLAY_METRIC_DPI;
-      mets.value = &dpi;
+      mets.type         = DISPLAY_METRIC_DPI;
+      mets.value        = &dpi;
       if (!video_context_driver_get_metrics(&mets))
          dpi            = 0.0f;
 
@@ -2908,7 +2902,9 @@ void menu_shader_manager_apply_changes(
 
    type = menu_shader_manager_get_type(shader);
 
-   if (shader->passes && type != RARCH_SHADER_NONE)
+   if (shader->passes
+         && type != RARCH_SHADER_NONE
+         && !(shader->flags & SHDR_FLAG_DISABLED))
    {
       menu_shader_manager_save_preset(shader, NULL,
             dir_video_shader, dir_menu_config, true);
@@ -3554,8 +3550,12 @@ bool rarch_menu_init(
    }
 #endif
 
+#if 0
+   /* TODO: No reason to do this here since shaders need
+    * content, and this is called in content_load() */
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
    menu_shader_manager_init();
+#endif
 #endif
 
    return true;
