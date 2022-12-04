@@ -115,6 +115,10 @@
 
 #include "config.def.h"
 
+#ifdef HAVE_MENU
+#include "menu/menu_driver.h"
+#endif
+
 #include "runloop.h"
 #include "camera/camera_driver.h"
 #include "location_driver.h"
@@ -242,8 +246,8 @@
 
 #define _PSUPP_BUF(buf, var, name, desc) \
    strlcat(buf, "  ", sizeof(buf)); \
-   strlcat(buf, name, sizeof(buf)); \
-   strlcat(buf, ":\n\t\t", sizeof(buf)); \
+   snprintf(buf + strlen(buf), sizeof(buf), "%-15s", name); \
+   strlcat(buf, " - ", sizeof(buf)); \
    strlcat(buf, desc, sizeof(buf)); \
    strlcat(buf, ": ", sizeof(buf)); \
    strlcat(buf, var ? "yes\n" : "no\n", sizeof(buf))
@@ -1036,7 +1040,6 @@ const char *path_get(enum rarch_path_type type)
 size_t path_get_realsize(enum rarch_path_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
 
    switch (type)
    {
@@ -1045,11 +1048,11 @@ size_t path_get_realsize(enum rarch_path_type type)
       case RARCH_PATH_DEFAULT_SHADER_PRESET:
          return sizeof(p_rarch->path_default_shader_preset);
       case RARCH_PATH_BASENAME:
-         return sizeof(runloop_st->runtime_content_path_basename);
+         return sizeof(runloop_state_get_ptr()->runtime_content_path_basename);
       case RARCH_PATH_CORE_OPTIONS:
          return sizeof(p_rarch->path_core_options_file);
       case RARCH_PATH_SUBSYSTEM:
-         return sizeof(runloop_st->subsystem_path);
+         return sizeof(runloop_state_get_ptr()->subsystem_path);
       case RARCH_PATH_CONFIG:
          return sizeof(p_rarch->path_config_file);
       case RARCH_PATH_CONFIG_APPEND:
@@ -1067,17 +1070,13 @@ size_t path_get_realsize(enum rarch_path_type type)
 bool path_set(enum rarch_path_type type, const char *path)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
+   runloop_state_t *runloop_st = NULL;
 
    if (!path)
       return false;
 
    switch (type)
    {
-      case RARCH_PATH_BASENAME:
-         strlcpy(runloop_st->runtime_content_path_basename, path,
-               sizeof(runloop_st->runtime_content_path_basename));
-         break;
       case RARCH_PATH_NAMES:
          runloop_path_set_basename(path);
          runloop_path_set_names();
@@ -1099,10 +1098,6 @@ bool path_set(enum rarch_path_type type, const char *path)
          strlcpy(p_rarch->path_config_file, path,
                sizeof(p_rarch->path_config_file));
          break;
-      case RARCH_PATH_SUBSYSTEM:
-         strlcpy(runloop_st->subsystem_path, path,
-               sizeof(runloop_st->subsystem_path));
-         break;
       case RARCH_PATH_CORE_OPTIONS:
          strlcpy(p_rarch->path_core_options_file, path,
                sizeof(p_rarch->path_core_options_file));
@@ -1110,6 +1105,16 @@ bool path_set(enum rarch_path_type type, const char *path)
       case RARCH_PATH_CONTENT:
          strlcpy(p_rarch->path_content, path,
                sizeof(p_rarch->path_content));
+         break;
+      case RARCH_PATH_BASENAME:
+         runloop_st = runloop_state_get_ptr();
+         strlcpy(runloop_st->runtime_content_path_basename, path,
+               sizeof(runloop_st->runtime_content_path_basename));
+         break;
+      case RARCH_PATH_SUBSYSTEM:
+         runloop_st = runloop_state_get_ptr();
+         strlcpy(runloop_st->subsystem_path, path,
+               sizeof(runloop_st->subsystem_path));
          break;
       case RARCH_PATH_NONE:
          break;
@@ -1121,16 +1126,11 @@ bool path_set(enum rarch_path_type type, const char *path)
 bool path_is_empty(enum rarch_path_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
 
    switch (type)
    {
       case RARCH_PATH_DEFAULT_SHADER_PRESET:
          if (string_is_empty(p_rarch->path_default_shader_preset))
-            return true;
-         break;
-      case RARCH_PATH_SUBSYSTEM:
-         if (string_is_empty(runloop_st->subsystem_path))
             return true;
          break;
       case RARCH_PATH_CONFIG:
@@ -1154,7 +1154,11 @@ bool path_is_empty(enum rarch_path_type type)
             return true;
          break;
       case RARCH_PATH_BASENAME:
-         if (string_is_empty(runloop_st->runtime_content_path_basename))
+         if (string_is_empty(runloop_state_get_ptr()->runtime_content_path_basename))
+            return true;
+         break;
+      case RARCH_PATH_SUBSYSTEM:
+         if (string_is_empty(runloop_state_get_ptr()->subsystem_path))
             return true;
          break;
       case RARCH_PATH_NONE:
@@ -1168,13 +1172,10 @@ bool path_is_empty(enum rarch_path_type type)
 void path_clear(enum rarch_path_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
+   runloop_state_t *runloop_st = NULL;
 
    switch (type)
    {
-      case RARCH_PATH_SUBSYSTEM:
-         *runloop_st->subsystem_path = '\0';
-         break;
       case RARCH_PATH_CORE:
          *p_rarch->path_libretro = '\0';
          break;
@@ -1183,9 +1184,6 @@ void path_clear(enum rarch_path_type type)
          break;
       case RARCH_PATH_CONTENT:
          *p_rarch->path_content = '\0';
-         break;
-      case RARCH_PATH_BASENAME:
-         *runloop_st->runtime_content_path_basename = '\0';
          break;
       case RARCH_PATH_CORE_OPTIONS:
          *p_rarch->path_core_options_file = '\0';
@@ -1198,6 +1196,14 @@ void path_clear(enum rarch_path_type type)
          break;
       case RARCH_PATH_NONE:
       case RARCH_PATH_NAMES:
+         break;
+      case RARCH_PATH_BASENAME:
+         runloop_st = runloop_state_get_ptr();
+         *runloop_st->runtime_content_path_basename = '\0';
+         break;
+      case RARCH_PATH_SUBSYSTEM:
+         runloop_st = runloop_state_get_ptr();
+         *runloop_st->subsystem_path = '\0';
          break;
    }
 }
@@ -1308,7 +1314,6 @@ static void path_deinit_subsystem(runloop_state_t *runloop_st)
 size_t dir_get_size(enum rarch_dir_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
 
    switch (type)
    {
@@ -1317,11 +1322,11 @@ size_t dir_get_size(enum rarch_dir_type type)
       case RARCH_DIR_SAVESTATE:
          return sizeof(p_rarch->dir_savestate);
       case RARCH_DIR_CURRENT_SAVESTATE:
-         return sizeof(runloop_st->savestate_dir);
+         return sizeof(runloop_state_get_ptr()->savestate_dir);
       case RARCH_DIR_SAVEFILE:
          return sizeof(p_rarch->dir_savefile);
       case RARCH_DIR_CURRENT_SAVEFILE:
-         return sizeof(runloop_st->savefile_dir);
+         return sizeof(runloop_state_get_ptr()->savefile_dir);
       case RARCH_DIR_NONE:
          break;
    }
@@ -1334,26 +1339,28 @@ size_t dir_get_size(enum rarch_dir_type type)
 void dir_clear(enum rarch_dir_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
+   runloop_state_t *runloop_st = NULL;
 
    switch (type)
    {
       case RARCH_DIR_SAVEFILE:
          *p_rarch->dir_savefile = '\0';
          break;
-      case RARCH_DIR_CURRENT_SAVEFILE:
-         *runloop_st->savefile_dir = '\0';
-         break;
       case RARCH_DIR_SAVESTATE:
          *p_rarch->dir_savestate = '\0';
-         break;
-      case RARCH_DIR_CURRENT_SAVESTATE:
-         *runloop_st->savestate_dir = '\0';
          break;
       case RARCH_DIR_SYSTEM:
          *p_rarch->dir_system = '\0';
          break;
       case RARCH_DIR_NONE:
+         break;
+      case RARCH_DIR_CURRENT_SAVEFILE:
+         runloop_st = runloop_state_get_ptr();
+         *runloop_st->savefile_dir = '\0';
+         break;
+      case RARCH_DIR_CURRENT_SAVESTATE:
+         runloop_st = runloop_state_get_ptr();
+         *runloop_st->savestate_dir = '\0';
          break;
    }
 }
@@ -1370,18 +1377,17 @@ static void dir_clear_all(void)
 char *dir_get_ptr(enum rarch_dir_type type)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
 
    switch (type)
    {
       case RARCH_DIR_SAVEFILE:
          return p_rarch->dir_savefile;
       case RARCH_DIR_CURRENT_SAVEFILE:
-         return runloop_st->savefile_dir;
+         return runloop_state_get_ptr()->savefile_dir;
       case RARCH_DIR_SAVESTATE:
          return p_rarch->dir_savestate;
       case RARCH_DIR_CURRENT_SAVESTATE:
-         return runloop_st->savestate_dir;
+         return runloop_state_get_ptr()->savestate_dir;
       case RARCH_DIR_SYSTEM:
          return p_rarch->dir_system;
       case RARCH_DIR_NONE:
@@ -1394,21 +1400,13 @@ char *dir_get_ptr(enum rarch_dir_type type)
 void dir_set(enum rarch_dir_type type, const char *path)
 {
    struct rarch_state *p_rarch = &rarch_st;
-   runloop_state_t *runloop_st = runloop_state_get_ptr();
+   runloop_state_t *runloop_st = NULL;
 
    switch (type)
    {
-      case RARCH_DIR_CURRENT_SAVEFILE:
-         strlcpy(runloop_st->savefile_dir, path,
-               sizeof(runloop_st->savefile_dir));
-         break;
       case RARCH_DIR_SAVEFILE:
          strlcpy(p_rarch->dir_savefile, path,
                sizeof(p_rarch->dir_savefile));
-         break;
-      case RARCH_DIR_CURRENT_SAVESTATE:
-         strlcpy(runloop_st->savestate_dir, path,
-               sizeof(runloop_st->savestate_dir));
          break;
       case RARCH_DIR_SAVESTATE:
          strlcpy(p_rarch->dir_savestate, path,
@@ -1419,6 +1417,16 @@ void dir_set(enum rarch_dir_type type, const char *path)
                sizeof(p_rarch->dir_system));
          break;
       case RARCH_DIR_NONE:
+         break;
+      case RARCH_DIR_CURRENT_SAVEFILE:
+         runloop_st = runloop_state_get_ptr();
+         strlcpy(runloop_st->savefile_dir, path,
+               sizeof(runloop_st->savefile_dir));
+         break;
+      case RARCH_DIR_CURRENT_SAVESTATE:
+         runloop_st = runloop_state_get_ptr();
+         strlcpy(runloop_st->savestate_dir, path,
+               sizeof(runloop_st->savestate_dir));
          break;
    }
 }
@@ -1670,15 +1678,6 @@ bool command_event(enum event_command cmd, void *data)
             command_event(CMD_EVENT_RECORD_DEINIT, NULL);
          else
             command_event(CMD_EVENT_RECORD_INIT, NULL);
-         break;
-      case CMD_EVENT_OSK_TOGGLE:
-         {
-            input_driver_state_t *input_st   = input_state_get_ptr();
-            if (input_st->flags & INP_FLAG_KB_LINEFEED_ENABLE)
-               input_st->flags &= ~INP_FLAG_KB_LINEFEED_ENABLE;
-            else
-               input_st->flags |=  INP_FLAG_KB_LINEFEED_ENABLE;
-         }
          break;
       case CMD_EVENT_SET_PER_GAME_RESOLUTION:
 #if defined(GEKKO)
@@ -2122,8 +2121,6 @@ bool command_event(enum event_command cmd, void *data)
                      MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
          }
          break;
-      case CMD_EVENT_SEND_DEBUG_INFO:
-         break;
       case CMD_EVENT_FPS_TOGGLE:
          settings->bools.video_fps_show = !(settings->bools.video_fps_show);
          break;
@@ -2150,7 +2147,7 @@ bool command_event(enum event_command cmd, void *data)
             input_overlay_load_active(input_st->overlay_visibility,
                   input_st->overlay_ptr, input_overlay_opacity);
 
-            input_st->overlay_ptr->blocked    = true;
+            input_st->overlay_ptr->flags     |= INPUT_OVERLAY_BLOCKED;
             input_st->overlay_ptr->next_index = (unsigned)((input_st->overlay_ptr->index + 1) % input_st->overlay_ptr->size);
 
             /* Check orientation, if required */
@@ -2164,6 +2161,15 @@ bool command_event(enum event_command cmd, void *data)
                            input_st->overlay_ptr);
          }
 #endif
+         break;
+      case CMD_EVENT_OSK_TOGGLE:
+         {
+            input_driver_state_t *input_st   = input_state_get_ptr();
+            if (input_st->flags & INP_FLAG_KB_LINEFEED_ENABLE)
+               input_st->flags &= ~INP_FLAG_KB_LINEFEED_ENABLE;
+            else
+               input_st->flags |=  INP_FLAG_KB_LINEFEED_ENABLE;
+         }
          break;
       case CMD_EVENT_DSP_FILTER_INIT:
 #ifdef HAVE_DSP_FILTER
@@ -2514,7 +2520,7 @@ bool command_event(enum event_command cmd, void *data)
 #ifdef HAVE_MENU
          retroarch_menu_running_finished(false);
 #endif
-         if (uico_st->is_on_foreground)
+         if (uico_st->flags & UICO_ST_FLAG_IS_ON_FOREGROUND)
          {
 #ifdef HAVE_QT
             bool desktop_menu_enable = settings->bools.desktop_menu_enable;
@@ -3025,7 +3031,7 @@ bool command_event(enum event_command cmd, void *data)
                 * the disk tray eject status. If status has changed,
                 * must refresh the disk options menu */
                if (initial_disk_ejected != disk_control_get_eject_state(
-				       &sys_info->disk_control))
+                     &sys_info->disk_control))
                {
                   menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
                   menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
@@ -3438,6 +3444,10 @@ bool command_event(enum event_command cmd, void *data)
          break;
       case CMD_EVENT_NONE:
          return false;
+
+      /* Deprecated */
+      case CMD_EVENT_SEND_DEBUG_INFO:
+         break;
    }
 
    return true;
@@ -4080,27 +4090,27 @@ void libretro_free_system_info(struct retro_system_info *info)
 
 static void retroarch_print_features(void)
 {
-   char buf[2048];
+   char buf[4096];
    buf[0] = '\0';
+
    frontend_driver_attach_console();
 
-   strlcpy(buf, "\nFeatures:\n", sizeof(buf));
+   strlcpy(buf, "Features:\n", sizeof(buf));
 
    _PSUPP_BUF(buf, SUPPORTS_LIBRETRODB,      "LibretroDB",      "LibretroDB support");
    _PSUPP_BUF(buf, SUPPORTS_COMMAND,         "Command",         "Command interface support");
-   _PSUPP_BUF(buf, SUPPORTS_NETWORK_COMMAND, "Network Command", "Network Command interface "
-         "support");
+   _PSUPP_BUF(buf, SUPPORTS_NETWORK_COMMAND, "Network Command", "Network Command interface support");
    _PSUPP_BUF(buf, SUPPORTS_SDL,             "SDL",             "SDL input/audio/video drivers");
    _PSUPP_BUF(buf, SUPPORTS_SDL2,            "SDL2",            "SDL2 input/audio/video drivers");
    _PSUPP_BUF(buf, SUPPORTS_X11,             "X11",             "X11 input/video drivers");
-   _PSUPP_BUF(buf, SUPPORTS_WAYLAND,         "wayland",         "Wayland input/video drivers");
+   _PSUPP_BUF(buf, SUPPORTS_UDEV,            "UDEV",            "UDEV/EVDEV input driver");
+   _PSUPP_BUF(buf, SUPPORTS_WAYLAND,         "Wayland",         "Wayland input/video drivers");
    _PSUPP_BUF(buf, SUPPORTS_THREAD,          "Threads",         "Threading support");
-   _PSUPP_BUF(buf, SUPPORTS_VULKAN,          "Vulkan",          "Vulkan video driver");
-   _PSUPP_BUF(buf, SUPPORTS_METAL,           "Metal",           "Metal video driver");
-   _PSUPP_BUF(buf, SUPPORTS_OPENGL,          "OpenGL",          "OpenGL   video driver support");
-   _PSUPP_BUF(buf, SUPPORTS_OPENGLES,        "OpenGL ES",       "OpenGLES video driver support");
+   _PSUPP_BUF(buf, SUPPORTS_VULKAN,          "Vulkan",          "Video driver");
+   _PSUPP_BUF(buf, SUPPORTS_METAL,           "Metal",           "Video driver");
+   _PSUPP_BUF(buf, SUPPORTS_OPENGL,          "OpenGL",          "Video driver");
+   _PSUPP_BUF(buf, SUPPORTS_OPENGLES,        "OpenGLES",        "Video driver");
    _PSUPP_BUF(buf, SUPPORTS_XVIDEO,          "XVideo",          "Video driver");
-   _PSUPP_BUF(buf, SUPPORTS_UDEV,            "UDEV",            "UDEV/EVDEV input driver support");
    _PSUPP_BUF(buf, SUPPORTS_EGL,             "EGL",             "Video context driver");
    _PSUPP_BUF(buf, SUPPORTS_KMS,             "KMS",             "Video context driver");
    _PSUPP_BUF(buf, SUPPORTS_VG,              "OpenVG",          "Video context driver");
@@ -4113,40 +4123,38 @@ static void retroarch_print_features(void)
    _PSUPP_BUF(buf, SUPPORTS_ROAR,            "RoarAudio",       "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_PULSE,           "PulseAudio",      "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_DSOUND,          "DirectSound",     "Audio driver");
-   _PSUPP_BUF(buf, SUPPORTS_WASAPI,          "WASAPI",     "Audio driver");
+   _PSUPP_BUF(buf, SUPPORTS_WASAPI,          "WASAPI",          "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_XAUDIO,          "XAudio2",         "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_AL,              "OpenAL",          "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_SL,              "OpenSL",          "Audio driver");
    _PSUPP_BUF(buf, SUPPORTS_7ZIP,            "7zip",            "7zip extraction support");
-   _PSUPP_BUF(buf, SUPPORTS_ZLIB,            "zlib",            ".zip extraction support");
+   _PSUPP_BUF(buf, SUPPORTS_ZLIB,            "zlib",            "zip extraction support");
    _PSUPP_BUF(buf, SUPPORTS_DYLIB,           "External",        "External filter and plugin support");
    _PSUPP_BUF(buf, SUPPORTS_CG,              "Cg",              "Fragment/vertex shader driver");
    _PSUPP_BUF(buf, SUPPORTS_GLSL,            "GLSL",            "Fragment/vertex shader driver");
    _PSUPP_BUF(buf, SUPPORTS_HLSL,            "HLSL",            "Fragment/vertex shader driver");
    _PSUPP_BUF(buf, SUPPORTS_SDL_IMAGE,       "SDL_image",       "SDL_image image loading");
    _PSUPP_BUF(buf, SUPPORTS_RPNG,            "rpng",            "PNG image loading/encoding");
-   _PSUPP_BUF(buf, SUPPORTS_RJPEG,            "rjpeg",           "JPEG image loading");
-   _PSUPP_BUF(buf, SUPPORTS_DYNAMIC,         "Dynamic",         "Dynamic run-time loading of "
-                                              "libretro library");
-   _PSUPP_BUF(buf, SUPPORTS_FFMPEG,          "FFmpeg",          "On-the-fly recording of gameplay "
-                                              "with libavcodec");
+   _PSUPP_BUF(buf, SUPPORTS_RJPEG,           "rjpeg",           "JPEG image loading");
+   _PSUPP_BUF(buf, SUPPORTS_DYNAMIC,         "Dynamic",         "Dynamic run-time loading of libretro library");
+   _PSUPP_BUF(buf, SUPPORTS_FFMPEG,          "FFmpeg",          "On-the-fly recording of gameplay with libavcodec");
    _PSUPP_BUF(buf, SUPPORTS_FREETYPE,        "FreeType",        "TTF font rendering driver");
-   _PSUPP_BUF(buf, SUPPORTS_CORETEXT,        "CoreText",        "TTF font rendering driver ");
+   _PSUPP_BUF(buf, SUPPORTS_CORETEXT,        "CoreText",        "TTF font rendering driver");
    _PSUPP_BUF(buf, SUPPORTS_NETPLAY,         "Netplay",         "Peer-to-peer netplay");
    _PSUPP_BUF(buf, SUPPORTS_LIBUSB,          "Libusb",          "Libusb support");
-   _PSUPP_BUF(buf, SUPPORTS_COCOA,           "Cocoa",           "Cocoa UI companion support "
-                                              "(for OSX and/or iOS)");
+   _PSUPP_BUF(buf, SUPPORTS_COCOA,           "Cocoa",           "Cocoa UI companion support (for OSX and/or iOS)");
    _PSUPP_BUF(buf, SUPPORTS_QT,              "Qt",              "Qt UI companion support");
    _PSUPP_BUF(buf, SUPPORTS_V4L2,            "Video4Linux2",    "Camera driver");
 
-   puts(buf);
+   fputs(buf, stdout);
 }
 
 static void retroarch_print_version(void)
 {
    char str[255];
-   frontend_driver_attach_console();
    str[0] = '\0';
+
+   frontend_driver_attach_console();
 
    fprintf(stdout, "%s: %s -- v%s",
          msg_hash_to_str(MSG_PROGRAM),
@@ -4188,7 +4196,7 @@ static void retroarch_print_help(const char *arg0)
          "Verbose logging.\n"
          "      --log-file=FILE            "
          "Log messages to FILE.\n"
-         "      --version                  "
+         "  -V, --version                  "
          "Show version.\n"
          "      --features                 "
          "Print available features compiled into program.\n"
@@ -4400,7 +4408,6 @@ static void retroarch_print_help(const char *arg0)
          sizeof(buf));
 
    fputs(buf, stdout);
-   fputs("\n", stdout);
 }
 
 #ifdef HAVE_DYNAMIC
@@ -4620,7 +4627,7 @@ static bool retroarch_parse_input_and_config(
       { "max-frames-ss",      0, NULL, RA_OPT_MAX_FRAMES_SCREENSHOT },
       { "max-frames-ss-path", 1, NULL, RA_OPT_MAX_FRAMES_SCREENSHOT_PATH },
       { "eof-exit",           0, NULL, RA_OPT_EOF_EXIT },
-      { "version",            0, NULL, RA_OPT_VERSION },
+      { "version",            0, NULL, 'V' /* RA_OPT_VERSION */ },
       { "log-file",           1, NULL, RA_OPT_LOG_FILE },
       { "accessibility",      0, NULL, RA_OPT_ACCESSIBILITY},
       { "load-menu-on-error", 0, NULL, RA_OPT_LOAD_MENU_ON_ERROR },
@@ -4694,7 +4701,7 @@ static bool retroarch_parse_input_and_config(
 
    /* Make sure we can call retroarch_parse_input several times ... */
    optind                          = 0;
-   optstring                       = "hs:fvS:A:U:DN:d:e:"
+   optstring                       = "hs:fvVS:A:U:DN:d:e:"
       BSV_MOVIE_ARG NETPLAY_ARG DYNAMIC_ARG FFMPEG_RECORD_ARG CONFIG_FILE_ARG;
 
 #if defined(WEBOS)
@@ -4726,10 +4733,29 @@ static bool retroarch_parse_input_and_config(
          if (c == -1)
             break;
 
+         /* Graceful failure with empty "-" parameter instead of allowing
+          * to continue to segmentation fault by trying to load content */
+         if (c == 0)
+         {
+            verbosity_enable();
+            fprintf(stderr, "%s\n", msg_hash_to_str(MSG_ERROR_PARSING_ARGUMENTS));
+            fprintf(stderr, "Try '%s --help' for more information\n", argv[0]);
+            exit(EXIT_FAILURE);
+         }
+
          switch (c)
          {
             case 'h':
                retroarch_print_help(argv[0]);
+               exit(0);
+
+            case 'V':
+            case RA_OPT_VERSION:
+               retroarch_print_version();
+               exit(0);
+
+            case RA_OPT_FEATURES:
+               retroarch_print_features();
                exit(0);
 
 #ifdef HAVE_CONFIGFILE
@@ -4754,6 +4780,7 @@ static bool retroarch_parse_input_and_config(
                retroarch_override_setting_set(
                      RARCH_OVERRIDE_SETTING_STATE_PATH, NULL);
                break;
+
             case 'v':
                verbosity_enable();
                retroarch_override_setting_set(
@@ -5109,10 +5136,6 @@ static bool retroarch_parse_input_and_config(
                path_set(RARCH_PATH_SUBSYSTEM, optarg);
                break;
 
-            case RA_OPT_FEATURES:
-               retroarch_print_features();
-               exit(0);
-
             case RA_OPT_EOF_EXIT:
 #ifdef HAVE_BSV_MOVIE
                {
@@ -5122,11 +5145,10 @@ static bool retroarch_parse_input_and_config(
 #endif
                break;
 
-            case RA_OPT_VERSION:
-               retroarch_print_version();
-               exit(0);
-
             case 'h':
+            case 'V':
+            case RA_OPT_VERSION:
+            case RA_OPT_FEATURES:
 #ifdef HAVE_CONFIGFILE
             case 'c':
             case RA_OPT_APPENDCONFIG:
@@ -5287,7 +5309,7 @@ bool retroarch_main_init(int argc, char *argv[])
    video_driver_state_t*video_st = video_state_get_ptr();
    settings_t *settings          = config_get_ptr();
    recording_state_t
-	   *recording_st              = recording_state_get_ptr();
+      *recording_st              = recording_state_get_ptr();
    global_t            *global   = global_get_ptr();
 #ifdef HAVE_ACCESSIBILITY
    access_state_t *access_st     = access_state_get_ptr();
@@ -5444,9 +5466,8 @@ bool retroarch_main_init(int argc, char *argv[])
    if (!video_driver_find_driver(settings,
          "video driver", verbosity_enabled))
       retroarch_fail(1, "video_driver_find_driver()");
-   if (!input_driver_find_driver(
-            settings,
-            "input driver", verbosity_enabled))
+   if (!input_driver_find_driver(settings,
+         "input driver", verbosity_enabled))
       retroarch_fail(1, "input_driver_find_driver()");
 
    if (!camera_driver_find_driver("camera driver", verbosity_enabled))
@@ -5573,8 +5594,6 @@ bool retroarch_main_init(int argc, char *argv[])
    if (!string_is_empty(recording_st->path))
       command_event(CMD_EVENT_RECORD_INIT, NULL);
 
-   runloop_path_init_savefile();
-
    command_event(CMD_EVENT_SET_PER_GAME_RESOLUTION, NULL);
 
    global->error_on_init            = false;
@@ -5584,8 +5603,8 @@ bool retroarch_main_init(int argc, char *argv[])
    {
       discord_state_t *discord_st = discord_state_get_ptr();
 
-	   if (command_event(CMD_EVENT_DISCORD_INIT, NULL))
-		   discord_st->inited = true;
+      if (command_event(CMD_EVENT_DISCORD_INIT, NULL))
+         discord_st->inited = true;
    }
 #endif
 
@@ -5847,12 +5866,8 @@ bool retroarch_ctl(enum rarch_ctl_state state, void *data)
                                            |   RUNLOOP_FLAG_IDLE
                                            |   RUNLOOP_FLAG_PAUSED
                                               );
-            runloop_frame_time_free();
-            runloop_audio_buffer_status_free();
-            input_game_focus_free();
-            runloop_fastmotion_override_free();
-            runloop_core_options_cb_free();
-            runloop_st->video_swap_interval_auto = 1;
+            runloop_state_free(runloop_st);
+
             memset(&input_st->analog_requested, 0,
                   sizeof(input_st->analog_requested));
          }
@@ -5986,169 +6001,169 @@ int retroarch_get_capabilities(enum rarch_capabilities type,
 
             if (cpu & RETRO_SIMD_MMX)
             {
-               s[_len++] = ' ';
                s[_len++] = 'M';
                s[_len++] = 'M';
                s[_len++] = 'X';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_MMXEXT)
             {
-               s[_len++] = ' ';
                s[_len++] = 'M';
                s[_len++] = 'M';
                s[_len++] = 'X';
                s[_len++] = 'E';
                s[_len++] = 'X';
                s[_len++] = 'T';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_SSE)
             {
-               s[_len++] = ' ';
                s[_len++] = 'S';
                s[_len++] = 'S';
                s[_len++] = 'E';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_SSE2)
             {
-               s[_len++] = ' ';
                s[_len++] = 'S';
                s[_len++] = 'S';
                s[_len++] = 'E';
                s[_len++] = '2';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_SSE3)
             {
-               s[_len++] = ' ';
                s[_len++] = 'S';
                s[_len++] = 'S';
                s[_len++] = 'E';
                s[_len++] = '3';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_SSE4)
             {
-               s[_len++] = ' ';
                s[_len++] = 'S';
                s[_len++] = 'S';
                s[_len++] = 'E';
                s[_len++] = '4';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_SSE42)
             {
-               s[_len++] = ' ';
                s[_len++] = 'S';
                s[_len++] = 'S';
                s[_len++] = 'E';
                s[_len++] = '4';
                s[_len++] = '.';
                s[_len++] = '2';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_AES)
             {
-               s[_len++] = ' ';
                s[_len++] = 'A';
                s[_len++] = 'E';
                s[_len++] = 'S';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_AVX)
             {
-               s[_len++] = ' ';
                s[_len++] = 'A';
                s[_len++] = 'V';
                s[_len++] = 'X';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_AVX2)
             {
-               s[_len++] = ' ';
                s[_len++] = 'A';
                s[_len++] = 'V';
                s[_len++] = 'X';
                s[_len++] = '2';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_NEON)
             {
-               s[_len++] = ' ';
                s[_len++] = 'N';
                s[_len++] = 'E';
                s[_len++] = 'O';
                s[_len++] = 'N';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_VFPV3)
             {
-               s[_len++] = ' ';
                s[_len++] = 'V';
                s[_len++] = 'F';
                s[_len++] = 'P';
                s[_len++] = 'v';
                s[_len++] = '3';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_VFPV4)
             {
-               s[_len++] = ' ';
                s[_len++] = 'V';
                s[_len++] = 'F';
                s[_len++] = 'P';
                s[_len++] = 'v';
                s[_len++] = '4';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_VMX)
             {
-               s[_len++] = ' ';
                s[_len++] = 'V';
                s[_len++] = 'M';
                s[_len++] = 'X';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_VMX128)
             {
-               s[_len++] = ' ';
                s[_len++] = 'V';
                s[_len++] = 'M';
                s[_len++] = 'X';
                s[_len++] = '1';
                s[_len++] = '2';
                s[_len++] = '8';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_VFPU)
             {
-               s[_len++] = ' ';
                s[_len++] = 'V';
                s[_len++] = 'F';
                s[_len++] = 'P';
                s[_len++] = 'U';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_PS)
             {
-               s[_len++] = ' ';
                s[_len++] = 'P';
                s[_len++] = 'S';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
             if (cpu & RETRO_SIMD_ASIMD)
             {
-               s[_len++] = ' ';
                s[_len++] = 'A';
                s[_len++] = 'S';
                s[_len++] = 'I';
                s[_len++] = 'M';
                s[_len++] = 'D';
+               s[_len++] = ' ';
                s[_len+1] = '\0';
             }
-            s[_len++] = '\0';
+            s[_len-1] = '\0';
          }
          break;
       case RARCH_CAPABILITIES_COMPILER:
