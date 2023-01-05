@@ -379,6 +379,7 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
    entry_label                = list->list[i].label;
    entry->type                = list->list[i].type;
    entry->entry_idx           = list->list[i].entry_idx;
+   entry->setting_type        = 0;
 
    cbs                        = (menu_file_list_cbs_t*)list->list[i].actiondata;
    entry->idx                 = (unsigned)i;
@@ -393,6 +394,10 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
       file_list_t *menu_stack       = MENU_LIST_GET(menu_st->entries.list, 0);
 
       entry->enum_idx               = cbs->enum_idx;
+
+      if (cbs->setting && cbs->setting->type)
+         entry->setting_type        = cbs->setting->type;
+
       if (cbs->checked)
          entry->flags |= MENU_ENTRY_FLAG_CHECKED;
 
@@ -460,6 +465,21 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
                      sizeof(cbs->action_sublabel_cache));
          }
       }
+   }
+
+   /* Inspect core options and set entries with only 2 options as
+    * boolean for accurate graphical switch icons */
+   if (     entry->type >= MENU_SETTINGS_CORE_OPTION_START
+         && entry->type < MENU_SETTINGS_CHEEVOS_START)
+   {
+      struct core_option *option      = NULL;
+      core_option_manager_t *coreopts = NULL;
+      size_t option_index             = entry->type - MENU_SETTINGS_CORE_OPTION_START;
+      retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts);
+      option = (struct core_option*)&coreopts->opts[option_index];
+
+      if (option->vals->size == 2)
+         entry->setting_type = ST_BOOL;
    }
 
    if (path_enabled)
@@ -3007,7 +3027,7 @@ bool menu_shader_manager_auto_preset_exists(
  *    SHADER_PRESET_CORE:   <target dir>/<core name>/<core name>
  *    SHADER_PRESET_PARENT: <target dir>/<core name>/<parent>
  *    SHADER_PRESET_GAME:   <target dir>/<core name>/<game name>
- * Needs to be consistent with load_shader_preset()
+ * Needs to be consistent with video_shader_load_auto_shader_preset()
  * Auto-shaders will be saved as a reference if possible
  **/
 bool menu_shader_manager_save_auto_preset(
@@ -3083,6 +3103,8 @@ bool menu_driver_search_filter_enabled(const char *label, unsigned type)
                        string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_FAVORITES)) ||
                        /* > Shader presets/passes */
                        string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET)) ||
+                       string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PREPEND)) ||
+                       string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND)) ||
                        string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PASS)) ||
                        /* > Cheat files */
                        string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_CHEAT_FILE_LOAD)) ||
@@ -3830,9 +3852,7 @@ bool menu_shader_manager_save_preset_internal(
    if (path_is_absolute(fullname))
    {
       preset_path = fullname;
-      if ((ret    = video_shader_write_preset(preset_path,
-            dir_video_shader,
-            shader, save_reference)))
+      if ((ret    = video_shader_write_preset(preset_path, shader, save_reference)))
          RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
       else
          RARCH_ERR("[Shaders]: Failed writing shader preset to \"%s\".\n", preset_path);
@@ -3864,7 +3884,6 @@ bool menu_shader_manager_save_preset_internal(
          preset_path = buffer;
 
          if ((ret = video_shader_write_preset(preset_path,
-               dir_video_shader,
                shader, save_reference)))
          {
             RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
@@ -5390,10 +5409,10 @@ bool menu_input_key_bind_iterate(
    /* Tick main timers */
    _binds->timer_timeout.current    = current_time;
    _binds->timer_timeout.timeout_us = _binds->timer_timeout.timeout_end -
-current_time;
+         current_time;
    _binds->timer_hold   .current    = current_time;
    _binds->timer_hold   .timeout_us = _binds->timer_hold   .timeout_end -
-current_time;
+         current_time;
 
    if (_binds->timer_timeout.timeout_us <= 0)
    {
@@ -5429,7 +5448,7 @@ current_time;
       {
          input_st->keyboard_press_cb        = NULL;
          input_st->keyboard_press_data      = NULL;
-	 input_st->flags                   &= ~INP_FLAG_KB_MAPPING_BLOCKED;
+         input_st->flags                   &= ~INP_FLAG_KB_MAPPING_BLOCKED;
       }
 
       return true;
@@ -5470,7 +5489,7 @@ current_time;
             new_binds.timer_hold.timeout_end - current_time;
 
          snprintf(bind->s, bind->len,
-               "[%s]\npress keyboard, mouse or joypad\nand hold ...",
+               "[%s]\nPress keyboard, mouse or joypad\nand hold ...",
                input_config_bind_map_get_desc(
                   _binds->begin - MENU_SETTINGS_BIND_BEGIN));
 
@@ -5501,7 +5520,7 @@ current_time;
          uint64_t current_usec             = cpu_features_get_time_usec();
          *(new_binds.output)               = new_binds.buffer;
 
-	 input_st->flags                  &= ~INP_FLAG_KB_MAPPING_BLOCKED;
+         input_st->flags                  &= ~INP_FLAG_KB_MAPPING_BLOCKED;
 
          /* Avoid new binds triggering things right away. */
          /* Inhibits input for 2 frames
@@ -5515,7 +5534,7 @@ current_time;
          {
             input_st->keyboard_press_cb        = NULL;
             input_st->keyboard_press_data      = NULL;
-	    input_st->flags                   &= ~INP_FLAG_KB_MAPPING_BLOCKED;
+            input_st->flags                   &= ~INP_FLAG_KB_MAPPING_BLOCKED;
             return true;
          }
 
@@ -6969,6 +6988,10 @@ void retroarch_menu_running_finished(bool quit)
       if (settings && settings->bools.input_overlay_hide_in_menu)
          input_overlay_init();
 #endif
+
+   /* Ignore frame delay target temporarily */
+   if (settings->bools.video_frame_delay_auto)
+      video_st->frame_delay_pause = true;
 }
 
 bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
@@ -7273,7 +7296,7 @@ bool menu_shader_manager_init(void)
    /* We get the shader preset directly from the video driver, so that
     * we are in sync with it (it could fail loading an auto-shader)
     * If we can't (e.g. get_current_shader is not implemented),
-    * we'll load retroarch_get_shader_preset() like always */
+    * we'll load video_shader_get_current_shader_preset() like always */
    video_shader_ctx_t shader_info = {0};
 
    video_shader_driver_get_current_shader(&shader_info);
@@ -7283,7 +7306,7 @@ bool menu_shader_manager_init(void)
        * have been a preset with a #reference in it to another preset */
       path_shader = shader_info.data->loaded_preset_path;
    else
-      path_shader = retroarch_get_shader_preset();
+      path_shader = video_shader_get_current_shader_preset();
 
    menu_shader_manager_free();
 
@@ -7332,21 +7355,23 @@ end:
 
 /**
  * menu_shader_manager_set_preset:
- * @shader                   : Shader handle.
+ * @menu_shader              : Shader handle to the menu shader.
  * @type                     : Type of shader.
  * @preset_path              : Preset path to load from.
  * @apply                    : Whether to apply the shader or just update shader information
  *
  * Sets shader preset.
  **/
-bool menu_shader_manager_set_preset(struct video_shader *shader,
-      enum rarch_shader_type type, const char *preset_path, bool apply)
+bool menu_shader_manager_set_preset(struct video_shader *menu_shader,
+                                    enum rarch_shader_type type, 
+                                    const char *preset_path, 
+                                    bool apply)
 {
    bool refresh                  = false;
    bool ret                      = false;
    settings_t *settings          = config_get_ptr();
 
-   if (apply && !apply_shader(settings, type, preset_path, true))
+   if (apply && !video_shader_apply_shader(settings, type, preset_path, true))
       goto clear;
 
    if (string_is_empty(preset_path))
@@ -7359,8 +7384,8 @@ bool menu_shader_manager_set_preset(struct video_shader *shader,
     * Used when a preset is directly loaded.
     * No point in updating when the Preset was
     * created from the menu itself. */
-   if (  !shader ||
-         !(video_shader_load_preset_into_shader(preset_path, shader)))
+   if (  !menu_shader ||
+         !(video_shader_load_preset_into_shader(preset_path, menu_shader)))
       goto end;
 
    RARCH_LOG("[Shaders]: Menu shader set to: \"%s\".\n", preset_path);
@@ -7380,11 +7405,66 @@ clear:
     *   entries in the shader options menu which can in
     *   turn lead to the menu selection pointer going out
     *   of bounds. This causes undefined behaviour/segfaults */
+   menu_shader_manager_clear_num_passes(menu_shader);
+   command_event(CMD_EVENT_SHADER_PRESET_LOADED, NULL);
+   return ret;
+}
+
+/**
+ * menu_shader_manager_append_preset:
+ * @shader                   : current shader
+ * @preset_path              : path to the preset to append
+ * @dir_video_shader         : temporary diretory
+ *
+ * combine current shader with a shader preset on disk
+ **/
+bool menu_shader_manager_append_preset(struct video_shader *shader, 
+                                       const char* preset_path,
+                                       const bool prepend)
+{
+   bool refresh = false;
+   bool ret = false;
+   settings_t* settings = config_get_ptr();
+   const char *dir_video_shader  = settings->paths.directory_video_shader;
+   enum rarch_shader_type type = menu_shader_manager_get_type(shader);
+
+   if (string_is_empty(preset_path))
+   {
+      ret = true;
+      goto clear;
+   }
+
+    if (!video_shader_combine_preset_and_apply(settings,
+                                 type,
+                                 shader,
+                                 preset_path,
+                                 dir_video_shader,
+                                 prepend,
+                                 true))
+      goto clear;
+
+   RARCH_LOG("[Shaders]: Menu shader set to: \"%s\".\n", preset_path);
+
+   ret = true;
+
+   menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+   command_event(CMD_EVENT_SHADER_PRESET_LOADED, NULL);
+   return ret;
+
+clear:
+   /* We don't want to disable shaders entirely here,
+    * just reset number of passes
+    * > Note: Disabling shaders at this point would in
+    *   fact be dangerous, since it changes the number of
+    *   entries in the shader options menu which can in
+    *   turn lead to the menu selection pointer going out
+    *   of bounds. This causes undefined behaviour/segfaults */
    menu_shader_manager_clear_num_passes(shader);
    command_event(CMD_EVENT_SHADER_PRESET_LOADED, NULL);
    return ret;
 }
 #endif
+
 
 /**
  * menu_iterate:
@@ -7554,6 +7634,18 @@ static int generic_menu_iterate(
                   default:
                      ret = msg_hash_get_help_enum(cbs->enum_idx,
                            menu->menu_state_msg, sizeof(menu->menu_state_msg));
+
+                     if (string_is_equal(menu->menu_state_msg,
+                              msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE)))
+                     {
+                        get_current_menu_sublabel(
+                              menu_st,
+                              menu->menu_state_msg, sizeof(menu->menu_state_msg));
+                        if (string_is_equal(menu->menu_state_msg, ""))
+                           strlcpy(menu->menu_state_msg,
+                                 msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE),
+                                 sizeof(menu->menu_state_msg));
+                     }
                      break;
                }
 
@@ -7659,11 +7751,34 @@ static int generic_menu_iterate(
                         menu->menu_state_msg, sizeof(menu->menu_state_msg));
                else
                {
-                  strlcpy(menu->menu_state_msg,
-                        msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE),
-                        sizeof(menu->menu_state_msg));
+                  /* Special handling for input and remap items */
+                  if (     (  type >= MENU_SETTINGS_REMAPPING_PORT_BEGIN
+                           && type <= MENU_SETTINGS_REMAPPING_PORT_END)
+                        || type == MENU_SETTINGS_INPUT_LIBRETRO_DEVICE
+                        || type == MENU_SETTINGS_INPUT_INPUT_REMAP_PORT)
+                  {
+                     get_current_menu_sublabel(
+                           menu_st,
+                           menu->menu_state_msg, sizeof(menu->menu_state_msg));
 
-                  ret = 0;
+                     ret = 0;
+                  }
+                  /* Use detailed help text for 'Analog to Digital', which
+                   * is the first item in global input settings */
+                  else if (type == MENU_SETTINGS_INPUT_ANALOG_DPAD_MODE
+                        || type == MENU_SETTINGS_INPUT_BEGIN)
+                  {
+                     ret = msg_hash_get_help_enum(MENU_ENUM_LABEL_VALUE_INPUT_ADC_TYPE,
+                           menu->menu_state_msg, sizeof(menu->menu_state_msg));
+                  }
+                  else
+                  {
+                     strlcpy(menu->menu_state_msg,
+                           msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE),
+                           sizeof(menu->menu_state_msg));
+
+                     ret = 0;
+                  }
                }
             }
          }
@@ -8121,8 +8236,8 @@ int generic_menu_entry_action(
             flush_target = msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_RPL_ENTRY_ACTIONS);
             break;
          }
-         /* If core was launched via standalone cores menu,
-          * flush to standalone cores menu */
+         /* If core was launched via 'Contentless Cores' menu,
+          * flush to 'Contentless Cores' menu */
          else if (string_is_equal(parent_label,
                         msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB)) ||
                   string_is_equal(parent_label,

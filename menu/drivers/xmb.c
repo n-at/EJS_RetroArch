@@ -55,6 +55,7 @@
 
 #include "../../file_path_special.h"
 #include "../../configuration.h"
+#include "../../audio/audio_driver.h"
 
 #include "../../tasks/tasks_internal.h"
 
@@ -411,6 +412,7 @@ typedef struct xmb_handle
    char prev_savestate_thumbnail_file_path[8204];
    char fullscreen_thumbnail_label[255];
 
+   bool allow_horizontal_animation;
    bool fullscreen_thumbnails_available;
    bool show_fullscreen_thumbnails;
    bool want_fullscreen_thumbnails;
@@ -2535,6 +2537,7 @@ static void xmb_context_reset_horizontal_list(
       else if (string_ends_with_size(xmb->horizontal_list.list[i].label, ".lvw",
               strlen(xmb->horizontal_list.list[i].label), STRLEN_CONST(".lvw")))
       {
+         node->console_name = strdup(path + strlen(msg_hash_to_str(MENU_ENUM_LABEL_EXPLORE_VIEW)) + 2);
          node->icon = xmb->textures.list[XMB_TEXTURE_CURSOR];
       }
    }
@@ -2902,6 +2905,8 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_AUTO_OVERRIDES_ENABLE:
       case MENU_ENUM_LABEL_AUTO_REMAPS_ENABLE:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
+      case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PREPEND:
+      case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND:
       case MENU_ENUM_LABEL_CHEAT_FILE_LOAD:
       case MENU_ENUM_LABEL_CHEAT_FILE_LOAD_APPEND:
       case MENU_ENUM_LABEL_CORE_RESTORE_BACKUP_LIST:
@@ -2916,6 +2921,8 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_RESTART_CONTENT:
       case MENU_ENUM_LABEL_REBOOT:
       case MENU_ENUM_LABEL_RESET_TO_DEFAULT_CONFIG:
+      case MENU_ENUM_LABEL_CHEAT_COPY_AFTER:
+      case MENU_ENUM_LABEL_CHEAT_COPY_BEFORE:
       case MENU_ENUM_LABEL_CHEAT_RELOAD_CHEATS:
       case MENU_ENUM_LABEL_RESTART_RETROARCH:
       case MENU_ENUM_LABEL_FRAME_TIME_COUNTER_SETTINGS:
@@ -3124,6 +3131,7 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
          return xmb->textures.list[XMB_TEXTURE_STREAM];
       case MENU_ENUM_LABEL_QUICK_MENU_STOP_STREAMING:
       case MENU_ENUM_LABEL_QUICK_MENU_STOP_RECORDING:
+      case MENU_ENUM_LABEL_CHEAT_DELETE:
       case MENU_ENUM_LABEL_CHEAT_DELETE_ALL:
       case MENU_ENUM_LABEL_CORE_DELETE:
       case MENU_ENUM_LABEL_DELETE_PLAYLIST:
@@ -3188,6 +3196,7 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_SAVE_GAME_OVERRIDES:
          return xmb->textures.list[XMB_TEXTURE_OVERRIDE];
       case MENU_ENUM_LABEL_ONSCREEN_NOTIFICATIONS_SETTINGS:
+      case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_SETTINGS:
          return xmb->textures.list[XMB_TEXTURE_NOTIFICATIONS];
 #ifdef HAVE_NETWORKING
       case MENU_ENUM_LABEL_NETPLAY_ENABLE_HOST:
@@ -3601,6 +3610,7 @@ static int xmb_draw_item(
       settings->uints.menu_xmb_thumbnail_scale_factor;
    bool menu_xmb_vertical_thumbnails   = settings->bools.menu_xmb_vertical_thumbnails;
    bool menu_show_sublabels            = settings->bools.menu_show_sublabels;
+   bool menu_switch_icons              = settings->bools.menu_xmb_switch_icons;
    unsigned show_history_icons         = settings->uints.playlist_show_history_icons;
    unsigned menu_xmb_vertical_fade_factor
                                        = settings->uints.menu_xmb_vertical_fade_factor;
@@ -3663,19 +3673,25 @@ static int xmb_draw_item(
          strlcpy(entry.path, entry_path, sizeof(entry.path));
    }
 
-   if (     string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_DISABLED))
-         || string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF)))
+   /* Only show switch icons with bool type options */
+   if (menu_switch_icons && entry.setting_type == ST_BOOL)
    {
-      if (xmb->textures.list[XMB_TEXTURE_SWITCH_OFF])
-         texture_switch = xmb->textures.list[XMB_TEXTURE_SWITCH_OFF];
-      else
-         do_draw_text   = true;
-   }
-   else if (string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_ENABLED))
-         || string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON)))
-   {
-      if (xmb->textures.list[XMB_TEXTURE_SWITCH_ON])
-         texture_switch = xmb->textures.list[XMB_TEXTURE_SWITCH_ON];
+      if (     string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_DISABLED))
+            || string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF)))
+      {
+         if (xmb->textures.list[XMB_TEXTURE_SWITCH_OFF])
+            texture_switch = xmb->textures.list[XMB_TEXTURE_SWITCH_OFF];
+         else
+            do_draw_text   = true;
+      }
+      else if (string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_ENABLED))
+            || string_is_equal(entry.value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON)))
+      {
+         if (xmb->textures.list[XMB_TEXTURE_SWITCH_ON])
+            texture_switch = xmb->textures.list[XMB_TEXTURE_SWITCH_ON];
+         else
+            do_draw_text   = true;
+      }
       else
          do_draw_text   = true;
    }
@@ -4032,9 +4048,20 @@ static int xmb_draw_item(
             texture = xmb->textures.list[XMB_TEXTURE_FAVORITES];
          else if (i < xmb->horizontal_list.size)
          {
-            xmb_node_t *sidebar_node = (xmb_node_t*)
-                  file_list_get_userdata_at_offset(&xmb->horizontal_list, i + 1);
+            xmb_node_t *sidebar_node = NULL;
+            unsigned offset          = 0;
 
+            /* Ignore Explore Views */
+            for (offset = 0; offset < xmb->horizontal_list.size; offset++)
+            {
+               char playlist_file_noext[255];
+               strlcpy(playlist_file_noext, xmb->horizontal_list.list[offset].path, sizeof(playlist_file_noext));
+               path_remove_extension(playlist_file_noext);
+               if (string_is_equal(playlist_file_noext, entry.rich_label))
+                  break;
+            }
+
+            sidebar_node = (xmb_node_t*)file_list_get_userdata_at_offset(&xmb->horizontal_list, offset);
             if (sidebar_node && sidebar_node->icon)
                texture = sidebar_node->icon;
          }
@@ -4463,6 +4490,11 @@ static enum menu_action xmb_parse_menu_entry_action(
             menu_driver_ctl(MENU_NAVIGATION_CTL_GET_SCROLL_ACCEL,
                   &scroll_accel);
 
+#ifdef HAVE_AUDIOMIXER
+               if ((current_time - xmb->last_tab_switch_time) >= XMB_TAB_SWITCH_REPEAT_DELAY || 
+                     scroll_accel <= 0)
+                  audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_RIGHT);
+#endif
             if (scroll_accel > 0)
             {
                /* Ignore input action if tab switch period
@@ -4559,6 +4591,20 @@ static enum menu_action xmb_parse_menu_entry_action(
       case MENU_ACTION_DOWN:
       case MENU_ACTION_SCROLL_UP:
       case MENU_ACTION_SCROLL_DOWN:
+#ifdef HAVE_AUDIOMIXER
+         if (action == MENU_ACTION_UP || action == MENU_ACTION_DOWN)
+         {
+            if (menu_entries_get_size() != 1)
+               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_UP);
+         }
+         else 
+         {
+            size_t selection = menu_navigation_get_selection();
+            if ((action == MENU_ACTION_SCROLL_UP && selection != 0) ||
+                  (action == MENU_ACTION_SCROLL_DOWN && selection != menu_entries_get_size() - 1))
+               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_SCROLL_UP);
+         }
+#endif
          if (xmb->show_fullscreen_thumbnails && xmb->is_quick_menu)
             return MENU_ACTION_NOOP;
          break;
@@ -7176,12 +7222,18 @@ static void xmb_context_reset_internal(xmb_handle_t *xmb,
          xmb->assets_missing  = true;
       xmb_context_reset_background(xmb, iconpath);
 
+      /* Reset previous selection buffer */
       xmb_free_list_nodes(&xmb->selection_buf_old, false);
       file_list_deinitialize(&xmb->selection_buf_old);
       xmb->selection_buf_old.list        = NULL;
       xmb->selection_buf_old.capacity    = 0;
       xmb->selection_buf_old.size        = 0;
+
+      /* Prevent horizontal animation on next menu toggle */
+      xmb->allow_horizontal_animation    = false;
    }
+   else
+      xmb->allow_horizontal_animation    = true;
 
    xmb_context_reset_horizontal_list(xmb);
 
@@ -7366,7 +7418,8 @@ static void xmb_list_cache(void *data, enum menu_list_type type, unsigned action
       return;
 
    /* Check whether to enable the horizontal animation. */
-   if (menu_horizontal_animation)
+   if (     menu_horizontal_animation
+         && xmb->allow_horizontal_animation)
    {
       unsigned first  = 0, last = 0;
       unsigned height = 0;

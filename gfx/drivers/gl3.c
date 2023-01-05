@@ -991,7 +991,7 @@ static bool gl3_init_filter_chain_preset(gl3_t *gl, const char *shader_path)
 
 static bool gl3_init_filter_chain(gl3_t *gl)
 {
-   const char *shader_path     = retroarch_get_shader_preset();
+   const char *shader_path     = video_shader_get_current_shader_preset();
    enum rarch_shader_type type = video_shader_parse_type(shader_path);
 
    if (string_is_empty(shader_path))
@@ -1377,7 +1377,7 @@ static unsigned gl3_num_miplevels(unsigned width, unsigned height)
 static void video_texture_load_gl3(
       const struct texture_image *ti,
       enum texture_filter_type filter_type,
-      uintptr_t *idptr)
+      GLuint *idptr)
 {
    /* Generate the OpenGL texture object */
    GLuint id;
@@ -1439,7 +1439,7 @@ static bool gl3_overlay_load(void *data,
       const void *image_data, unsigned num_images)
 {
    unsigned i, j;
-   uintptr_t id;
+   GLuint id;
    gl3_t *gl = (gl3_t*)data;
    const struct texture_image *images =
       (const struct texture_image*)image_data;
@@ -1860,7 +1860,9 @@ static bool gl3_frame(void *data, const void *frame,
       &video_info->osd_stat_params;
    const char *stat_text                       = video_info->stat_text;
    bool statistics_show                        = video_info->statistics_show;
+#if 0
    bool msg_bgcolor_enable                     = video_info->msg_bgcolor_enable;
+#endif
    unsigned black_frame_insertion              = video_info->black_frame_insertion;
 
    unsigned hard_sync_frames                   = video_info->hard_sync_frames;
@@ -2092,7 +2094,7 @@ static struct video_shader *gl3_get_current_shader(void *data)
 #ifdef HAVE_THREADS
 static int video_texture_load_wrap_gl3_mipmap(void *data)
 {
-   uintptr_t id = 0;
+   GLuint id = 0;
 
    if (!data)
       return 0;
@@ -2103,7 +2105,7 @@ static int video_texture_load_wrap_gl3_mipmap(void *data)
 
 static int video_texture_load_wrap_gl3(void *data)
 {
-   uintptr_t id = 0;
+   GLuint id = 0;
 
    if (!data)
       return 0;
@@ -2116,7 +2118,7 @@ static int video_texture_load_wrap_gl3(void *data)
 static uintptr_t gl3_load_texture(void *video_data, void *data,
       bool threaded, enum texture_filter_type filter_type)
 {
-   uintptr_t id = 0;
+   GLuint id = 0;
 
 #ifdef HAVE_THREADS
    if (threaded)

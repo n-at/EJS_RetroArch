@@ -441,6 +441,18 @@ MSG_HASH(
    "cheevos_challenge_indicators"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_SETTINGS,
+   "cheevos_appearance_settings"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_ANCHOR,
+   "cheevos_appearance_anchor"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_PADDING_AUTO,
+   "cheevos_appearance_padding_auto"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_CLOSE_CONTENT,
    "unload_core"
    )
@@ -766,6 +778,12 @@ MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DEVICE_TYPE,
    "deferred_dropdown_box_list_input_device_type"
    )
+#ifdef ANDROID
+MSG_HASH(
+        MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_SELECT_PHYSICAL_KEYBOARD,
+    "deferred_dropdown_box_list_input_select_physical_keyboard"
+)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_INPUT_DESCRIPTION,
    "deferred_dropdown_box_list_input_description"
@@ -1115,6 +1133,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_RETRO_ACHIEVEMENTS_SETTINGS_LIST,
    "deferred_retro_achievements_settings_list"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_DEFERRED_CHEEVOS_APPEARANCE_SETTINGS_LIST,
+   "deferred_cheevos_appearance_settings_list"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_DEFERRED_REWIND_SETTINGS_LIST,
@@ -1544,6 +1566,12 @@ MSG_HASH(
    "input_nowinkey_enable"
    )
 #endif
+#ifdef ANDROID
+MSG_HASH(
+        MENU_ENUM_LABEL_INPUT_SELECT_PHYSICAL_KEYBOARD,
+        "input_android_physical_keyboard"
+)
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_INPUT_SENSORS_ENABLE,
    "input_sensors_enable"
@@ -1742,6 +1770,7 @@ MSG_HASH(
    MENU_ENUM_LABEL_INPUT_SMALL_KEYBOARD_ENABLE,
    "input_small_keyboard_enable"
    )
+
 MSG_HASH(
    MENU_ENUM_LABEL_INPUT_TOUCH_ENABLE,
    "input_touch_enable"
@@ -3773,6 +3802,14 @@ MSG_HASH(
    "video_shader_preset"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PREPEND,
+   "video_shader_preset_prepend"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND,
+   "video_shader_preset_append"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PARAMETERS,
    "video_shader_preset_parameters"
    )
@@ -4349,6 +4386,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_MATERIALUI_ICONS_ENABLE,
    "materialui_icons_enable"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_MATERIALUI_SWITCH_ICONS,
+   "materialui_switch_icons"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_MATERIALUI_PLAYLIST_ICONS_ENABLE,
@@ -5073,6 +5114,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_MENU_SOUND_BGM,
    "menu_sound_bgm"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_MENU_SOUND_SCROLL,
+   "menu_sound_scroll"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_CONTENT_RUNTIME_LOG,

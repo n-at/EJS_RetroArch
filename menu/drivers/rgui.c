@@ -51,6 +51,7 @@
 #include "../../input/input_osk.h"
 
 #include "../../configuration.h"
+#include "../../audio/audio_driver.h"
 #include "../../file_path_special.h"
 #include "../../gfx/drivers_font_renderer/bitmap.h"
 
@@ -4888,12 +4889,13 @@ static void rgui_render_toggle_switch(
 
 static enum rgui_entry_value_type rgui_get_entry_value_type(
       const char *entry_value,
+      uint8_t entry_setting_type,
       bool entry_checked,
       bool switch_icons_enabled)
 {
    if (!string_is_empty(entry_value))
    {
-      if (switch_icons_enabled)
+      if (switch_icons_enabled && entry_setting_type == ST_BOOL)
       {
          /* Toggle switch off */
          if (string_is_equal(entry_value, msg_hash_to_str(MENU_ENUM_LABEL_DISABLED)) ||
@@ -5500,6 +5502,7 @@ static void rgui_render(
          /* Get 'type' of entry value component */
          entry_value_type = rgui_get_entry_value_type(
                entry_value,
+               entry.setting_type,
                entry.flags & MENU_ENTRY_FLAG_CHECKED,
                rgui_switch_icons);
 
@@ -7987,6 +7990,20 @@ static enum menu_action rgui_parse_menu_entry_action(
          if (     (rgui->flags & RGUI_FLAG_SHOW_FULLSCREEN_THUMBNAIL)
                && (rgui->is_quick_menu))
             new_action = MENU_ACTION_NOOP;
+#ifdef HAVE_AUDIOMIXER
+         if (action == MENU_ACTION_UP || action == MENU_ACTION_DOWN)
+         {
+            if (menu_entries_get_size() != 1)
+               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_UP);
+         }
+         else 
+         {
+            size_t selection = menu_navigation_get_selection();
+            if ((action == MENU_ACTION_SCROLL_UP && selection != 0) ||
+                  (action == MENU_ACTION_SCROLL_DOWN && selection != menu_entries_get_size() - 1))
+               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_SCROLL_UP);
+         }
+#endif
          break;
       case MENU_ACTION_LEFT:
       case MENU_ACTION_RIGHT:

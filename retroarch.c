@@ -1226,7 +1226,7 @@ static void ram_state_to_file(void)
 
    state_path[0] = '\0';
 
-   if (retroarch_get_current_savestate_path(state_path, sizeof(state_path)))
+   if (runloop_get_current_savestate_path(state_path, sizeof(state_path)))
       command_event(CMD_EVENT_RAM_STATE_TO_FILE, state_path);
 }
 
@@ -1529,10 +1529,10 @@ bool command_event(enum event_command cmd, void *data)
       case CMD_EVENT_SHADER_NEXT:
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
 #ifdef HAVE_MENU
-         dir_check_shader(menu_st->driver_data, settings,
+         video_shader_dir_check_shader(menu_st->driver_data, settings,
                &video_st->dir_shader_list, true, false);
 #else
-         dir_check_shader(NULL, settings,
+         video_shader_dir_check_shader(NULL, settings,
                &video_st->dir_shader_list, true, false);
 #endif
 #endif
@@ -1540,10 +1540,10 @@ bool command_event(enum event_command cmd, void *data)
       case CMD_EVENT_SHADER_PREV:
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
 #ifdef HAVE_MENU
-         dir_check_shader(menu_st->driver_data, settings,
+         video_shader_dir_check_shader(menu_st->driver_data, settings,
                &video_st->dir_shader_list, false, true);
 #else
-         dir_check_shader(NULL, settings,
+         video_shader_dir_check_shader(NULL, settings,
                &video_st->dir_shader_list, false, true);
 #endif
 #endif
@@ -2005,6 +2005,11 @@ bool command_event(enum event_command cmd, void *data)
       case CMD_EVENT_REINIT:
          command_event_reinit(
                data ? *(const int*)data : DRIVERS_CMD_ALL);
+
+         /* Recalibrate frame delay target */
+         if (settings->bools.video_frame_delay_auto)
+            video_st->frame_delay_target = 0;
+
          break;
       case CMD_EVENT_CHEATS_APPLY:
 #ifdef HAVE_CHEATS

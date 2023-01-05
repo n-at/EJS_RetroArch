@@ -96,7 +96,7 @@ void retroarch_override_setting_unset(enum rarch_override_setting enum_idx, void
 
 bool retroarch_override_setting_is_set(enum rarch_override_setting enum_idx, void *data);
 
-const char* retroarch_get_shader_preset(void);
+const char* video_shader_get_current_shader_preset(void);
 
 /**
  * retroarch_main_init:
@@ -208,10 +208,6 @@ enum rarch_state_flags
    RARCH_FLAGS_IPS_PREF                     = (1 << 12),
    RARCH_FLAGS_BLOCK_CONFIG_READ            = (1 << 13)
 };
-
-bool retroarch_get_current_savestate_path(char *path, size_t len);
-
-bool retroarch_get_entry_state_path(char *path, size_t len, unsigned slot);
 
 /**
  * retroarch_fail:

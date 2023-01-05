@@ -228,11 +228,13 @@ DEFAULT_SUBLABEL_MACRO(menu_action_sublabel_setting_audio_mixer_stream_remove,
 DEFAULT_SUBLABEL_MACRO(menu_action_sublabel_setting_audio_mixer_stream_volume,
       MENU_ENUM_SUBLABEL_MIXER_ACTION_VOLUME)
 #endif
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_accessibility_enabled, MENU_ENUM_SUBLABEL_ACCESSIBILITY_ENABLED
-         )
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_accessibility_narrator_speech_speed, MENU_ENUM_SUBLABEL_ACCESSIBILITY_NARRATOR_SPEECH_SPEED
-         )
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_reset_to_default_config,             MENU_ENUM_SUBLABEL_RESET_TO_DEFAULT_CONFIG)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_accessibility_enabled, MENU_ENUM_SUBLABEL_ACCESSIBILITY_ENABLED)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_accessibility_narrator_speech_speed, MENU_ENUM_SUBLABEL_ACCESSIBILITY_NARRATOR_SPEECH_SPEED)
+
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_load_config,                      MENU_ENUM_SUBLABEL_CONFIGURATIONS)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_save_current_config,              MENU_ENUM_SUBLABEL_SAVE_CURRENT_CONFIG)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_save_new_config,                  MENU_ENUM_SUBLABEL_SAVE_NEW_CONFIG)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_reset_to_default_config,          MENU_ENUM_SUBLABEL_RESET_TO_DEFAULT_CONFIG)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_quick_menu_override_options,             MENU_ENUM_SUBLABEL_QUICK_MENU_OVERRIDE_OPTIONS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_quick_menu_start_streaming,             MENU_ENUM_SUBLABEL_QUICK_MENU_START_STREAMING)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_quick_menu_start_recording,             MENU_ENUM_SUBLABEL_QUICK_MENU_START_RECORDING)
@@ -304,6 +306,11 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_unlock_sound_enable,   MENU_
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_auto_screenshot,       MENU_ENUM_SUBLABEL_CHEEVOS_AUTO_SCREENSHOT)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_start_active,          MENU_ENUM_SUBLABEL_CHEEVOS_START_ACTIVE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_verbose_enable,        MENU_ENUM_SUBLABEL_CHEEVOS_VERBOSE_ENABLE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_appearance_settings,   MENU_ENUM_SUBLABEL_CHEEVOS_APPEARANCE_SETTINGS)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_appearance_anchor,     MENU_ENUM_SUBLABEL_CHEEVOS_APPEARANCE_ANCHOR)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_appearance_padding_auto, MENU_ENUM_SUBLABEL_CHEEVOS_APPEARANCE_PADDING_AUTO)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_appearance_padding_h,  MENU_ENUM_SUBLABEL_CHEEVOS_APPEARANCE_PADDING_H)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_appearance_padding_v,  MENU_ENUM_SUBLABEL_CHEEVOS_APPEARANCE_PADDING_V)
 #endif
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_views_settings_list,      MENU_ENUM_SUBLABEL_MENU_VIEWS_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_quick_menu_views_settings_list, MENU_ENUM_SUBLABEL_QUICK_MENU_VIEWS_SETTINGS)
@@ -437,9 +444,11 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_meta_overlay_next,          ME
 #endif
 
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_hotkey_block_delay,         MENU_ENUM_SUBLABEL_INPUT_HOTKEY_BLOCK_DELAY)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_device_type,                MENU_ENUM_SUBLABEL_INPUT_DEVICE_TYPE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_adc_type,                   MENU_ENUM_SUBLABEL_INPUT_ADC_TYPE)
 #ifdef HAVE_MATERIALUI
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_icons_enable,       MENU_ENUM_SUBLABEL_MATERIALUI_ICONS_ENABLE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_icons_enable,        MENU_ENUM_SUBLABEL_MATERIALUI_ICONS_ENABLE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_switch_icons,        MENU_ENUM_SUBLABEL_MATERIALUI_SWITCH_ICONS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_playlist_icons_enable, MENU_ENUM_SUBLABEL_MATERIALUI_PLAYLIST_ICONS_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_landscape_layout_optimization, MENU_ENUM_SUBLABEL_MATERIALUI_LANDSCAPE_LAYOUT_OPTIMIZATION)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_materialui_show_nav_bar,        MENU_ENUM_SUBLABEL_MATERIALUI_SHOW_NAV_BAR)
@@ -702,6 +711,9 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_autodetect_enable,       MENU_
 #if defined(HAVE_DINPUT) || defined(HAVE_WINRAWINPUT)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_nowinkey_enable,         MENU_ENUM_SUBLABEL_INPUT_NOWINKEY_ENABLE)
 #endif
+#ifdef ANDROID
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_select_physical_keyboard,   MENU_ENUM_SUBLABEL_INPUT_SELECT_PHYSICAL_KEYBOARD)
+#endif
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_sensors_enable,          MENU_ENUM_SUBLABEL_INPUT_SENSORS_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_auto_mouse_grab,         MENU_ENUM_SUBLABEL_INPUT_AUTO_MOUSE_GRAB)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_input_auto_game_focus,         MENU_ENUM_SUBLABEL_INPUT_AUTO_GAME_FOCUS)
@@ -904,6 +916,7 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_throttle_framerate,            
 #ifdef HAVE_XMB
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_xmb_layout,                            MENU_ENUM_SUBLABEL_XMB_LAYOUT)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_xmb_icon_theme,                        MENU_ENUM_SUBLABEL_XMB_THEME)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_xmb_switch_icons,                      MENU_ENUM_SUBLABEL_XMB_SWITCH_ICONS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_xmb_shadows_enable,                    MENU_ENUM_SUBLABEL_XMB_SHADOWS_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_xmb_vertical_thumbnails,               MENU_ENUM_SUBLABEL_XMB_VERTICAL_THUMBNAILS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_menu_xmb_thumbnail_scale_factor,       MENU_ENUM_SUBLABEL_MENU_XMB_THUMBNAIL_SCALE_FACTOR)
@@ -1055,6 +1068,8 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_watch_for_changes,           
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_shader_remember_last_dir,        MENU_ENUM_SUBLABEL_VIDEO_SHADER_REMEMBER_LAST_DIR)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_num_passes,                     MENU_ENUM_SUBLABEL_VIDEO_SHADER_NUM_PASSES)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset,                         MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset_prepend,                 MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_APPEND)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset_append,                  MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_APPEND)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset_save,                    MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_SAVE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset_remove,                  MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_REMOVE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_shader_preset_save_reference,          MENU_ENUM_SUBLABEL_VIDEO_SHADER_PRESET_SAVE_REFERENCE)
@@ -1232,7 +1247,7 @@ static int action_bind_sublabel_systeminfo_controller_entry(
       {
             snprintf(tmp, sizeof(tmp),
                val_port_dev_name,
-               controller,
+               controller + 1,
                input_config_get_device_name(controller),
                input_config_get_device_name_index(controller));
 
@@ -1241,8 +1256,7 @@ static int action_bind_sublabel_systeminfo_controller_entry(
       }
    }
 
-   /* TODO/FIXME - Localize */
-   snprintf(tmp, sizeof(tmp), "Device display name: %s\nDevice config name: %s\nDevice VID/PID: %d/%d",
+   snprintf(tmp, sizeof(tmp), msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PORT_DEVICE_INFO),
       input_config_get_device_display_name(controller) ? input_config_get_device_display_name(controller) : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
       input_config_get_device_display_name(controller) ? input_config_get_device_config_name(controller) : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
       input_config_get_device_vid(controller), input_config_get_device_pid(controller));
@@ -1329,9 +1343,8 @@ static int action_bind_sublabel_subsystem_add(
 
    if (subsystem && runloop_st->subsystem_current_count > 0)
    {
-      /* TODO/FIXME - Localize */
       if (content_get_subsystem_rom_id() < subsystem->num_roms)
-         snprintf(s, len, " Current Content: %s",
+         snprintf(s, len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SUBSYSTEM_CONTENT_INFO),
             content_get_subsystem() == type - MENU_SETTINGS_SUBSYSTEM_ADD
             ? subsystem->roms[content_get_subsystem_rom_id()].desc
             : subsystem->roms[0].desc);
@@ -1419,29 +1432,32 @@ static int action_bind_sublabel_audio_mixer_stream(
    {
       case AUDIO_STREAM_STATE_NONE:
          strlcpy(msg,
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_STREAM_STATE_NONE),
                sizeof(msg));
          break;
       case AUDIO_STREAM_STATE_STOPPED:
-         /* TODO/FIXME - Localize */
-         strlcpy(msg, "Stopped", sizeof(msg));
+         strlcpy(msg,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_STREAM_STATE_STOPPED),
+               sizeof(msg));
          break;
       case AUDIO_STREAM_STATE_PLAYING:
-         /* TODO/FIXME - Localize */
-         strlcpy(msg, "Playing", sizeof(msg));
+         strlcpy(msg,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_STREAM_STATE_PLAYING),
+               sizeof(msg));
          break;
       case AUDIO_STREAM_STATE_PLAYING_LOOPED:
-         /* TODO/FIXME - Localize */
-         strlcpy(msg, "Playing (Looped)", sizeof(msg));
+         strlcpy(msg,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_STREAM_STATE_PLAYING_LOOPED),
+               sizeof(msg));
          break;
       case AUDIO_STREAM_STATE_PLAYING_SEQUENTIAL:
-         /* TODO/FIXME - Localize */
-         strlcpy(msg, "Playing (Sequential)", sizeof(msg));
+         strlcpy(msg,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_AUDIO_STREAM_STATE_PLAYING_SEQUENTIAL),
+               sizeof(msg));
          break;
    }
 
-   /* TODO/FIXME - Localize */
-   snprintf(s, len, "State : %s | %s: %.2f dB", msg,
+   snprintf(s, len, "%s | %s: %.2f dB", msg,
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_VOLUME),
          stream->volume);
    return 0;
@@ -2057,8 +2073,24 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
       return 0;
    }
 
-   /* Mapped input ports require special handling */
-   if (type == MENU_SETTINGS_INPUT_INPUT_REMAP_PORT)
+   /* Quick Menu Port Controls require special handling */
+   if (     type >= MENU_SETTINGS_REMAPPING_PORT_BEGIN
+         && type <= MENU_SETTINGS_REMAPPING_PORT_END)
+   {
+      BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_user_bind_settings);
+      return 0;
+   }
+   else if (type == MENU_SETTINGS_INPUT_LIBRETRO_DEVICE)
+   {
+      BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_device_type);
+      return 0;
+   }
+   else if (type == MENU_SETTINGS_INPUT_ANALOG_DPAD_MODE)
+   {
+      BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_adc_type);
+      return 0;
+   }
+   else if (type == MENU_SETTINGS_INPUT_INPUT_REMAP_PORT)
    {
       BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_remap_port);
       return 0;
@@ -2319,6 +2351,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_materialui_icons_enable);
 #endif
             break;
+         case MENU_ENUM_LABEL_MATERIALUI_SWITCH_ICONS:
+#ifdef HAVE_MATERIALUI
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_materialui_switch_icons);
+#endif
+            break;
          case MENU_ENUM_LABEL_MATERIALUI_PLAYLIST_ICONS_ENABLE:
 #ifdef HAVE_MATERIALUI
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_materialui_playlist_icons_enable);
@@ -2469,6 +2506,12 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_shader_preset);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PREPEND:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_shader_preset_prepend);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_APPEND:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_shader_preset_append);
             break;
          case MENU_ENUM_LABEL_VIDEO_SHADER_NUM_PASSES:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_shader_num_passes);
@@ -2992,6 +3035,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_xmb_icon_theme);
 #endif
             break;
+         case MENU_ENUM_LABEL_XMB_SWITCH_ICONS:
+#ifdef HAVE_XMB
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_xmb_switch_icons);
+#endif
+            break;
          case MENU_ENUM_LABEL_MENU_THROTTLE_FRAMERATE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_menu_throttle_framerate);
             break;
@@ -3086,6 +3134,15 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_SHADER_OPTIONS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_shader_options);
+            break;
+         case MENU_ENUM_LABEL_CONFIGURATIONS:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_load_config);
+            break;
+         case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_save_current_config);
+            break;
+         case MENU_ENUM_LABEL_SAVE_NEW_CONFIG:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_save_new_config);
             break;
          case MENU_ENUM_LABEL_RESET_TO_DEFAULT_CONFIG:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_reset_to_default_config);
@@ -3556,6 +3613,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
 #if defined(HAVE_DINPUT) || defined(HAVE_WINRAWINPUT)
          case MENU_ENUM_LABEL_INPUT_NOWINKEY_ENABLE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_nowinkey_enable);
+            break;
+#endif
+#ifdef ANDROID
+         case MENU_ENUM_LABEL_INPUT_SELECT_PHYSICAL_KEYBOARD:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_select_physical_keyboard);
             break;
 #endif
          case MENU_ENUM_LABEL_INPUT_SENSORS_ENABLE:
@@ -4233,6 +4295,21 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_CHEEVOS_START_ACTIVE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_start_active);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_SETTINGS:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_appearance_settings);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_ANCHOR:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_appearance_anchor);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_PADDING_AUTO:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_appearance_padding_auto);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_PADDING_H:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_appearance_padding_h);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_PADDING_V:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_appearance_padding_v);
             break;
 #endif
          case MENU_ENUM_LABEL_SETTINGS:

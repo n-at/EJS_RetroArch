@@ -1949,7 +1949,7 @@ static void *d3d12_gfx_init(const video_info_t* video,
       d3d12_fake_context.get_flags = d3d12_get_flags;
       d3d12_fake_context.get_metrics = win32_get_metrics;
       video_context_driver_set(&d3d12_fake_context); 
-      const char *shader_preset   = retroarch_get_shader_preset();
+      const char *shader_preset   = video_shader_get_current_shader_preset();
       enum rarch_shader_type type = video_shader_parse_type(shader_preset);
       d3d12_gfx_set_shader(d3d12, type, shader_preset);
    }
@@ -2616,8 +2616,7 @@ static bool d3d12_gfx_frame(
    D3D12RSSetViewports(d3d12->queue.cmd, 1, &d3d12->frame.viewport);
    D3D12RSSetScissorRects(d3d12->queue.cmd, 1, &d3d12->frame.scissorRect);
 
-   if (!d3d12->shader_preset || d3d12->pass[0].rt.handle)
-      D3D12DrawInstanced(d3d12->queue.cmd, 4, 1, 0, 0);
+   D3D12DrawInstanced(d3d12->queue.cmd, 4, 1, 0, 0);
 
    D3D12SetPipelineState(d3d12->queue.cmd,
          d3d12->pipes[VIDEO_SHADER_STOCK_BLEND]);
