@@ -13,6 +13,7 @@ EOPTS = $(addprefix -s $(EMPTY), $(EOPT)) # Add '-s ' to each option
 OS = Emscripten
 OBJ :=
 
+HAVE_PATCH = 1
 HAVE_DSP_FILTER = 1
 HAVE_VIDEO_FILTER = 1
 HAVE_OVERLAY = 1
@@ -41,6 +42,7 @@ HAVE_CHEATS = 1
 HAVE_IBXM = 1
 HAVE_CORE_INFO_CACHE = 1
 HAVE_7ZIP = 1
+HAVE_BSV_MOVIE = 1
 
 
 ASYNC ?= 0

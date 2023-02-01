@@ -26,7 +26,6 @@
 #endif
 
 #include <compat/strl.h>
-#include <retro_assert.h>
 #include <lists/string_list.h>
 #include <streams/interface_stream.h>
 #include <streams/file_stream.h>
@@ -777,7 +776,7 @@ static void task_save_handler(retro_task_t *task)
          const char *failed_undo_str = msg_hash_to_str(
                MSG_FAILED_TO_UNDO_SAVE_STATE);
          RARCH_ERR("[State]: %s \"%s\".\n", failed_undo_str,
-            undo_save_buf.path);
+               undo_save_buf.path);
          err[0]      = '\0';
          snprintf(err, err_size - 1, "%s \"RAM\".", failed_undo_str);
       }
@@ -955,13 +954,13 @@ static void task_load_handler(retro_task_t *task)
        * data *
       if (!(state->file = intfstream_open_rzip_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ)))
-         goto end;
+         goto not_found;
 #else
     */
       if (!(state->file = intfstream_open_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ,
                   RETRO_VFS_FILE_ACCESS_HINT_NONE)))
-         goto end;
+         goto not_found;
 //#endif
 
       if ((state->size = intfstream_get_size(state->file)) < 0)
@@ -995,7 +994,7 @@ static void task_load_handler(retro_task_t *task)
          snprintf(msg,
                8192 * sizeof(char),
                msg_hash_to_str(MSG_AUTOLOADING_SAVESTATE_FAILED),
-               state->path);
+               path_basename(state->path));
          task_set_error(task, strdup(msg));
          free(msg);
       }
@@ -1017,13 +1016,14 @@ static void task_load_handler(retro_task_t *task)
          size_t msg_size   = 8192 * sizeof(char);
          char *msg         = (char*)malloc(msg_size);
 
+         msg[0]            = '\0';
+
          if (state->flags & SAVE_TASK_FLAG_AUTOLOAD)
          {
-            msg[0]         = '\0';
             snprintf(msg,
                   msg_size - 1,
                   msg_hash_to_str(MSG_AUTOLOADING_SAVESTATE_SUCCEEDED),
-                  state->path);
+                  path_basename(state->path));
          }
          else
          {
@@ -1032,12 +1032,9 @@ static void task_load_handler(retro_task_t *task)
                      msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT_AUTO),
                      msg_size - 1);
             else
-            {
-               msg[0]      = '\0';
                snprintf(msg, msg_size - 1,
                      msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT),
                      state->state_slot);
-            }
          }
 
          task_set_title(task, strdup(msg));
@@ -1048,6 +1045,23 @@ static void task_load_handler(retro_task_t *task)
    }
 
    return;
+
+not_found:
+   {
+      size_t msg_size   = 8192 * sizeof(char);
+      char *msg         = (char*)malloc(msg_size);
+
+      msg[0] = '\0';
+
+      snprintf(msg,
+            msg_size - 1,
+            "%s \"%s\".",
+            msg_hash_to_str(MSG_FAILED_TO_LOAD_STATE),
+            path_basename(state->path));
+
+      task_set_title(task, strdup(msg));
+      free(msg);
+   }
 
 end:
    task_load_handler_finished(task, state);
@@ -1339,7 +1353,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
       /* Delay OSD messages and widgets for a few frames
        * to prevent GPU screenshots from having notifications */
       runloop_state_t *runloop_st = runloop_state_get_ptr();
-      runloop_st->msg_queue_delay = 10;
+      runloop_st->msg_queue_delay = 12;
       state->flags               |= SAVE_TASK_FLAG_THUMBNAIL_ENABLE;
    }
    state->state_slot             = settings->ints.state_slot;
@@ -1639,6 +1653,28 @@ static bool content_save_state_in_progress(void* data)
 void content_wait_for_save_state_task(void)
 {
    task_queue_wait(content_save_state_in_progress, NULL);
+}
+
+
+static bool task_load_state_finder(retro_task_t *task, void *user_data)
+{
+   return (task && task->handler == task_load_handler);
+}
+
+/* Returns true if a load state task is in progress */
+bool content_load_state_in_progress(void* data)
+{
+   task_finder_data_t find_data;
+
+   find_data.func     = task_load_state_finder;
+   find_data.userdata = NULL;
+
+   return task_queue_find(&find_data);
+}
+
+void content_wait_for_load_state_task(void)
+{
+   task_queue_wait(content_load_state_in_progress, NULL);
 }
 
 /**
@@ -2186,7 +2222,6 @@ void path_deinit_savefile(void)
 void path_init_savefile_new(void)
 {
    task_save_files = string_list_new();
-   retro_assert(task_save_files);
 }
 
 void *savefile_ptr_get(void)

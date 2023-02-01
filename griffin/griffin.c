@@ -1237,8 +1237,10 @@ RETROARCH
 ============================================================ */
 #include "../retroarch.c"
 #include "../runloop.c"
+#ifdef HAVE_RUNAHEAD
+#include "../runahead.c"
+#endif
 #include "../command.c"
-#include "../driver.c"
 #include "../midi_driver.c"
 #include "../location_driver.c"
 #include "../ui/ui_companion_driver.c"
@@ -1366,6 +1368,7 @@ DATA RUNLOOP
 #include "../tasks/task_patch.c"
 #endif
 #include "../tasks/task_save.c"
+#include "../tasks/task_movie.c"
 #include "../tasks/task_image.c"
 #include "../tasks/task_file_transfer.c"
 #include "../tasks/task_playlist_manager.c"

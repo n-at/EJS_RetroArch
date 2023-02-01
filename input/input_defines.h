@@ -120,6 +120,7 @@ enum
 
    RARCH_VRR_RUNLOOP_TOGGLE,
    RARCH_RUNAHEAD_TOGGLE,
+   RARCH_PREEMPT_TOGGLE,
    RARCH_FPS_TOGGLE,
    RARCH_STATISTICS_TOGGLE,
    RARCH_AI_SERVICE,
@@ -233,8 +234,8 @@ enum input_turbo_default_button
 #define GET_HAT(x)         (x & (~HAT_MASK))
 
 #ifdef HAVE_BSV_MOVIE
-#define BSV_MOVIE_IS_PLAYBACK_ON() (input_st->bsv_movie_state_handle && (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_PLAYBACK))
-#define BSV_MOVIE_IS_PLAYBACK_OFF() (input_st->bsv_movie_state_handle && (!(input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_PLAYBACK)))
+#define BSV_MOVIE_IS_PLAYBACK_ON() (input_st->bsv_movie_state_handle && (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_PLAYBACK) && !(input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_END))
+#define BSV_MOVIE_IS_RECORDING() (input_st->bsv_movie_state_handle && (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_RECORDING))
 
 #endif
 

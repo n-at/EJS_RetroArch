@@ -1506,6 +1506,7 @@ static float ozone_last_framebuffer_opacity = -1.0f;
 /* Forward declarations */
 static void ozone_cursor_animation_cb(void *userdata);
 static void ozone_selection_changed(ozone_handle_t *ozone, bool allow_animation);
+static void ozone_unload_thumbnail_textures(void *data);
 
 static INLINE uint8_t ozone_count_lines(const char *str)
 {
@@ -1798,6 +1799,9 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_REMAP_FILE_SAVE_CORE:
       case MENU_ENUM_LABEL_REMAP_FILE_SAVE_CONTENT_DIR:
       case MENU_ENUM_LABEL_REMAP_FILE_SAVE_GAME:
+      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE:
+      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR:
+      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME:
       case MENU_ENUM_LABEL_NETWORK_ON_DEMAND_THUMBNAILS:
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SAVESTATE];
       case MENU_ENUM_LABEL_LOAD_STATE:
@@ -1846,7 +1850,6 @@ static uintptr_t ozone_entries_icon_get_texture(
       /* Menu icons */
       case MENU_ENUM_LABEL_CONTENT_SETTINGS:
       case MENU_ENUM_LABEL_UPDATE_ASSETS:
-      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_GAME:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_GLOBAL:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_GAME:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_QUICKMENU];
@@ -1861,7 +1864,6 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_UPDATE_INSTALLED_CORES:
       case MENU_ENUM_LABEL_SWITCH_INSTALLED_CORES_PFD:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_CORE:
-      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CORE:
       case MENU_ENUM_LABEL_SET_CORE_ASSOCIATION:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_SET_CORE_ASSOCIATION:
       case MENU_ENUM_LABEL_CORE_INFORMATION:
@@ -2023,9 +2025,13 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_REMAP_FILE_REMOVE_CORE:
       case MENU_ENUM_LABEL_REMAP_FILE_REMOVE_CONTENT_DIR:
       case MENU_ENUM_LABEL_REMAP_FILE_REMOVE_GAME:
+      case MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CORE:
+      case MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR:
+      case MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_GAME:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_CLOSE];
       case MENU_ENUM_LABEL_CORE_OPTIONS_RESET:
       case MENU_ENUM_LABEL_REMAP_FILE_RESET:
+      case MENU_ENUM_LABEL_OVERRIDE_UNLOAD:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_UNDO];
       case MENU_ENUM_LABEL_CORE_OPTIONS_FLUSH:
       case MENU_ENUM_LABEL_REMAP_FILE_FLUSH:
@@ -2078,7 +2084,6 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_ADD_CONTENT_LIST:
       case MENU_ENUM_LABEL_SCAN_DIRECTORY:
       case MENU_ENUM_LABEL_MANUAL_CONTENT_SCAN_LIST:
-      case MENU_ENUM_LABEL_SAVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_PARENT:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_FOLDER];
       case MENU_ENUM_LABEL_PRIVACY_SETTINGS:
@@ -2127,6 +2132,7 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_CONFIGURATIONS:
       case MENU_ENUM_LABEL_GAME_SPECIFIC_OPTIONS:
       case MENU_ENUM_LABEL_REMAP_FILE_LOAD:
+      case MENU_ENUM_LABEL_OVERRIDE_FILE_LOAD:
       case MENU_ENUM_LABEL_AUTO_OVERRIDES_ENABLE:
       case MENU_ENUM_LABEL_AUTO_REMAPS_ENABLE:
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
@@ -3990,6 +3996,9 @@ static void ozone_go_to_sidebar(
    gfx_animation_push(&entry);
 
    ozone_sidebar_update_collapse(ozone, ozone_collapse_sidebar, true);
+#ifdef HAVE_AUDIOMIXER
+   audio_driver_mixer_play_scroll_sound(false);
+#endif
 }
 
 static void linebreak_after_colon(char (*str)[255])
@@ -4281,6 +4290,11 @@ static void ozone_leave_sidebar(
    gfx_animation_push(&entry);
 
    ozone_sidebar_update_collapse(ozone, ozone_collapse_sidebar, true);
+
+#ifdef HAVE_AUDIOMIXER
+   audio_driver_mixer_play_scroll_sound(true);
+#endif
+
 }
 
 static void ozone_free_node(ozone_node_t *node)
@@ -7879,15 +7893,8 @@ static enum menu_action ozone_parse_menu_entry_action(
             break;
 
          }
-         else 
-         { 
-#ifdef HAVE_AUDIOMIXER
-            if (selection_total > 1)
-               audio_driver_mixer_play_scroll_sound(false);
-#endif
-            if (!menu_navigation_wraparound_enable && selection == selection_total - 1)
+         else if (!menu_navigation_wraparound_enable && selection == selection_total - 1)
                ozone_start_cursor_wiggle(ozone, MENU_ACTION_DOWN);
-         }
 
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                && (ozone->is_quick_menu))
@@ -7922,15 +7929,8 @@ static enum menu_action ozone_parse_menu_entry_action(
 #endif
             break;
          }
-         else 
-         {
-#ifdef HAVE_AUDIOMIXER
-            if (selection_total > 1)
-               audio_driver_mixer_play_scroll_sound(true);
-#endif
-            if (!menu_navigation_wraparound_enable && selection == 0)
+         else if (!menu_navigation_wraparound_enable && selection == 0)
                ozone_start_cursor_wiggle(ozone, MENU_ACTION_UP);
-         }
          
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                && (ozone->is_quick_menu))
@@ -7974,9 +7974,6 @@ static enum menu_action ozone_parse_menu_entry_action(
          }
 
          ozone_go_to_sidebar(ozone, ozone_collapse_sidebar, tag);
-#ifdef HAVE_AUDIOMIXER
-         audio_driver_mixer_play_scroll_sound(true);
-#endif
          new_action    = MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE;
          break;
       case MENU_ACTION_RIGHT:
@@ -8005,12 +8002,7 @@ static enum menu_action ozone_parse_menu_entry_action(
          }
 
          if (!(ozone->flags & OZONE_FLAG_EMPTY_PLAYLIST)) 
-         {
             ozone_leave_sidebar(ozone, ozone_collapse_sidebar, tag);
-#ifdef HAVE_AUDIOMIXER
-            audio_driver_mixer_play_scroll_sound(false);
-#endif
-         }
 
          new_action    = MENU_ACTION_ACCESSIBILITY_SPEAK_LABEL;
          break;
@@ -8069,8 +8061,19 @@ static enum menu_action ozone_parse_menu_entry_action(
          if (ozone->flags & OZONE_FLAG_CURSOR_IN_SIDEBAR)
          {
             /* Go back to main menu tab */
-            if (ozone->categories_selection_ptr != 0)
+            if (ozone->categories_selection_ptr != 0) 
+            {
                ozone_sidebar_goto(ozone, 0);
+#ifdef HAVE_AUDIOMIXER
+               audio_driver_mixer_play_scroll_sound(true);
+#endif
+            }
+            else
+            {
+               /* Jump to first item on Main Menu */
+               ozone->tab_selection[ozone->categories_selection_ptr] = 0;
+               menu_navigation_set_selection(0);
+            }
 
             new_action = MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE;
             break;
@@ -8102,10 +8105,6 @@ static enum menu_action ozone_parse_menu_entry_action(
             new_action = MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE;
             break;
          }
-#ifdef HAVE_AUDIOMIXER
-         if (selection != 0)
-            audio_driver_mixer_play_scroll_sound(true);
-#endif
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                && (ozone->is_quick_menu))
             return MENU_ACTION_NOOP;
@@ -8126,10 +8125,6 @@ static enum menu_action ozone_parse_menu_entry_action(
             new_action = MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE;
             break;
          }
-#ifdef HAVE_AUDIOMIXER
-         if (selection < selection_total - 1)
-            audio_driver_mixer_play_scroll_sound(false);
-#endif
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                && (ozone->is_quick_menu))
             return MENU_ACTION_NOOP;
@@ -8535,6 +8530,7 @@ static void ozone_refresh_thumbnail_image(void *data, unsigned i)
       return;
 
    ozone->flags &= ~OZONE_FLAG_SKIP_THUMBNAIL_RESET;
+   ozone_unload_thumbnail_textures(ozone);
 
    /* Refresh metadata */
    if (!i)
@@ -11251,6 +11247,9 @@ static void ozone_populate_entries(
       menu_driver_ctl(RARCH_MENU_CTL_UNSET_PREVENT_POPULATE, NULL);
       ozone_selection_changed(ozone, false);
 
+      /* Refresh title for search terms */
+      ozone_set_header(ozone);
+
       /* Handle playlist searches
        * (Ozone is a fickle beast...) */
       if (ozone->flags & OZONE_FLAG_IS_PLAYLIST)
@@ -11296,12 +11295,6 @@ static void ozone_populate_entries(
             ozone->num_search_terms_old = num_search_terms;
          }
       }
-      else if (ozone->flags & OZONE_FLAG_IS_EXPLORE_LIST)
-      {
-         /* when refreshing the explore view, also refresh the title */
-         ozone_set_header(ozone);
-      }
-
       return;
    }
 

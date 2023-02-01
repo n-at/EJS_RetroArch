@@ -213,41 +213,19 @@ void retro_main_log_file_deinit(void)
 #if !defined(HAVE_LOGGER)
 void RARCH_LOG_V(const char *tag, const char *fmt, va_list ap)
 {
-   verbosity_state_t *g_verbosity = &main_verbosity_st;
-   const char              *tag_v = tag ? tag : FILE_PATH_LOG_INFO;
-
-#if TARGET_OS_IPHONE
-#if TARGET_IPHONE_SIMULATOR
-   vprintf(fmt, ap);
-#else
-   static aslclient asl_client;
-   static int asl_initialized = 0;
-   if (!asl_initialized)
-   {
-      asl_client      = asl_open(
-            FILE_PATH_PROGRAM_NAME,
-            "com.apple.console",
-            ASL_OPT_STDERR | ASL_OPT_NO_DELAY);
-      asl_initialized = 1;
-   }
-   aslmsg msg = asl_new(ASL_TYPE_MSG);
-   asl_set(msg, ASL_KEY_READ_UID, "-1");
-   if (tag)
-      asl_log(asl_client, msg, ASL_LEVEL_NOTICE, "%s", tag);
-   asl_vlog(asl_client, msg, ASL_LEVEL_NOTICE, fmt, ap);
-   asl_free(msg);
-#endif
-#elif defined(_XBOX1)
+#if defined(_XBOX1)
    /* FIXME: Using arbitrary string as fmt argument is unsafe. */
    char msg_new[256];
    char buffer[256];
+   const char *tag_v = tag ? tag : FILE_PATH_LOG_INFO;
 
-   msg_new[0] = buffer[0] = '\0';
+   msg_new[0]        = buffer[0] = '\0';
    snprintf(msg_new, sizeof(msg_new), "%s: %s %s",
          FILE_PATH_PROGRAM_NAME, tag_v, fmt);
    wvsprintf(buffer, msg_new, ap);
    OutputDebugStringA(buffer);
 #elif defined(ANDROID)
+   verbosity_state_t *g_verbosity = &main_verbosity_st;
    int prio = ANDROID_LOG_INFO;
    if (tag)
    {
@@ -265,15 +243,17 @@ void RARCH_LOG_V(const char *tag, const char *fmt, va_list ap)
    else
       __android_log_vprint(prio, FILE_PATH_PROGRAM_NAME, fmt, ap);
 #else
-   FILE *fp = (FILE*)g_verbosity->fp;
+   verbosity_state_t *g_verbosity = &main_verbosity_st;
+   FILE                       *fp = (FILE*)g_verbosity->fp;
+   const char              *tag_v = tag ? tag : FILE_PATH_LOG_INFO;
 #if defined(HAVE_QT) || defined(__WINRT__)
    char buffer[2048];
-   buffer[0] = '\0';
+   buffer[0]         = '\0';
 
    /* Ensure null termination and line break in error case */
    if (vsnprintf(buffer, sizeof(buffer), fmt, ap) < 0)
    {
-      int end;
+      size_t end;
       buffer[sizeof(buffer) - 1]  = '\0';
       end = strlen(buffer) - 1;
       if (end >= 0)
@@ -298,7 +278,29 @@ void RARCH_LOG_V(const char *tag, const char *fmt, va_list ap)
 #if defined(__WINRT__)
    OutputDebugStringA(buffer);
 #endif
+#else /* !HAVE_QT && !__WINRT__ */
+#if TARGET_OS_IPHONE
+#if TARGET_IPHONE_SIMULATOR
+   vprintf(fmt, ap);
 #else
+   static aslclient asl_client;
+   static int asl_initialized = 0;
+   if (!asl_initialized)
+   {
+      asl_client      = asl_open(
+                                 FILE_PATH_PROGRAM_NAME,
+                                 "com.apple.console",
+                                 ASL_OPT_STDERR | ASL_OPT_NO_DELAY);
+      asl_initialized = 1;
+   }
+   aslmsg msg = asl_new(ASL_TYPE_MSG);
+   asl_set(msg, ASL_KEY_READ_UID, "-1");
+   if (tag)
+      asl_log(asl_client, msg, ASL_LEVEL_NOTICE, "%s", tag);
+   asl_vlog(asl_client, msg, ASL_LEVEL_NOTICE, fmt, ap);
+   asl_free(msg);
+#endif
+#endif
 #if defined(HAVE_LIBNX)
    mutexLock(&g_verbosity->mtx);
 #endif

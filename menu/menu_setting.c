@@ -62,6 +62,7 @@
 
 #ifdef HAVE_CHEEVOS
 #include "../cheevos/cheevos.h"
+#include "../cheevos/cheevos_locals.h"
 #endif
 
 #ifdef HAVE_TRANSLATE
@@ -306,6 +307,7 @@ enum settings_list_type
    SETTINGS_LIST_PLAYLIST,
    SETTINGS_LIST_CHEEVOS,
    SETTINGS_LIST_CHEEVOS_APPEARANCE,
+   SETTINGS_LIST_CHEEVOS_VISIBILITY,
    SETTINGS_LIST_CORE_UPDATER,
    SETTINGS_LIST_NETPLAY,
    SETTINGS_LIST_LAKKA_SERVICES,
@@ -2906,6 +2908,35 @@ static int setting_action_ok_select_physical_keyboard(
 }
 #endif
 
+#if !defined(RARCH_CONSOLE)
+static int setting_string_action_ok_audio_device(
+      rarch_setting_t *setting, size_t idx, bool wraparound)
+{
+   char enum_idx[16];
+   if (!setting)
+      return -1;
+
+   snprintf(enum_idx, sizeof(enum_idx), "%d", setting->enum_idx);
+
+   generic_action_ok_displaylist_push(
+         enum_idx, /* we will pass the enumeration index of the string as a path */
+         NULL, NULL, 0, idx, 0,
+         ACTION_OK_DL_DROPDOWN_BOX_LIST_AUDIO_DEVICE);
+   return 0;
+}
+
+static int setting_string_action_start_audio_device(rarch_setting_t *setting)
+{
+   if (!setting)
+      return -1;
+
+   strlcpy(setting->value.target.string, "", setting->size);
+
+   command_event(CMD_EVENT_AUDIO_REINIT, NULL);
+   return 0;
+}
+#endif
+
 static int setting_string_action_left_string_options(
    rarch_setting_t* setting, size_t idx, bool wraparound)
 {
@@ -5091,6 +5122,18 @@ static void setting_get_string_representation_int_audio_wasapi_sh_buffer_length(
 }
 #endif
 
+static void setting_get_string_representation_string_audio_device(rarch_setting_t *setting,
+      char *s, size_t len)
+{
+   if (!setting)
+      return;
+
+   if (string_is_empty(setting->value.target.string))
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DONT_CARE), len);
+   else
+      strlcpy(s, setting->value.target.string, len);
+}
+
 static void setting_get_string_representation_crt_switch_resolution_super(
       rarch_setting_t *setting,
       char *s, size_t len)
@@ -5848,11 +5891,17 @@ static int setting_string_action_left_audio_device(
    audio_device_index--;
 
    /* Reset index if needed */
-   if (audio_device_index < 0)
+   if (audio_device_index < -1)
       audio_device_index = (int)(ptr->size - 1);
 
-   strlcpy(setting->value.target.string, ptr->elems[audio_device_index].data, setting->size);
+   if (audio_device_index < 0)
+      strlcpy(setting->value.target.string,
+            "", setting->size);
+   else
+      strlcpy(setting->value.target.string,
+            ptr->elems[audio_device_index].data, setting->size);
 
+   command_event(CMD_EVENT_AUDIO_REINIT, NULL);
    return 0;
 }
 #endif
@@ -6126,16 +6175,21 @@ static int setting_string_action_right_audio_device(
       return -1;
 
    /* Get index in the string list */
-   audio_device_index = string_list_find_elem(ptr,setting->value.target.string) -1;
+   audio_device_index = string_list_find_elem(ptr,setting->value.target.string) - 1;
    audio_device_index++;
 
    /* Reset index if needed */
    if (audio_device_index == (signed)ptr->size)
-      audio_device_index = 0;
+      audio_device_index = -1;
 
-   strlcpy(setting->value.target.string,
-         ptr->elems[audio_device_index].data, setting->size);
+   if (audio_device_index < 0)
+      strlcpy(setting->value.target.string,
+            "", setting->size);
+   else
+      strlcpy(setting->value.target.string,
+            ptr->elems[audio_device_index].data, setting->size);
 
+   command_event(CMD_EVENT_AUDIO_REINIT, NULL);
    return 0;
 }
 #endif
@@ -8500,8 +8554,8 @@ static void general_write_handler(rarch_setting_t *setting)
 
                /* In all cases, need to close and reopen
                 * playlist file (to update maximum capacity) */
-               rarch_favorites_deinit();
-               rarch_favorites_init();
+               retroarch_favorites_deinit();
+               retroarch_favorites_init();
             }
          }
          break;
@@ -8652,31 +8706,6 @@ static void general_write_handler(rarch_setting_t *setting)
                            default_aspect;
          }
          break;
-#if defined(HAVE_RUNAHEAD) && (defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB))
-      case MENU_ENUM_LABEL_RUN_AHEAD_ENABLED:
-      case MENU_ENUM_LABEL_RUN_AHEAD_FRAMES:
-      case MENU_ENUM_LABEL_RUN_AHEAD_SECONDARY_INSTANCE:
-         {
-            settings_t *settings              = config_get_ptr();
-            bool run_ahead_enabled            = settings->bools.run_ahead_enabled;
-            unsigned run_ahead_frames         = settings->uints.run_ahead_frames;
-            bool run_ahead_secondary_instance = settings->bools.run_ahead_secondary_instance;
-
-            /* If any changes here will cause second
-             * instance runahead to be enabled, must
-             * re-apply cheats to ensure that they
-             * propagate to the newly-created secondary
-             * core */
-            if (run_ahead_enabled &&
-                (run_ahead_frames > 0) &&
-                run_ahead_secondary_instance &&
-                !retroarch_ctl(RARCH_CTL_IS_SECOND_CORE_LOADED, NULL) &&
-                retroarch_ctl(RARCH_CTL_IS_SECOND_CORE_AVAILABLE, NULL) &&
-                command_event(CMD_EVENT_LOAD_SECOND_CORE, NULL))
-               command_event(CMD_EVENT_CHEATS_APPLY, NULL);
-         }
-         break;
-#endif
       default:
          /* Special cases */
 
@@ -8710,6 +8739,104 @@ static void frontend_log_level_change_handler(rarch_setting_t *setting)
 
    verbosity_set_log_level(*setting->value.target.unsigned_integer);
 }
+
+#ifdef HAVE_RUNAHEAD
+static void runahead_change_handler(rarch_setting_t *setting)
+{
+   settings_t *settings              = config_get_ptr();
+   bool run_ahead_enabled            = settings->bools.run_ahead_enabled;
+   bool preempt_enabled              = settings->bools.preemptive_frames_enable;
+   bool refresh                      = false;
+#if (defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB))
+   unsigned run_ahead_frames         = settings->uints.run_ahead_frames;
+   bool run_ahead_secondary_instance = settings->bools.run_ahead_secondary_instance;
+#endif
+
+   if (!setting)
+      return;
+
+   switch (setting->enum_idx)
+   {
+      case MENU_ENUM_LABEL_RUN_AHEAD_ENABLED:
+         if (run_ahead_enabled && preempt_enabled)
+         {
+            /* Disable preemptive frames and inform user */
+            settings->bools.preemptive_frames_enable = false;
+            preempt_deinit(runloop_state_get_ptr());
+            runloop_msg_queue_push(
+                  msg_hash_to_str(MSG_PREEMPT_DISABLED), 1, 100, false,
+                  NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         }
+         menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+         /* fall-through */
+      case MENU_ENUM_LABEL_RUN_AHEAD_FRAMES:
+#if (defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB))
+      case MENU_ENUM_LABEL_RUN_AHEAD_SECONDARY_INSTANCE:
+         /* If any changes here will cause second
+          * instance runahead to be enabled, must
+          * re-apply cheats to ensure that they
+          * propagate to the newly-created secondary
+          * core */
+         if (     run_ahead_enabled
+               && (run_ahead_frames > 0)
+               && run_ahead_secondary_instance
+               && !retroarch_ctl(RARCH_CTL_IS_SECOND_CORE_LOADED, NULL)
+               && retroarch_ctl(RARCH_CTL_IS_SECOND_CORE_AVAILABLE, NULL)
+               && command_event(CMD_EVENT_LOAD_SECOND_CORE, NULL))
+            command_event(CMD_EVENT_CHEATS_APPLY, NULL);
+#endif
+         break;
+      default:
+         break;
+   }
+}
+
+static void preempt_change_handler(rarch_setting_t *setting)
+{
+   settings_t *settings   = config_get_ptr();
+   bool preempt_enabled   = settings->bools.preemptive_frames_enable;
+   bool run_ahead_enabled = settings->bools.run_ahead_enabled;
+   preempt_t *preempt     = runloop_state_get_ptr()->preempt_data;
+   bool refresh           = false;
+   bool netplay_enabled;
+
+#ifdef HAVE_NETWORKING
+   netplay_enabled = netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL);
+#else
+   netplay_enabled = false;
+#endif
+
+   if (!setting)
+      return;
+
+   switch (setting->enum_idx)
+   {
+      case MENU_ENUM_LABEL_PREEMPT_ENABLE:
+         if (preempt_enabled && run_ahead_enabled)
+         {
+            /* Disable runahead and inform user */
+            settings->bools.run_ahead_enabled = false;
+            runloop_msg_queue_push(
+                  msg_hash_to_str(MSG_RUNAHEAD_DISABLED), 1, 100, false,
+                  NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         }
+
+         if ((preempt_enabled != !!preempt) && !netplay_enabled)
+            command_event(CMD_EVENT_PREEMPT_UPDATE, NULL);
+
+         menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+         break;
+      case MENU_ENUM_LABEL_PREEMPT_FRAMES:
+         if (     preempt
+               && preempt->frames != settings->uints.run_ahead_frames
+               && !netplay_enabled)
+            command_event(CMD_EVENT_PREEMPT_UPDATE, NULL);
+         break;
+      default:
+         break;
+   }
+}
+#endif
 
 #ifdef HAVE_OVERLAY
 static void overlay_enable_toggle_change_handler(rarch_setting_t *setting)
@@ -8802,6 +8929,36 @@ static void achievement_hardcore_mode_write_handler(rarch_setting_t *setting)
 static void achievement_leaderboards_enabled_write_handler(rarch_setting_t* setting)
 {
    rcheevos_leaderboards_enabled_changed();
+}
+
+static void setting_get_string_representation_uint_cheevos_visibility_summary(
+   rarch_setting_t* setting,
+   char* s, size_t len)
+{
+   if (!setting)
+      return;
+
+   switch (*setting->value.target.unsigned_integer)
+   {
+   case RCHEEVOS_SUMMARY_ALLGAMES:
+      strlcpy(s,
+         msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SUMMARY_ALLGAMES),
+         len);
+      break;
+   case RCHEEVOS_SUMMARY_HASCHEEVOS:
+      strlcpy(s,
+         msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SUMMARY_HASCHEEVOS),
+         len);
+      break;
+   case RCHEEVOS_SUMMARY_OFF:
+      strlcpy(s,
+         msg_hash_to_str(
+            MENU_ENUM_LABEL_VALUE_OFF),
+         len);
+      break;
+   }
 }
 
 static void achievement_leaderboards_get_string_representation(rarch_setting_t* setting, char* s, size_t len)
@@ -9769,6 +9926,36 @@ static bool setting_append_list(
 
          CONFIG_ACTION(
                list, list_info,
+               MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CORE,
+               MENU_ENUM_LABEL_VALUE_REMOVE_CURRENT_CONFIG_OVERRIDE_CORE,
+               &group_info,
+               &subgroup_info,
+               parent_group);
+         MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_MENU_REMOVE_CURRENT_CONFIG_OVERRIDE_CORE);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+
+         CONFIG_ACTION(
+               list, list_info,
+               MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR,
+               MENU_ENUM_LABEL_VALUE_REMOVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR,
+               &group_info,
+               &subgroup_info,
+               parent_group);
+         MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_MENU_REMOVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+
+         CONFIG_ACTION(
+               list, list_info,
+               MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_GAME,
+               MENU_ENUM_LABEL_VALUE_REMOVE_CURRENT_CONFIG_OVERRIDE_GAME,
+               &group_info,
+               &subgroup_info,
+               parent_group);
+         MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_MENU_REMOVE_CURRENT_CONFIG_OVERRIDE_GAME);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+
+         CONFIG_ACTION(
+               list, list_info,
                MENU_ENUM_LABEL_HELP_LIST,
                MENU_ENUM_LABEL_VALUE_HELP_LIST,
                &group_info,
@@ -10162,6 +10349,14 @@ static bool setting_append_list(
                &group_info,
                &subgroup_info,
                parent_group);
+
+         CONFIG_ACTION(
+               list, list_info,
+               MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_SETTINGS,
+               MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SETTINGS,
+               &group_info,
+               &subgroup_info,
+               parent_group);
 #endif
 
          CONFIG_ACTION(
@@ -10463,9 +10658,9 @@ static bool setting_append_list(
          {
             unsigned i, listing = 0;
 #ifndef HAVE_DYNAMIC
-            struct bool_entry bool_entries[9];
+            struct bool_entry bool_entries[10];
 #else
-            struct bool_entry bool_entries[8];
+            struct bool_entry bool_entries[9];
 #endif
             START_GROUP(list, list_info, &group_info,
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_SETTINGS), parent_group);
@@ -10529,6 +10724,13 @@ static bool setting_append_list(
             bool_entries[listing].name_enum_idx  = MENU_ENUM_LABEL_CORE_INFO_CACHE_ENABLE;
             bool_entries[listing].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_CORE_INFO_CACHE_ENABLE;
             bool_entries[listing].default_value  = DEFAULT_CORE_INFO_CACHE_ENABLE;
+            bool_entries[listing].flags          = SD_FLAG_ADVANCED;
+            listing++;
+
+            bool_entries[listing].target         = &settings->bools.core_info_savestate_bypass;
+            bool_entries[listing].name_enum_idx  = MENU_ENUM_LABEL_CORE_INFO_SAVESTATE_BYPASS;
+            bool_entries[listing].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_CORE_INFO_SAVESTATE_BYPASS;
+            bool_entries[listing].default_value  = DEFAULT_CORE_INFO_SAVESTATE_BYPASS;
             bool_entries[listing].flags          = SD_FLAG_ADVANCED;
             listing++;
 
@@ -13548,11 +13750,12 @@ static bool setting_append_list(
                parent_group,
                general_write_handler,
                general_read_handler);
-         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ALLOW_INPUT);
-         (*list)[list_info->index - 1].ui_type       = ST_UI_TYPE_STRING_LINE_EDIT;
-         (*list)[list_info->index - 1].action_start  = setting_generic_action_start_default;
+         (*list)[list_info->index - 1].action_start  = &setting_string_action_start_audio_device;
          (*list)[list_info->index - 1].action_left   = &setting_string_action_left_audio_device;
          (*list)[list_info->index - 1].action_right  = &setting_string_action_right_audio_device;
+         (*list)[list_info->index - 1].action_ok     = &setting_string_action_ok_audio_device;
+         (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_string_audio_device;
 #endif
 
          CONFIG_UINT(
@@ -14753,6 +14956,7 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
          menu_settings_list_current_add_range(list, list_info, 1, 10, 0.1, true, true);
 
+#ifdef HAVE_RUNAHEAD
          CONFIG_BOOL(
                list, list_info,
                &settings->bools.run_ahead_enabled,
@@ -14768,9 +14972,7 @@ static bool setting_append_list(
                general_read_handler,
                SD_FLAG_NONE
                );
-         (*list)[list_info->index - 1].action_ok     = setting_bool_action_left_with_refresh;
-         (*list)[list_info->index - 1].action_left   = setting_bool_action_left_with_refresh;
-         (*list)[list_info->index - 1].action_right  = setting_bool_action_right_with_refresh;
+         (*list)[list_info->index - 1].change_handler = runahead_change_handler;
 
          CONFIG_UINT(
             list, list_info,
@@ -14786,7 +14988,8 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].ui_type   = ST_UI_TYPE_UINT_COMBOBOX;
          (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
          (*list)[list_info->index - 1].offset_by = 1;
-         menu_settings_list_current_add_range(list, list_info, 1, 12, 1, true, true);
+         (*list)[list_info->index - 1].change_handler = runahead_change_handler;
+         menu_settings_list_current_add_range(list, list_info, 1, MAX_RUNAHEAD_FRAMES, 1, true, true);
 
 #if defined(HAVE_DYNAMIC) || defined(HAVE_DYLIB)
          CONFIG_BOOL(
@@ -14804,6 +15007,7 @@ static bool setting_append_list(
                general_read_handler,
                SD_FLAG_NONE
                );
+         (*list)[list_info->index - 1].change_handler = runahead_change_handler;
 #endif
 
          CONFIG_BOOL(
@@ -14821,6 +15025,56 @@ static bool setting_append_list(
                general_read_handler,
                SD_FLAG_ADVANCED
                );
+
+         CONFIG_BOOL(
+               list, list_info,
+               &settings->bools.preemptive_frames_enable,
+               MENU_ENUM_LABEL_PREEMPT_ENABLE,
+               MENU_ENUM_LABEL_VALUE_PREEMPT_ENABLE,
+               false,
+               MENU_ENUM_LABEL_VALUE_OFF,
+               MENU_ENUM_LABEL_VALUE_ON,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler,
+               SD_FLAG_NONE);
+         (*list)[list_info->index - 1].change_handler = preempt_change_handler;
+
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.run_ahead_frames,
+               MENU_ENUM_LABEL_PREEMPT_FRAMES,
+               MENU_ENUM_LABEL_VALUE_PREEMPT_FRAMES,
+               1,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].ui_type   = ST_UI_TYPE_UINT_COMBOBOX;
+         (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+         (*list)[list_info->index - 1].offset_by = 1;
+         (*list)[list_info->index - 1].change_handler = preempt_change_handler;
+         menu_settings_list_current_add_range(list, list_info, 1, MAX_RUNAHEAD_FRAMES, 1, true, true);
+
+         CONFIG_BOOL(
+               list, list_info,
+               &settings->bools.preemptive_frames_hide_warnings,
+               MENU_ENUM_LABEL_PREEMPT_HIDE_WARNINGS,
+               MENU_ENUM_LABEL_VALUE_PREEMPT_HIDE_WARNINGS,
+               DEFAULT_PREEMPT_HIDE_WARNINGS,
+               MENU_ENUM_LABEL_VALUE_OFF,
+               MENU_ENUM_LABEL_VALUE_ON,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler,
+               SD_FLAG_ADVANCED
+               );
+#endif
 
 #ifdef ANDROID
          CONFIG_UINT(
@@ -19993,22 +20247,6 @@ static bool setting_append_list(
 
          CONFIG_BOOL(
                list, list_info,
-               &settings->bools.cheevos_challenge_indicators,
-               MENU_ENUM_LABEL_CHEEVOS_CHALLENGE_INDICATORS,
-               MENU_ENUM_LABEL_VALUE_CHEEVOS_CHALLENGE_INDICATORS,
-               true,
-               MENU_ENUM_LABEL_VALUE_OFF,
-               MENU_ENUM_LABEL_VALUE_ON,
-               &group_info,
-               &subgroup_info,
-               parent_group,
-               general_write_handler,
-               general_read_handler,
-               SD_FLAG_NONE
-               );
-
-         CONFIG_BOOL(
-               list, list_info,
                &settings->bools.cheevos_richpresence_enable,
                MENU_ENUM_LABEL_CHEEVOS_RICHPRESENCE_ENABLE,
                MENU_ENUM_LABEL_VALUE_CHEEVOS_RICHPRESENCE_ENABLE,
@@ -20059,22 +20297,6 @@ static bool setting_append_list(
                SD_FLAG_NONE
             );
 #endif
-
-         CONFIG_BOOL(
-               list, list_info,
-               &settings->bools.cheevos_verbose_enable,
-               MENU_ENUM_LABEL_CHEEVOS_VERBOSE_ENABLE,
-               MENU_ENUM_LABEL_VALUE_CHEEVOS_VERBOSE_ENABLE,
-               true,
-               MENU_ENUM_LABEL_VALUE_OFF,
-               MENU_ENUM_LABEL_VALUE_ON,
-               &group_info,
-               &subgroup_info,
-               parent_group,
-               general_write_handler,
-               general_read_handler,
-               SD_FLAG_ADVANCED
-               );
 
          CONFIG_BOOL(
                list, list_info,
@@ -20206,6 +20428,118 @@ static bool setting_append_list(
          );
          menu_settings_list_current_add_range(list, list_info, 0.0, 0.5, 0.01, true, true);
 #endif
+
+         END_SUB_GROUP(list, list_info, parent_group);
+         END_GROUP(list, list_info, parent_group);
+#endif
+         break;
+      case SETTINGS_LIST_CHEEVOS_VISIBILITY:
+#ifdef HAVE_CHEEVOS
+         START_GROUP(list, list_info, &group_info,
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SETTINGS),
+            parent_group);
+         parent_group = msg_hash_to_str(MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_SETTINGS);
+         START_SUB_GROUP(list, list_info, "State", &group_info, &subgroup_info, parent_group);
+
+         CONFIG_UINT(
+            list, list_info,
+            &settings->uints.cheevos_visibility_summary,
+            MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_SUMMARY,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SUMMARY,
+            DEFAULT_CHEEVOS_VISIBILITY_SUMMARY,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler);
+         (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+         (*list)[list_info->index - 1].action_left = &setting_uint_action_left_with_refresh;
+         (*list)[list_info->index - 1].action_right = &setting_uint_action_right_with_refresh;
+         (*list)[list_info->index - 1].get_string_representation =
+            &setting_get_string_representation_uint_cheevos_visibility_summary;
+         menu_settings_list_current_add_range(list, list_info, 0, RCHEEVOS_SUMMARY_LAST - 1, 1, true, true);
+         (*list)[list_info->index - 1].ui_type = ST_UI_TYPE_UINT_COMBOBOX;
+
+         CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_visibility_unlock,
+            MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_UNLOCK,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_UNLOCK,
+            DEFAULT_CHEEVOS_VISIBILITY_UNLOCK,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_NONE
+         );
+
+         CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_visibility_mastery,
+            MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_MASTERY,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_MASTERY,
+            DEFAULT_CHEEVOS_VISIBILITY_MASTERY,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_NONE
+         );
+
+         CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_challenge_indicators,
+            MENU_ENUM_LABEL_CHEEVOS_CHALLENGE_INDICATORS,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_CHALLENGE_INDICATORS,
+            true,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_NONE
+         );
+
+         CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_verbose_enable,
+            MENU_ENUM_LABEL_CHEEVOS_VERBOSE_ENABLE,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VERBOSE_ENABLE,
+            true,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_ADVANCED
+         );
+
+         CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_visibility_account,
+            MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_ACCOUNT,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_ACCOUNT,
+            DEFAULT_CHEEVOS_VISIBILITY_ACCOUNT,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_ADVANCED
+         );
+
 
          END_SUB_GROUP(list, list_info, parent_group);
          END_GROUP(list, list_info, parent_group);
@@ -22249,6 +22583,7 @@ static rarch_setting_t *menu_setting_new_internal(rarch_setting_info_t *list_inf
       SETTINGS_LIST_PLAYLIST,
       SETTINGS_LIST_CHEEVOS,
       SETTINGS_LIST_CHEEVOS_APPEARANCE,
+      SETTINGS_LIST_CHEEVOS_VISIBILITY,
       SETTINGS_LIST_CORE_UPDATER,
       SETTINGS_LIST_NETPLAY,
       SETTINGS_LIST_LAKKA_SERVICES,

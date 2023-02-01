@@ -24,7 +24,6 @@
 #include <string/stdstring.h>
 #include <encodings/utf.h>
 #include <clamping.h>
-#include <retro_assert.h>
 #include <memalign.h>
 #include <audio/conversion/float_to_s16.h>
 #include <audio/conversion/s16_to_float.h>
@@ -584,10 +583,6 @@ bool audio_driver_init_internal(
    convert_s16_to_float_init_simd();
    convert_float_to_s16_init_simd();
 
-   /* Used for recording even if audio isn't enabled. */
-   retro_assert(conv_buf != NULL);
-   retro_assert(audio_buf != NULL);
-
    if (!conv_buf || !audio_buf)
       goto error;
 
@@ -602,10 +597,7 @@ bool audio_driver_init_internal(
 #ifdef HAVE_REWIND
    /* Needs to be able to hold full content of a full max_bufsamples
     * in addition to its own. */
-   rewind_buf = (int16_t*)memalign_alloc(64, max_bufsamples * sizeof(int16_t));
-   retro_assert(rewind_buf != NULL);
-
-   if (!rewind_buf)
+   if (!(rewind_buf = (int16_t*)memalign_alloc(64, max_bufsamples * sizeof(int16_t))))
       goto error;
 
    audio_driver_st.rewind_buf    = rewind_buf;
@@ -647,7 +639,7 @@ bool audio_driver_init_internal(
                audio_driver_st.current_audio))
       {
          RARCH_ERR("Cannot open threaded audio driver ... Exiting ...\n");
-	 return false;
+         return false;
       }
    }
    else
@@ -727,14 +719,7 @@ bool audio_driver_init_internal(
 
    audio_driver_st.data_ptr   = 0;
 
-   retro_assert(settings->uints.audio_output_sample_rate <
-         audio_driver_st.input * AUDIO_MAX_RATIO);
-
-   samples_buf = (float*)memalign_alloc(64, outsamples_max * sizeof(float));
-
-   retro_assert(samples_buf != NULL);
-
-   if (!samples_buf)
+   if (!(samples_buf = (float*)memalign_alloc(64, outsamples_max * sizeof(float))))
       goto error;
 
    audio_driver_st.output_samples_buf = (float*)samples_buf;
@@ -809,8 +794,8 @@ void audio_driver_sample(int16_t left, int16_t right)
    }
 
    if (!(    (runloop_flags & RUNLOOP_FLAG_PAUSED)
-		   || !(audio_st->flags & AUDIO_FLAG_ACTIVE)
-		   || !(audio_st->output_samples_buf)))
+         || !(audio_st->flags & AUDIO_FLAG_ACTIVE)
+         || !(audio_st->output_samples_buf)))
       audio_driver_flush(audio_st,
             config_get_ptr()->floats.slowmotion_ratio,
             config_get_ptr()->bools.audio_fastforward_mute,
@@ -1348,6 +1333,7 @@ void audio_driver_load_system_sounds(void)
    const char *path_ok                   = NULL;
    const char *path_cancel               = NULL;
    const char *path_notice               = NULL;
+   const char *path_notice_back          = NULL;
    const char *path_bgm                  = NULL;
    const char *path_cheevo_unlock        = NULL;
    const char *path_up                   = NULL;
@@ -1413,6 +1399,8 @@ void audio_driver_load_system_sounds(void)
             path_cancel = path;
          else if (string_is_equal_noncase(basename_noext, "notice"))
             path_notice = path;
+         else if (string_is_equal_noncase(basename_noext, "notice_back"))
+            path_notice_back = path;
          else if (string_is_equal_noncase(basename_noext, "bgm"))
             path_bgm = path;
          else if (string_is_equal_noncase(basename_noext, "unlock"))
@@ -1428,8 +1416,12 @@ void audio_driver_load_system_sounds(void)
       task_push_audio_mixer_load(path_ok, NULL, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_OK);
    if (path_cancel && audio_enable_menu_cancel)
       task_push_audio_mixer_load(path_cancel, NULL, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_CANCEL);
-   if (path_notice && audio_enable_menu_notice)
-      task_push_audio_mixer_load(path_notice, NULL, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_NOTICE);
+   if (audio_enable_menu_notice) {
+      if (path_notice)
+         task_push_audio_mixer_load(path_notice, NULL, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_NOTICE);
+      if (path_notice_back)
+          task_push_audio_mixer_load(path_notice_back, NULL, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_NOTICE_BACK);
+   }
    if (path_bgm && audio_enable_menu_bgm)
       task_push_audio_mixer_load(path_bgm, audio_driver_load_menu_bgm_callback, NULL, true, AUDIO_MIXER_SLOT_SELECTION_MANUAL, AUDIO_MIXER_SYSTEM_SLOT_BGM);
    if (path_cheevo_unlock && audio_enable_cheevo_unlock)
@@ -1463,6 +1455,7 @@ void audio_driver_mixer_play_menu_sound_looped(unsigned i)
 void audio_driver_mixer_play_menu_sound(unsigned i)
 {
    audio_driver_st.mixer_streams[i].stop_cb = audio_mixer_menu_stop_cb;
+   audio_driver_mixer_stop_stream(i);
    audio_driver_mixer_play_stream_internal(i, AUDIO_STREAM_STATE_PLAYING);
 }
 
@@ -1472,10 +1465,7 @@ void audio_driver_mixer_play_scroll_sound(bool direction_up)
    bool        audio_enable_menu = settings->bools.audio_enable_menu;
    bool audio_enable_menu_scroll = settings->bools.audio_enable_menu_scroll;
    if (audio_enable_menu && audio_enable_menu_scroll)
-   {
-      audio_driver_mixer_stop_stream(direction_up ? AUDIO_MIXER_SYSTEM_SLOT_UP : AUDIO_MIXER_SYSTEM_SLOT_DOWN);
-      audio_driver_mixer_play_menu_sound(direction_up ? AUDIO_MIXER_SYSTEM_SLOT_UP : AUDIO_MIXER_SYSTEM_SLOT_DOWN);
-   }
+      audio_driver_mixer_play_menu_sound(direction_up ? AUDIO_MIXER_SYSTEM_SLOT_UP : AUDIO_MIXER_SYSTEM_SLOT_DOWN);  
 }
 
 void audio_driver_mixer_play_stream_looped(unsigned i)

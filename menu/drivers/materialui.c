@@ -9135,10 +9135,6 @@ static enum menu_action materialui_parse_menu_entry_action(
           * > If current selection is off screen,
           *   auto select 'middle' item */
          materialui_auto_select_onscreen_entry(mui, MUI_ONSCREEN_ENTRY_CENTRE);
-#ifdef HAVE_AUDIOMIXER
-         if (menu_entries_get_size() != 1)
-            audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_UP);
-#endif
          break;
       case MENU_ACTION_LEFT:
       case MENU_ACTION_RIGHT:
@@ -9214,17 +9210,9 @@ static enum menu_action materialui_parse_menu_entry_action(
          }
          /* > ...otherwise, if current selection is off
           *   screen, auto select *last* item */
-         else 
-         {
+         else
             materialui_auto_select_onscreen_entry(mui, MUI_ONSCREEN_ENTRY_LAST);
-#ifdef HAVE_AUDIOMIXER
-            /* > The playlist if above leads to code 
-            *    that already plays the scrolling sound correctly,
-            *    So this is for every case that isn't the playlist tab. */
-            if (menu_navigation_get_selection() != 0)
-               audio_driver_mixer_play_scroll_sound(true);
-#endif
-         }
+         
          break;
       case MENU_ACTION_SCROLL_DOWN:
          /* Ascend alphabet (A towards Z)
@@ -9238,14 +9226,9 @@ static enum menu_action materialui_parse_menu_entry_action(
          }
          /* > ...otherwise, if current selection is off
           *   screen, auto select *first* item */
-         else 
-         {
+         else
             materialui_auto_select_onscreen_entry(mui, MUI_ONSCREEN_ENTRY_FIRST);
-#ifdef HAVE_AUDIOMIXER
-            if (menu_navigation_get_selection() != menu_entries_get_size() - 1)
-               audio_driver_mixer_play_scroll_sound(false);
-#endif
-         }
+   
          break;
       case MENU_ACTION_SCAN:
          /* - If this is a playlist, 'scan' command is used
@@ -9370,6 +9353,18 @@ static enum menu_action materialui_parse_menu_entry_action(
                materialui_switch_tabs(mui, main_menu_tab, MENU_ACTION_NOOP);
                new_action = MENU_ACTION_NOOP;
             }
+            else if (main_menu_tab_index == mui->nav_bar.active_menu_tab_index)
+            {
+               /* Jump to first item on Main Menu */
+               menu_navigation_set_selection(0);
+               materialui_navigation_set(mui, true);
+            }
+         }
+         else if (materialui_list_get_size(mui, MENU_LIST_PLAIN) == 1)
+         {
+            /* Jump to first item on current menu */
+            menu_navigation_set_selection(0);
+            materialui_navigation_set(mui, true);
          }
          break;
       default:
@@ -10667,7 +10662,10 @@ static void materialui_list_insert(
                node->icon_texture_index = MUI_TEXTURE_UNDO_LOAD_STATE;
                node->icon_type          = MUI_ICON_TYPE_INTERNAL;
             }
-            else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_UNDO_SAVE_STATE)))
+            else if (
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_UNDO_SAVE_STATE)) ||
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_OVERRIDE_UNLOAD))
+                  )
             {
                node->icon_texture_index = MUI_TEXTURE_UNDO_SAVE_STATE;
                node->icon_type          = MUI_ICON_TYPE_INTERNAL;
@@ -10705,6 +10703,9 @@ static void materialui_list_insert(
             else if (
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DELETE_ENTRY)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DELETE_PLAYLIST)) ||
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CORE)) ||
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_CONTENT_DIR)) ||
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMOVE_CURRENT_CONFIG_OVERRIDE_GAME)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_REMOVE))
                   )
             {
@@ -10852,6 +10853,7 @@ static void materialui_list_insert(
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_SAVE_CORE)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_SAVE_CONTENT_DIR)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_REMAP_FILE_SAVE_GAME)) ||
+                  string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_OVERRIDE_FILE_LOAD)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_META_CHEAT_SEARCH)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_CHEAT_SEARCH_SETTINGS)) ||
                   string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_CHEAT_START_OR_CONT)) ||

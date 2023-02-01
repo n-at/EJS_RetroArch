@@ -398,6 +398,19 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
       if (cbs->setting && cbs->setting->type)
          entry->setting_type        = cbs->setting->type;
 
+      /* Exceptions without cbs->setting->type */
+      if (!entry->setting_type)
+      {
+         switch (entry->type)
+         {
+            case MENU_SETTING_ACTION_CORE_LOCK:
+               entry->setting_type  = ST_BOOL;
+               break;
+            default:
+               break;
+         }
+      }
+
       if (cbs->checked)
          entry->flags |= MENU_ENTRY_FLAG_CHECKED;
 
@@ -476,9 +489,11 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
       core_option_manager_t *coreopts = NULL;
       size_t option_index             = entry->type - MENU_SETTINGS_CORE_OPTION_START;
       retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts);
-      option = (struct core_option*)&coreopts->opts[option_index];
 
-      if (option->vals->size == 2)
+      if (coreopts)
+         option                       = (struct core_option*)&coreopts->opts[option_index];
+
+      if (option && option->vals && option->vals->size == 2)
          entry->setting_type = ST_BOOL;
    }
 
@@ -1193,7 +1208,19 @@ void menu_input_pointer_close_messagebox(struct menu_state *menu_st)
    /* Determine whether this is a help or info
     * message box */
    if (list && list->size)
+   {
       label = list->list[list->size - 1].label;
+      /* Play sound for closing the info box */
+#ifdef HAVE_AUDIOMIXER
+      {
+         settings_t *settings          = config_get_ptr();
+         bool        audio_enable_menu = settings->bools.audio_enable_menu;
+         bool audio_enable_menu_notice = settings->bools.audio_enable_menu_notice;
+         if (audio_enable_menu && audio_enable_menu_notice)
+            audio_driver_mixer_play_menu_sound(AUDIO_MIXER_SYSTEM_SLOT_NOTICE_BACK);
+      }
+#endif
+   }
 
    /* Pop stack, if required */
    if (menu_should_pop_stack(label))
@@ -6871,8 +6898,8 @@ void retroarch_menu_running(void)
             true);
    }
 
-   /* Prevent stray input (for a single frame) */
-   menu_st->input_driver_flushing_input = 1;
+   /* Prevent stray input */
+   menu_st->input_driver_flushing_input = 2;
 
 #ifdef HAVE_AUDIOMIXER
    if (audio_enable_menu && audio_enable_menu_bgm)
@@ -6940,9 +6967,8 @@ void retroarch_menu_running_finished(bool quit)
             false);
    }
 
-   /* Prevent stray input
-    * (for a single frame) */
-   menu_st->input_driver_flushing_input = 1;
+   /* Prevent stray input */
+   menu_st->input_driver_flushing_input = 2;
 
    if (!quit)
    {
@@ -6970,6 +6996,13 @@ void retroarch_menu_running_finished(bool quit)
             command_event(CMD_EVENT_GAME_FOCUS_TOGGLE, &game_focus_cmd);
          }
       }
+
+#if HAVE_RUNAHEAD
+      /* Preemptive Frames isn't run behind the menu,
+       * so its savestate buffer is out of date. */
+      if (!settings->bools.menu_pause_libretro)
+         command_event(CMD_EVENT_PREEMPT_RESET_BUFFER, NULL);
+#endif
    }
 
    /* Ensure that menu screensaver is disabled when
@@ -7093,7 +7126,7 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
             menu_st->entries.begin               = 0;
 
             command_event(CMD_EVENT_HISTORY_DEINIT, NULL);
-            rarch_favorites_deinit();
+            retroarch_favorites_deinit();
 
             menu_st->dialog_st.pending_push  = false;
             menu_st->dialog_st.current_id    = 0;
@@ -7862,6 +7895,16 @@ static int generic_menu_iterate(
       size_t new_selection_ptr = selection;
       menu_entries_pop_stack(&new_selection_ptr, 0, 0);
       menu_st->selection_ptr   = selection;
+      /* Play sound for closing the info box */
+#ifdef HAVE_AUDIOMIXER
+      {
+         bool        audio_enable_menu = settings->bools.audio_enable_menu;
+         bool audio_enable_menu_notice = settings->bools.audio_enable_menu_notice;
+         if (audio_enable_menu && audio_enable_menu_notice && 
+               string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_INFO_SCREEN)))
+            audio_driver_mixer_play_menu_sound(AUDIO_MIXER_SYSTEM_SLOT_NOTICE_BACK);
+      }
+#endif
    }
 
    if (BIT64_GET(menu->state, MENU_STATE_POST_ITERATE))
@@ -7933,6 +7976,10 @@ int generic_menu_entry_action(
 
                if (menu_driver_ctx->navigation_decrement)
                   menu_driver_ctx->navigation_decrement(menu_userdata);
+#ifdef HAVE_AUDIOMIXER
+               if (menu_entries_get_size() != 1)
+                  audio_driver_mixer_play_scroll_sound(true);
+#endif
             }
          }
          break;
@@ -7963,6 +8010,10 @@ int generic_menu_entry_action(
 
                if (menu_driver_ctx->navigation_increment)
                   menu_driver_ctx->navigation_increment(menu_userdata);
+#ifdef HAVE_AUDIOMIXER
+               if (menu_entries_get_size() != 1)
+                  audio_driver_mixer_play_scroll_sound(false);
+#endif
             }
          }
          break;
@@ -7972,6 +8023,10 @@ int generic_menu_entry_action(
             if (selection_buf_size > 0)
             {
                unsigned scroll_speed  = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 10);
+#ifdef HAVE_AUDIOMIXER
+               if (menu_st->selection_ptr != 0)
+                  audio_driver_mixer_play_scroll_sound(true);
+#endif
                if (!(menu_st->selection_ptr == 0 && !wraparound_enable))
                {
                   size_t idx             = 0;
@@ -7990,6 +8045,7 @@ int generic_menu_entry_action(
          }
          else /* MENU_SCROLL_START_LETTER */
          {
+            size_t selection_old = menu_st->selection_ptr;
             if (
                      menu_st->scroll.index_size
                   && menu_st->selection_ptr != 0
@@ -8009,6 +8065,10 @@ int generic_menu_entry_action(
                   menu_driver_ctx->navigation_descend_alphabet(
                         menu_userdata, &menu_st->selection_ptr);
             }
+#ifdef HAVE_AUDIOMIXER
+            if (menu_st->selection_ptr != selection_old)
+               audio_driver_mixer_play_scroll_sound(true);
+#endif
          }
          break;
       case MENU_ACTION_SCROLL_DOWN:
@@ -8017,6 +8077,10 @@ int generic_menu_entry_action(
             if (selection_buf_size > 0)
             {
                unsigned scroll_speed  = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 10);
+#ifdef HAVE_AUDIOMIXER
+               if (menu_st->selection_ptr != menu_entries_get_size() - 1)
+                  audio_driver_mixer_play_scroll_sound(false);
+#endif
                if (!(menu_st->selection_ptr >= selection_buf_size - 1
                      && !wraparound_enable))
                {
@@ -8039,6 +8103,7 @@ int generic_menu_entry_action(
          {
             if (menu_st->scroll.index_size)
             {
+               size_t selection_old = menu_st->selection_ptr;
                if (menu_st->selection_ptr == menu_st->scroll.index_list[menu_st->scroll.index_size - 1])
                   menu_st->selection_ptr = selection_buf_size - 1;
                else
@@ -8056,6 +8121,10 @@ int generic_menu_entry_action(
                if (menu_driver_ctx->navigation_ascend_alphabet)
                   menu_driver_ctx->navigation_ascend_alphabet(
                         menu_userdata, &menu_st->selection_ptr);
+#ifdef HAVE_AUDIOMIXER
+               if (menu_st->selection_ptr != selection_old)
+                  audio_driver_mixer_play_scroll_sound(false);
+#endif
             }
          }
          break;
@@ -8213,6 +8282,7 @@ int generic_menu_entry_action(
       const char *deferred_path = menu ? menu->deferred_path : NULL;
       const char *flush_target  = msg_hash_to_str(MENU_ENUM_LABEL_MAIN_MENU);
       size_t stack_offset       = 1;
+      unsigned i                = 0;
       bool reset_navigation     = true;
 
       /* Loop backwards through the menu stack to
@@ -8261,6 +8331,9 @@ int generic_menu_entry_action(
        * the menu stack. We therefore have to force a
        * RARCH_MENU_CTL_UNSET_PREVENT_POPULATE */
       menu_driver_ctl(RARCH_MENU_CTL_UNSET_PREVENT_POPULATE, NULL);
+
+      /* Ozone requires thumbnail refreshing */
+      menu_driver_ctl(RARCH_MENU_CTL_REFRESH_THUMBNAIL_IMAGE, &i);
 
       if (reset_navigation)
          menu_st->selection_ptr = 0;

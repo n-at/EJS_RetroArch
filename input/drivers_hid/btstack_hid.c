@@ -1409,7 +1409,6 @@ static int16_t btstack_hid_joypad_state(
    unsigned i;
    int16_t ret                          = 0;
    const struct retro_keybind *binds    = (const struct retro_keybind*)binds_data;
-   btstack_hid_t         *hid            = (btstack_hid_t*)data;
    uint16_t port_idx                     = joypad_info->joy_idx;
    joypad_connection_t              *pad = &slots[port_idx];
 
@@ -1456,7 +1455,6 @@ static void btstack_hid_free(const void *data)
    btpad_set_inquiry_state(true);
    btstack_set_poweron(false);
 
-   free(slots);
    if (hid)
       free(hid);
 }

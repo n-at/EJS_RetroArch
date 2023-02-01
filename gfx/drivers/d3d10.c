@@ -24,8 +24,6 @@
 #define CINTERFACE
 #define COBJMACROS
 
-#include <assert.h>
-
 #include <string/stdstring.h>
 #include <file/file_path.h>
 #include <encodings/utf.h>
@@ -34,7 +32,6 @@
 
 #include <dxgi.h>
 
-#include "../../driver.h"
 #include "../../verbosity.h"
 #include "../../configuration.h"
 #include "../../retroarch.h"
@@ -79,7 +76,7 @@ static void d3d10_clear_scissor(d3d10_video_t *d3d10, unsigned width, unsigned h
 #ifdef HAVE_OVERLAY
 static void d3d10_free_overlays(d3d10_video_t* d3d10)
 {
-   unsigned i;
+   int i;
    for (i = 0; i < (unsigned)d3d10->overlays.count; i++)
       d3d10_release_texture(&d3d10->overlays.textures[i]);
 
@@ -149,8 +146,8 @@ static void d3d10_overlay_set_alpha(void* data, unsigned index, float mod)
 
 static bool d3d10_overlay_load(void* data, const void* image_data, unsigned num_images)
 {
+   int i;
    D3D10_BUFFER_DESC desc;
-   unsigned                          i = 0;
    d3d10_sprite_t*             sprites = NULL;
    d3d10_video_t*              d3d10   = (d3d10_video_t*)data;
    const struct texture_image* images  = (const struct texture_image*)image_data;
@@ -252,7 +249,8 @@ static void d3d10_get_overlay_interface(void* data, const video_overlay_interfac
 
 static void d3d10_render_overlay(d3d10_video_t *d3d10)
 {
-   unsigned       i;
+   UINT offset = 0, stride = 0;
+   int i;
 
    if (d3d10->flags & D3D10_ST_FLAG_OVERLAYS_FULLSCREEN)
       d3d10->device->lpVtbl->RSSetViewports(d3d10->device, 1, &d3d10->viewport);
@@ -262,11 +260,13 @@ static void d3d10_render_overlay(d3d10_video_t *d3d10)
    d3d10->device->lpVtbl->OMSetBlendState(d3d10->device,
          d3d10->blend_enable, NULL,
          D3D10_DEFAULT_SAMPLE_MASK);
-   D3D10SetVertexBuffer(d3d10->device, 0, d3d10->overlays.vbo, sizeof(d3d10_sprite_t), 0);
+   stride = sizeof(d3d10_sprite_t);
+   d3d10->device->lpVtbl->IASetVertexBuffers(
+         d3d10->device, 0, 1, (D3D10Buffer* const)&d3d10->overlays.vbo, &stride, &offset);
    d3d10->device->lpVtbl->PSSetSamplers(d3d10->device, 0, 1,
          &d3d10->samplers[RARCH_FILTER_UNSPEC][RARCH_WRAP_DEFAULT]);
 
-   for (i = 0; i < (unsigned)d3d10->overlays.count; i++)
+   for (i = 0; i < d3d10->overlays.count; i++)
    {
       d3d10->device->lpVtbl->PSSetShaderResources(d3d10->device, 0, 1, &d3d10->overlays.textures[i].view);
       d3d10->device->lpVtbl->Draw(d3d10->device, 1, i);
@@ -276,7 +276,7 @@ static void d3d10_render_overlay(d3d10_video_t *d3d10)
 
 static void d3d10_set_filtering(void* data, unsigned index, bool smooth, bool ctx_scaling)
 {
-   unsigned       i;
+   int i;
    d3d10_video_t* d3d10 = (d3d10_video_t*)data;
 
    if (smooth)
@@ -346,13 +346,13 @@ static void d3d10_update_viewport(d3d10_video_t *d3d10, bool force_full)
 
 static void d3d10_free_shader_preset(d3d10_video_t* d3d10)
 {
-   unsigned i;
+   int i;
    if (!d3d10->shader_preset)
       return;
 
    for (i = 0; i < d3d10->shader_preset->passes; i++)
    {
-      unsigned j;
+      int j;
 
       free(d3d10->shader_preset->pass[i].source.string.vertex);
       free(d3d10->shader_preset->pass[i].source.string.fragment);
@@ -1154,8 +1154,6 @@ static void d3d10_init_history(d3d10_video_t* d3d10,
    /* TODO/FIXME: should we init history to max_width/max_height instead ?
     * to prevent out of memory errors happening several frames later
     * and to reduce memory fragmentation */
-
-   assert(d3d10->shader_preset);
    for (i = 0; i < (int)d3d10->shader_preset->history_size + 1; i++)
    {
       d3d10->frame.texture[i].desc.Width  = width;
@@ -1172,10 +1170,7 @@ static void d3d10_init_history(d3d10_video_t* d3d10,
 static void d3d10_init_render_targets(d3d10_video_t* d3d10,
       unsigned width, unsigned height)
 {
-   unsigned i;
-
-   assert(d3d10->shader_preset);
-
+   int i;
    for (i = 0; i < d3d10->shader_preset->passes; i++)
    {
       struct video_shader_pass* pass = &d3d10->shader_preset->pass[i];
@@ -1277,6 +1272,7 @@ static bool d3d10_gfx_frame(
       video_frame_info_t* video_info)
 {
    unsigned           i;
+   UINT offset = 0, stride    = 0;
    d3d10_texture_t*   texture = NULL;
    d3d10_video_t      * d3d10 = (d3d10_video_t*)data;
    D3D10Device       context  = d3d10->device;
@@ -1395,7 +1391,9 @@ static bool d3d10_gfx_frame(
                   width, height, pitch, d3d10->format, frame, &d3d10->frame.texture[0]);
    }
 
-   D3D10SetVertexBuffer(context, 0, d3d10->frame.vbo, sizeof(d3d10_vertex_t), 0);
+   stride = sizeof(d3d10_vertex_t);
+   context->lpVtbl->IASetVertexBuffers(
+         context, 0, 1, (D3D10Buffer* const)&d3d10->frame.vbo, &stride, &offset);
    context->lpVtbl->OMSetBlendState(context, d3d10->blend_disable, NULL,
          D3D10_DEFAULT_SAMPLE_MASK);
 
@@ -1415,7 +1413,7 @@ static bool d3d10_gfx_frame(
 
       for (i = 0; i < d3d10->shader_preset->passes; i++)
       {
-         unsigned j;
+         int j;
 
          d3d10_set_shader(context, &d3d10->pass[i].shader);
 
@@ -1538,11 +1536,13 @@ static bool d3d10_gfx_frame(
    if (    (d3d10->flags & D3D10_ST_FLAG_MENU_ENABLE) 
          && d3d10->menu.texture.handle)
    {
+      UINT offset = 0, stride = 0;
       if (d3d10->flags & D3D10_ST_FLAG_MENU_FULLSCREEN)
          context->lpVtbl->RSSetViewports(context, 1, &d3d10->viewport);
 
       d3d10_set_shader(context, &d3d10->shaders[VIDEO_SHADER_STOCK_BLEND]);
-      D3D10SetVertexBuffer(context, 0, d3d10->menu.vbo, sizeof(d3d10_vertex_t), 0);
+      context->lpVtbl->IASetVertexBuffers(
+            context, 0, 1, (D3D10Buffer* const)&d3d10->menu.vbo, &stride, &offset);
       context->lpVtbl->VSSetConstantBuffers(context, 0, 1, &d3d10->ubo);
       d3d10_set_texture_and_sampler(context, 0, &d3d10->menu.texture);
       context->lpVtbl->Draw(context, 4, 0);
@@ -1568,8 +1568,11 @@ static bool d3d10_gfx_frame(
    if (d3d10->flags & D3D10_ST_FLAG_MENU_ENABLE)
 #endif
    {
+      UINT offset = 0, stride = 0;
+      stride = sizeof(d3d10_sprite_t);
       context->lpVtbl->RSSetViewports(context, 1, &d3d10->viewport);
-      D3D10SetVertexBuffer(context, 0, d3d10->sprites.vbo, sizeof(d3d10_sprite_t), 0);
+      context->lpVtbl->IASetVertexBuffers(
+            context, 0, 1, (D3D10Buffer* const)&d3d10->sprites.vbo, &stride, &offset);
    }
 #endif
 
@@ -1582,11 +1585,14 @@ static bool d3d10_gfx_frame(
       {
          if (osd_params)
          {
+            UINT stride = 0, offset = 0;
             context->lpVtbl->RSSetViewports(context, 1, &d3d10->viewport);
             d3d10->device->lpVtbl->OMSetBlendState(d3d10->device,
                   d3d10->blend_enable, NULL,
                   D3D10_DEFAULT_SAMPLE_MASK);
-            D3D10SetVertexBuffer(context, 0, d3d10->sprites.vbo, sizeof(d3d10_sprite_t), 0);
+            stride = sizeof(d3d10_sprite_t);
+            context->lpVtbl->IASetVertexBuffers(
+                  context, 0, 1, (D3D10Buffer* const)&d3d10->sprites.vbo, &stride, &offset);
             font_driver_render_msg(d3d10,
                   stat_text,
                   (const struct font_params*)osd_params, NULL);
@@ -1606,11 +1612,14 @@ static bool d3d10_gfx_frame(
 
    if (msg && *msg)
    {
+      UINT offset = 0, stride = 0;
       d3d10->device->lpVtbl->RSSetViewports(d3d10->device, 1, &d3d10->viewport);
       d3d10->device->lpVtbl->OMSetBlendState(d3d10->device,
             d3d10->blend_enable, NULL,
             D3D10_DEFAULT_SAMPLE_MASK);
-      D3D10SetVertexBuffer(d3d10->device, 0, d3d10->sprites.vbo, sizeof(d3d10_sprite_t), 0);
+      stride = sizeof(d3d10_sprite_t);
+      d3d10->device->lpVtbl->IASetVertexBuffers(
+            d3d10->device, 0, 1, (D3D10Buffer* const)&d3d10->sprites.vbo, &stride, &offset);
       font_driver_render_msg(d3d10, msg, NULL, NULL);
    }
    d3d10->flags &= ~D3D10_ST_FLAG_SPRITES_ENABLE;
@@ -1634,13 +1643,13 @@ static void d3d10_gfx_set_nonblock_state(void* data, bool toggle,
 
    if (toggle)
    {
-      d3d10->flags        &= ~D3D10_ST_FLAG_VSYNC;
-      d3d10->swap_interval =  0;
+      d3d10->flags         &= ~D3D10_ST_FLAG_VSYNC;
+      d3d10->swap_interval  =  0;
    }
    else
    {
-      d3d10->flags        |=  D3D10_ST_FLAG_VSYNC;
-      d3d10->swap_interval =  swap_interval;
+      d3d10->flags         |=  D3D10_ST_FLAG_VSYNC;
+      d3d10->swap_interval  =  swap_interval;
    }
 }
 

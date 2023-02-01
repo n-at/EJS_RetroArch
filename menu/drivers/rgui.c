@@ -51,7 +51,6 @@
 #include "../../input/input_osk.h"
 
 #include "../../configuration.h"
-#include "../../audio/audio_driver.h"
 #include "../../file_path_special.h"
 #include "../../gfx/drivers_font_renderer/bitmap.h"
 
@@ -2365,8 +2364,10 @@ static bool rgui_downscale_thumbnail(
    /* Determine output dimensions */
    float display_aspect_ratio    = (float)max_width / (float)max_height;
    float         aspect_ratio    = (float)image_src->width / (float)image_src->height;
-   float core_aspect             = (thumbnail_core_aspect && video_st)
-         ? video_st->av_info.geometry.aspect_ratio : aspect_ratio;
+   float core_aspect             = (thumbnail_core_aspect
+         && video_st && video_st->av_info.geometry.aspect_ratio > 0)
+               ? video_st->av_info.geometry.aspect_ratio
+               : aspect_ratio;
 
    if (aspect_ratio > display_aspect_ratio)
    {
@@ -5092,7 +5093,7 @@ static void rgui_render(
          unsigned new_ptr;
          menu_entries_ctl(MENU_ENTRIES_CTL_START_GET, &old_start);
 
-         /* Note: It's okay for this to go out of range
+         /* NOTE: It's okay for this to go out of range
           * (limits are checked in rgui_pointer_up()) */
          new_ptr = (unsigned)((rgui->pointer.y - rgui->term_layout.start_y) / rgui->font_height_stride) + old_start;
 
@@ -7872,6 +7873,13 @@ static enum menu_action rgui_parse_menu_entry_action(
             rgui_toggle_fs_thumbnail(rgui, config_get_ptr()->bools.menu_rgui_inline_thumbnails);
             new_action = MENU_ACTION_NOOP;
          }
+
+         if (string_is_equal(rgui->menu_title, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MAIN_MENU)))
+         {
+            /* Jump to first item on Main Menu */
+            menu_navigation_set_selection(0);
+            new_action = MENU_ACTION_NOOP;
+         }
          break;
       case MENU_ACTION_START:
          /* Playlist thumbnail fullscreen toggle */
@@ -7990,20 +7998,6 @@ static enum menu_action rgui_parse_menu_entry_action(
          if (     (rgui->flags & RGUI_FLAG_SHOW_FULLSCREEN_THUMBNAIL)
                && (rgui->is_quick_menu))
             new_action = MENU_ACTION_NOOP;
-#ifdef HAVE_AUDIOMIXER
-         if (action == MENU_ACTION_UP || action == MENU_ACTION_DOWN)
-         {
-            if (menu_entries_get_size() != 1)
-               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_UP);
-         }
-         else 
-         {
-            size_t selection = menu_navigation_get_selection();
-            if ((action == MENU_ACTION_SCROLL_UP && selection != 0) ||
-                  (action == MENU_ACTION_SCROLL_DOWN && selection != menu_entries_get_size() - 1))
-               audio_driver_mixer_play_scroll_sound(action == MENU_ACTION_SCROLL_UP);
-         }
-#endif
          break;
       case MENU_ACTION_LEFT:
       case MENU_ACTION_RIGHT:

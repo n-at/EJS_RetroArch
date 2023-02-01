@@ -331,24 +331,27 @@ void rcheevos_award_achievement(rcheevos_locals_t* locals,
          cheevo->id, cheevo->title, cheevo->description);
 
    /* Show the on screen message. */
-#if defined(HAVE_GFX_WIDGETS)
-   if (widgets_ready)
-      gfx_widgets_push_achievement(msg_hash_to_str(MSG_ACHIEVEMENT_UNLOCKED), cheevo->title, cheevo->badge);
-   else
-#endif
+   if (settings->bools.cheevos_visibility_unlock)
    {
-      char buffer[256];
-      size_t _len    = strlcpy(buffer,
+#if defined(HAVE_GFX_WIDGETS)
+      if (widgets_ready)
+         gfx_widgets_push_achievement(msg_hash_to_str(MSG_ACHIEVEMENT_UNLOCKED), cheevo->title, cheevo->badge);
+      else
+#endif
+      {
+         char buffer[256];
+         size_t _len    = strlcpy(buffer,
             msg_hash_to_str(MSG_ACHIEVEMENT_UNLOCKED),
             sizeof(buffer));
-      buffer[_len  ] = ':';
-      buffer[_len+1] = ' ';
-      buffer[_len+2] = '\0';
-      strlcat(buffer, cheevo->title, sizeof(buffer));
-      runloop_msg_queue_push(buffer, 0, 2 * 60, false, NULL,
+         buffer[_len  ] = ':';
+         buffer[_len+1] = ' ';
+         buffer[_len+2] = '\0';
+         strlcat(buffer, cheevo->title, sizeof(buffer));
+         runloop_msg_queue_push(buffer, 0, 2 * 60, false, NULL,
             MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-      runloop_msg_queue_push(cheevo->description, 0, 3 * 60, false, NULL,
+         runloop_msg_queue_push(cheevo->description, 0, 3 * 60, false, NULL,
             MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+      }
    }
 
    /* Start the award task (unofficial achievement 
@@ -669,6 +672,7 @@ bool rcheevos_unload(void)
 
    if (rcheevos_locals.loaded)
    {
+      unsigned count = 0;
 #ifdef HAVE_MENU
       rcheevos_menu_reset_badges();
 
@@ -680,6 +684,45 @@ bool rcheevos_unload(void)
             rcheevos_locals.menuitem_count      = 0;
       }
 #endif
+
+      count = rcheevos_locals.game.achievement_count;
+      rcheevos_locals.game.achievement_count = 0;
+      if (rcheevos_locals.game.achievements)
+      {
+         rcheevos_racheevo_t* achievement = rcheevos_locals.game.achievements;
+         rcheevos_racheevo_t* end = achievement + count;
+         while (achievement < end)
+         {
+            CHEEVOS_FREE(achievement->title);
+            CHEEVOS_FREE(achievement->description);
+            CHEEVOS_FREE(achievement->badge);
+            CHEEVOS_FREE(achievement->memaddr);
+
+            ++achievement;
+         }
+
+         CHEEVOS_FREE(rcheevos_locals.game.achievements);
+         rcheevos_locals.game.achievements      = NULL;
+      }
+
+      count = rcheevos_locals.game.leaderboard_count;
+      rcheevos_locals.game.leaderboard_count = 0;
+      if (rcheevos_locals.game.leaderboards)
+      {
+         rcheevos_ralboard_t* lboard = rcheevos_locals.game.leaderboards;
+         rcheevos_ralboard_t* end = lboard + count;
+         while (lboard < end)
+         {
+            CHEEVOS_FREE(lboard->title);
+            CHEEVOS_FREE(lboard->description);
+            CHEEVOS_FREE(lboard->mem);
+
+            ++lboard;
+         }
+
+         CHEEVOS_FREE(rcheevos_locals.game.leaderboards);
+         rcheevos_locals.game.leaderboards      = NULL;
+      }
 
       if (rcheevos_locals.game.title)
       {
@@ -1477,44 +1520,47 @@ void rcheevos_show_mastery_placard(void)
    title[sizeof(title) - 1] = '\0';
    CHEEVOS_LOG(RCHEEVOS_TAG "%s\n", title);
 
-#if defined (HAVE_GFX_WIDGETS)
-   if (gfx_widgets_ready())
+   if (settings->bools.cheevos_visibility_mastery)
    {
-      const bool content_runtime_log      = settings->bools.content_runtime_log;
-      const bool content_runtime_log_aggr = settings->bools.content_runtime_log_aggregate;
-      char msg[128];
-      size_t len = strlcpy(msg, rcheevos_locals.displayname, sizeof(msg));
-
-      if (len < sizeof(msg) - 12 &&
-         (content_runtime_log || content_runtime_log_aggr))
+#if defined (HAVE_GFX_WIDGETS)
+      if (gfx_widgets_ready())
       {
-         const char* content_path   = path_get(RARCH_PATH_CONTENT);
-         const char* core_path      = path_get(RARCH_PATH_CORE);
-         runtime_log_t* runtime_log = runtime_log_init(
+         const bool content_runtime_log      = settings->bools.content_runtime_log;
+         const bool content_runtime_log_aggr = settings->bools.content_runtime_log_aggregate;
+         char msg[128];
+         size_t len = strlcpy(msg, rcheevos_locals.displayname, sizeof(msg));
+
+         if (len < sizeof(msg) - 12 &&
+            (content_runtime_log || content_runtime_log_aggr))
+         {
+            const char* content_path   = path_get(RARCH_PATH_CONTENT);
+            const char* core_path      = path_get(RARCH_PATH_CORE);
+            runtime_log_t* runtime_log = runtime_log_init(
                content_path, core_path,
                settings->paths.directory_runtime_log,
                settings->paths.directory_playlist,
                !content_runtime_log_aggr);
 
-         if (runtime_log)
-         {
-            const runloop_state_t* runloop_state = runloop_state_get_ptr();
-            runtime_log_add_runtime_usec(runtime_log,
-               runloop_state->core_runtime_usec);
+            if (runtime_log)
+            {
+               const runloop_state_t* runloop_state = runloop_state_get_ptr();
+               runtime_log_add_runtime_usec(runtime_log,
+                  runloop_state->core_runtime_usec);
 
-            len += snprintf(msg + len, sizeof(msg) - len, " | ");
-            runtime_log_get_runtime_str(runtime_log, msg + len, sizeof(msg) - len);
-            msg[sizeof(msg) - 1] = '\0';
+               len += snprintf(msg + len, sizeof(msg) - len, " | ");
+               runtime_log_get_runtime_str(runtime_log, msg + len, sizeof(msg) - len);
+               msg[sizeof(msg) - 1] = '\0';
 
-            free(runtime_log);
+               free(runtime_log);
+            }
          }
-      }
 
-      gfx_widgets_push_achievement(title, msg, rcheevos_locals.game.badge_name);
-   }
-   else
+         gfx_widgets_push_achievement(title, msg, rcheevos_locals.game.badge_name);
+      }
+      else
 #endif
-      runloop_msg_queue_push(title, 0, 3 * 60, false, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+         runloop_msg_queue_push(title, 0, 3 * 60, false, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+   }
 }
 
 static void rcheevos_show_game_placard(void)
@@ -1528,6 +1574,9 @@ static void rcheevos_show_game_placard(void)
    int number_of_unsupported         = 0;
    int number_of_core                = 0;
    int mode                          = RCHEEVOS_ACTIVE_SOFTCORE;
+
+   if (rcheevos_locals.game.id < 0) /* make sure there's actually a game loaded */
+      return;
 
    if (rcheevos_locals.hardcore_active)
       mode = RCHEEVOS_ACTIVE_HARDCORE;
@@ -1574,7 +1623,8 @@ static void rcheevos_show_game_placard(void)
    msg[sizeof(msg) - 1] = 0;
    CHEEVOS_LOG(RCHEEVOS_TAG "%s\n", msg);
 
-   if (settings->bools.cheevos_verbose_enable)
+   if (settings->uints.cheevos_visibility_summary == RCHEEVOS_SUMMARY_ALLGAMES ||
+       (number_of_core > 0 && settings->uints.cheevos_visibility_summary == RCHEEVOS_SUMMARY_HASCHEEVOS))
    {
 #if defined (HAVE_GFX_WIDGETS)
       if (gfx_widgets_ready())
@@ -1729,7 +1779,7 @@ static void rcheevos_fetch_game_data(void)
       const settings_t* settings = config_get_ptr();
       if (settings->bools.cheevos_verbose_enable)
          runloop_msg_queue_push(
-            "This game has no achievements.",
+            "RetroAchievements: Game could not be identified.",
             0, 3 * 60, false, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
       CHEEVOS_LOG(RCHEEVOS_TAG "Game could not be identified\n");
@@ -1939,7 +1989,7 @@ static void rcheevos_login_callback(void* userdata)
    if (rcheevos_locals.token[0])
    {
       const settings_t* settings = config_get_ptr();
-      if (settings->bools.cheevos_verbose_enable)
+      if (settings->bools.cheevos_visibility_account)
       {
          char msg[256];
          msg[0] = '\0';

@@ -1847,10 +1847,6 @@ MSG_HASH(
    "Tundaan Bingkai (ms)"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_VIDEO_FRAME_DELAY,
-   "Mengurangi latensi dengan mengorbankan risiko video gagap yang lebih tinggi. Menambahkan penundaan setelah VSync (dalam ms)."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FRAME_DELAY_AUTO,
    "Frame Delay Otomatis"
    )
@@ -2017,6 +2013,10 @@ MSG_HASH(
    "Ganti perangkat audio default yang digunakan driver audio. Ini tergantung driver."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_AUDIO_DEVICE,
+   "Ganti perangkat audio default yang digunakan driver audio. Ini tergantung driver."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_LATENCY,
    "Latensi Audio (ms)"
    )
@@ -2175,14 +2175,6 @@ MSG_HASH(
    "Jumlah maksimal pemain yang diperbolehkan di RetroArch."
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_INPUT_POLL_TYPE_BEHAVIOR,
-   "Perilaku Polling"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_INPUT_POLL_TYPE_BEHAVIOR,
-   "Memengaruhi cara penjajakan masukan di RetroArch. Jika diatur ke 'Lebih Awal' atau \"Telat\" dapat mengurangi latensi, tapi tergantung konfigurasi."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_REMAP_BINDS_ENABLE,
    "Atur ulang letak stik kendali untuk Core ini"
    )
@@ -2207,6 +2199,8 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_NOWINKEY_ENABLE,
    "Kombinasi tombil Win-key hanya tersedia di aplikasi."
    )
+#endif
+#ifdef ANDROID
 #endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SENSORS_ENABLE,
@@ -2787,6 +2781,9 @@ MSG_HASH(
    )
 
 /* Settings > Achievements > Appearance */
+
+
+/* Settings > Achievements > Visibility */
 
 
 /* Settings > Network */

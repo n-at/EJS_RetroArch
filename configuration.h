@@ -342,6 +342,7 @@ typedef struct settings
 #endif
 
       unsigned cheevos_appearance_anchor;
+      unsigned cheevos_visibility_summary;
    } uints;
 
    struct
@@ -836,6 +837,9 @@ typedef struct settings
       bool cheevos_unlock_sound_enable;
       bool cheevos_challenge_indicators;
       bool cheevos_appearance_padding_auto;
+      bool cheevos_visibility_unlock;
+      bool cheevos_visibility_mastery;
+      bool cheevos_visibility_account;
 
       /* Camera */
       bool camera_allow;
@@ -881,6 +885,8 @@ typedef struct settings
       bool run_ahead_enabled;
       bool run_ahead_secondary_instance;
       bool run_ahead_hide_warnings;
+      bool preemptive_frames_enable;
+      bool preemptive_frames_hide_warnings;
       bool pause_nonactive;
       bool pause_on_disconnect;
       bool block_sram_overwrite;
@@ -899,6 +905,7 @@ typedef struct settings
       bool check_firmware_before_loading;
       bool core_option_category_enable;
       bool core_info_cache_enable;
+      bool core_info_savestate_bypass;
 #ifndef HAVE_DYNAMIC
       bool always_reload_core_on_run_content;
 #endif
@@ -1082,6 +1089,18 @@ const char *config_get_default_record(void);
 bool config_load_override(void *data);
 
 /**
+ * config_load_override_file:
+ *
+ * Tries to load specified configuration file.
+ * These settings will always have precedence, thus this feature
+ * can be used to enforce overrides.
+ *
+ * Returns: false if there was an error or no action was performed.
+ *
+ */
+bool config_load_override_file(const char *path);
+
+/**
  * config_unload_override:
  *
  * Unloads configuration overrides if overrides are active.
@@ -1126,9 +1145,9 @@ bool config_save_file(const char *path);
  *
  * Writes a config file override to disk.
  *
- * Returns: true (1) on success, otherwise returns false (0).
+ * Returns: true (1) on success, (-1) if nothing to write, otherwise returns false (0).
  **/
-bool config_save_overrides(enum override_type type, void *data);
+int8_t config_save_overrides(enum override_type type, void *data, bool remove);
 
 /* Replaces currently loaded configuration file with
  * another one. Will load a dummy core to flush state
@@ -1152,9 +1171,9 @@ void config_load_file_salamander(void);
 void config_save_file_salamander(void);
 #endif
 
-void rarch_config_init(void);
+void retroarch_config_init(void);
 
-void rarch_config_deinit(void);
+void retroarch_config_deinit(void);
 
 settings_t *config_get_ptr(void);
 

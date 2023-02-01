@@ -189,6 +189,10 @@
 #define DEFAULT_CHEEVOS_APPEARANCE_PADDING_AUTO true
 #define DEFAULT_CHEEVOS_APPEARANCE_PADDING_H 0.0f
 #define DEFAULT_CHEEVOS_APPEARANCE_PADDING_V 0.0f
+#define DEFAULT_CHEEVOS_VISIBILITY_SUMMARY 1 /* RCHEEVOS_SUMMARY_HASCHEEVOS */
+#define DEFAULT_CHEEVOS_VISIBILITY_UNLOCK true
+#define DEFAULT_CHEEVOS_VISIBILITY_MASTERY true
+#define DEFAULT_CHEEVOS_VISIBILITY_ACCOUNT true
 #endif
 
 /* VIDEO */
@@ -316,6 +320,12 @@
  * into a single (compressed) file for improved
  * load times on platforms with slow IO */
 #define DEFAULT_CORE_INFO_CACHE_ENABLE true
+
+/* Specifies whether to ignore core info
+ * savestate capabilities, allowing to
+ * experiment with related features
+ * (run ahead, rewind, etc) */
+#define DEFAULT_CORE_INFO_SAVESTATE_BYPASS false
 
 /* Specifies whether to 'reload' (fork and quit)
  * RetroArch when launching content with the
@@ -1295,6 +1305,8 @@
 
 /* Hide warning messages when using the Run Ahead feature. */
 #define DEFAULT_RUN_AHEAD_HIDE_WARNINGS false
+/* Hide warning messages when using Preemptive Frames. */
+#define DEFAULT_PREEMPT_HIDE_WARNINGS   false
 
 /* Enable stdin/network command interface. */
 #define DEFAULT_NETWORK_CMD_ENABLE false

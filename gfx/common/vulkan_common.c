@@ -374,7 +374,7 @@ static void vulkan_debug_mark_object(VkDevice device,
    }
 }
 
-void vulkan_debug_mark_buffer(VkDevice device, VkBuffer buffer)
+static void vulkan_debug_mark_buffer(VkDevice device, VkBuffer buffer)
 {
    static unsigned object_count;
    vulkan_debug_mark_object(device, VK_OBJECT_TYPE_BUFFER, (uint64_t)buffer, "RetroArch buffer", ++object_count);
@@ -390,6 +390,25 @@ void vulkan_debug_mark_memory(VkDevice device, VkDeviceMemory memory)
 {
    static unsigned object_count;
    vulkan_debug_mark_object(device, VK_OBJECT_TYPE_DEVICE_MEMORY, (uint64_t)memory, "RetroArch memory", ++object_count);
+}
+
+static INLINE unsigned vulkan_format_to_bpp(VkFormat format)
+{
+   switch (format)
+   {
+      case VK_FORMAT_B8G8R8A8_UNORM:
+         return 4;
+      case VK_FORMAT_R4G4B4A4_UNORM_PACK16:
+      case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
+      case VK_FORMAT_R5G6B5_UNORM_PACK16:
+         return 2;
+      case VK_FORMAT_R8_UNORM:
+         return 1;
+      default: /* Unknown format */
+         break;
+   }
+
+   return 0;
 }
 
 struct vk_texture vulkan_create_texture(vk_t *vk,
@@ -866,7 +885,7 @@ void vulkan_destroy_texture(
    tex->layout                        = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
-static void vulkan_write_quad_descriptors(
+void vulkan_write_quad_descriptors(
       VkDevice device,
       VkDescriptorSet set,
       VkBuffer buffer,
@@ -1037,125 +1056,6 @@ void vulkan_draw_triangles(vk_t *vk, const struct vk_draw_triangles *call)
 
    /* Draw the quad */
    vkCmdDraw(vk->cmd, call->vertices, 1, 0, 0);
-}
-
-void vulkan_draw_quad(vk_t *vk, const struct vk_draw_quad *quad)
-{
-   if (quad->texture && quad->texture->image)
-      vulkan_transition_texture(vk, vk->cmd, quad->texture);
-
-   if (quad->pipeline != vk->tracker.pipeline)
-   {
-      VkRect2D sci;
-      vkCmdBindPipeline(vk->cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS, quad->pipeline);
-
-      vk->tracker.pipeline = quad->pipeline;
-      /* Changing pipeline invalidates dynamic state. */
-      vk->tracker.dirty   |= VULKAN_DIRTY_DYNAMIC_BIT;
-      if (vk->flags & VK_FLAG_TRACKER_USE_SCISSOR)
-         sci               = vk->tracker.scissor;
-      else
-      {
-         /* No scissor -> viewport */
-         sci.offset.x      = vk->vp.x;
-         sci.offset.y      = vk->vp.y;
-         sci.extent.width  = vk->vp.width;
-         sci.extent.height = vk->vp.height;
-      }
-
-      vkCmdSetViewport(vk->cmd, 0, 1, &vk->vk_vp);
-      vkCmdSetScissor (vk->cmd, 0, 1, &sci);
-
-      vk->tracker.dirty &= ~VULKAN_DIRTY_DYNAMIC_BIT;
-   }
-   else if (vk->tracker.dirty & VULKAN_DIRTY_DYNAMIC_BIT)
-   {
-      VkRect2D sci;
-      if (vk->flags & VK_FLAG_TRACKER_USE_SCISSOR)
-         sci               = vk->tracker.scissor;
-      else
-      {
-         /* No scissor -> viewport */
-         sci.offset.x      = vk->vp.x;
-         sci.offset.y      = vk->vp.y;
-         sci.extent.width  = vk->vp.width;
-         sci.extent.height = vk->vp.height;
-      }
-
-      vkCmdSetViewport(vk->cmd, 0, 1, &vk->vk_vp);
-      vkCmdSetScissor (vk->cmd, 0, 1, &sci);
-
-      vk->tracker.dirty &= ~VULKAN_DIRTY_DYNAMIC_BIT;
-   }
-
-   /* Upload descriptors */
-   {
-      VkDescriptorSet set;
-      struct vk_buffer_range range;
-
-      if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->ubo,
-               sizeof(*quad->mvp), &range))
-         return;
-
-      if (
-               string_is_equal_fast(quad->mvp,
-                  &vk->tracker.mvp, sizeof(*quad->mvp))
-            || quad->texture->view != vk->tracker.view
-            || quad->sampler != vk->tracker.sampler)
-      {
-         /* Upload UBO */
-         struct vk_buffer_range range;
-
-         if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->ubo,
-                  sizeof(*quad->mvp), &range))
-            return;
-
-         memcpy(range.data, quad->mvp, sizeof(*quad->mvp));
-
-         set = vulkan_descriptor_manager_alloc(
-               vk->context->device,
-               &vk->chain->descriptor_manager);
-
-         vulkan_write_quad_descriptors(
-               vk->context->device,
-               set,
-               range.buffer,
-               range.offset,
-               sizeof(*quad->mvp),
-               quad->texture,
-               quad->sampler);
-
-         vkCmdBindDescriptorSets(vk->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-               vk->pipelines.layout, 0,
-               1, &set, 0, NULL);
-
-         vk->tracker.view    = quad->texture->view;
-         vk->tracker.sampler = quad->sampler;
-         vk->tracker.mvp     = *quad->mvp;
-      }
-   }
-
-   /* Upload VBO */
-   {
-      struct vk_buffer_range range;
-      if (!vulkan_buffer_chain_alloc(vk->context, &vk->chain->vbo,
-               6 * sizeof(struct vk_vertex), &range))
-         return;
-
-      {
-         struct vk_vertex         *pv = (struct vk_vertex*)range.data;
-         const struct vk_color *color = &quad->color;
-
-         VULKAN_WRITE_QUAD_VBO(pv, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, color);
-      }
-
-      vkCmdBindVertexBuffers(vk->cmd, 0, 1,
-            &range.buffer, &range.offset);
-   }
-
-   /* Draw the quad */
-   vkCmdDraw(vk->cmd, 6, 1, 0, 0);
 }
 
 struct vk_buffer vulkan_create_buffer(
@@ -1549,7 +1449,6 @@ static bool vulkan_context_init_gpu(gfx_ctx_vulkan_data_t *vk)
 
 static bool vulkan_context_init_device(gfx_ctx_vulkan_data_t *vk)
 {
-   bool use_device_ext;
    uint32_t queue_count;
    unsigned i;
    static const float one                  = 1.0f;
@@ -1585,6 +1484,9 @@ static bool vulkan_context_init_device(gfx_ctx_vulkan_data_t *vk)
       iface = NULL;
    }
 
+   if (!vulkan_context_init_gpu(vk))
+      return false;
+
    if (!cached_device_vk && iface && iface->create_device)
    {
       struct retro_vulkan_context context     = { 0 };
@@ -1606,6 +1508,9 @@ static bool vulkan_context_init_device(gfx_ctx_vulkan_data_t *vk)
       }
       else
       {
+         if (vk->context.gpu != VK_NULL_HANDLE && context.gpu != vk->context.gpu)
+            RARCH_ERR("[Vulkan]: Got unexpected VkPhysicalDevice, despite RetroArch using explicit physical device.\n");
+
          vk->context.destroy_device       = iface->destroy_device;
 
          vk->context.device               = context.device;
@@ -1626,9 +1531,6 @@ static bool vulkan_context_init_device(gfx_ctx_vulkan_data_t *vk)
       vk->context.destroy_device = cached_destroy_device_vk;
       cached_destroy_device_vk   = NULL;
    }
-
-   if (!vulkan_context_init_gpu(vk))
-      return false;
 
    vkGetPhysicalDeviceProperties(vk->context.gpu,
          &vk->context.gpu_properties);
@@ -1733,7 +1635,7 @@ static bool vulkan_context_init_device(gfx_ctx_vulkan_data_t *vk)
          return false;
       }
 
-      if (!(use_device_ext = vulkan_find_device_extensions(vk->context.gpu,
+      if (!(vulkan_find_device_extensions(vk->context.gpu,
               enabled_device_extensions, &enabled_device_extension_count,
               device_extensions, ARRAY_SIZE(device_extensions),
               optional_device_extensions,
@@ -2374,7 +2276,7 @@ bool vulkan_surface_create(gfx_ctx_vulkan_data_t *vk,
             return false;
          break;
       case VULKAN_WSI_MVK_MACOS:
-#ifdef HAVE_COCOA
+#if defined(HAVE_COCOA) || defined(HAVE_COCOA_METAL)
          {
             PFN_vkCreateMacOSSurfaceMVK create;
             if (!VULKAN_SYMBOL_WRAPPER_LOAD_INSTANCE_SYMBOL(vk->context.instance, "vkCreateMacOSSurfaceMVK", create))
@@ -3016,6 +2918,11 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
          return false;
       }  
 
+      VkFormatProperties formatProperties;
+      vkGetPhysicalDeviceFormatProperties(vk->context.gpu, VK_FORMAT_R5G6B5_UNORM_PACK16, &formatProperties);
+      if (formatProperties.optimalTilingFeatures != 0)
+          vk->context.flags |= VK_CTX_FLAG_HAS_PACK16_FMTS;
+
 #ifdef VULKAN_HDR_SWAPCHAIN
       if (settings->bools.video_hdr_enable)
          vk->context.flags |=  VK_CTX_FLAG_HDR_ENABLE;
@@ -3046,7 +2953,10 @@ bool vulkan_create_swapchain(gfx_ctx_vulkan_data_t *vk,
                   formats[i].format == VK_FORMAT_R8G8B8A8_UNORM ||
                   formats[i].format == VK_FORMAT_B8G8R8A8_UNORM ||
                   formats[i].format == VK_FORMAT_A8B8G8R8_UNORM_PACK32)
+            {
                format = formats[i];
+               break;
+            }
          }
       }
 

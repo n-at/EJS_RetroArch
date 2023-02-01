@@ -103,7 +103,7 @@ typedef struct cg_renderchain
 
 static INLINE bool d3d9_cg_validate_param_name(const char *name)
 {
-   unsigned i;
+   int i;
    static const char *illegal[] = {
       "PREV.",
       "PREV1.",
@@ -507,10 +507,10 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
 {
    unsigned i;
    float texture_size[2];
-   char attr_texture[64]    = {0};
-   char attr_input_size[64] = {0};
-   char attr_tex_size[64]   = {0};
-   char attr_coord[64]      = {0};
+   char attr_texture[64];
+   char attr_input_size[64];
+   char attr_tex_size[64];
+   char attr_coord[64];
    static const char *prev_names[] = {
       "PREV",
       "PREV1",
@@ -526,15 +526,21 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
 
    for (i = 0; i < TEXTURES - 1; i++)
    {
+      char prev_name[32];
       CGparameter param;
       float video_size[2];
       CGprogram fprg = (CGprogram)pass->fprg;
       CGprogram vprg = (CGprogram)pass->vprg;
 
-      snprintf(attr_texture,    sizeof(attr_texture),    "%s.texture",      prev_names[i]);
-      snprintf(attr_input_size, sizeof(attr_input_size), "%s.video_size",   prev_names[i]);
-      snprintf(attr_tex_size,   sizeof(attr_tex_size),   "%s.texture_size", prev_names[i]);
-      snprintf(attr_coord,      sizeof(attr_coord),      "%s.tex_coord",    prev_names[i]);
+      strlcpy(prev_name, prev_names[i], sizeof(prev_name));
+      strlcpy(attr_texture,    prev_name,       sizeof(attr_texture));
+      strlcat(attr_texture,    ".texture",      sizeof(attr_texture));
+      strlcpy(attr_input_size, prev_name,       sizeof(attr_input_size));
+      strlcat(attr_input_size, ".video_size",   sizeof(attr_input_size));
+      strlcpy(attr_tex_size,   prev_name,       sizeof(attr_tex_size));
+      strlcat(attr_tex_size,   ".texture_size", sizeof(attr_tex_size));
+      strlcpy(attr_coord,      prev_name,       sizeof(attr_coord));
+      strlcat(attr_coord,      ".tex_coord",    sizeof(attr_coord));
 
       video_size[0]  = chain->prev.last_width[
          (chain->prev.ptr - (i + 1)) & TEXTURESMASK];
@@ -606,18 +612,22 @@ static void d3d9_cg_renderchain_bind_pass(
       CGparameter param;
       float video_size[2];
       float texture_size[2];
-      char pass_base[64]        = {0};
-      char attr_texture[64]     = {0};
-      char attr_input_size[64]  = {0};
-      char attr_tex_size[64]    = {0};
-      char attr_coord[64]       = {0};
+      char pass_base[64];
+      char attr_texture[64];
+      char attr_input_size[64];
+      char attr_tex_size[64];
+      char attr_coord[64];
       struct shader_pass *curr_pass = (struct shader_pass*)&chain->passes->data[i];
 
-      snprintf(pass_base,       sizeof(pass_base),       "PASS%u",          i);
-      snprintf(attr_texture,    sizeof(attr_texture),    "%s.texture",      pass_base);
-      snprintf(attr_input_size, sizeof(attr_input_size), "%s.video_size",   pass_base);
-      snprintf(attr_tex_size,   sizeof(attr_tex_size),   "%s.texture_size", pass_base);
-      snprintf(attr_coord,      sizeof(attr_coord),      "%s.tex_coord",    pass_base);
+      snprintf(pass_base, sizeof(pass_base), "PASS%u", i);
+      strlcpy(attr_texture,    pass_base,       sizeof(attr_texture));
+      strlcat(attr_texture,    ".texture",      sizeof(attr_texture));
+      strlcpy(attr_input_size, pass_base,       sizeof(attr_input_size));
+      strlcat(attr_input_size, ".video_size",   sizeof(attr_input_size));
+      strlcpy(attr_tex_size,   pass_base,       sizeof(attr_tex_size));
+      strlcat(attr_tex_size,   ".texture_size", sizeof(attr_tex_size));
+      strlcpy(attr_coord,      pass_base,       sizeof(attr_coord));
+      strlcat(attr_coord,      ".tex_coord",    sizeof(attr_coord));
 
       video_size[0]   = curr_pass->last_width;
       video_size[1]   = curr_pass->last_height;
@@ -672,7 +682,7 @@ static void d3d9_cg_renderchain_bind_pass(
 
 static void d3d9_cg_deinit_progs(cg_renderchain_t *chain)
 {
-   unsigned i;
+   int i;
 
    if (chain->chain.passes->count >= 1)
    {
@@ -702,7 +712,7 @@ static void d3d9_cg_deinit_progs(cg_renderchain_t *chain)
 
 static void d3d9_cg_destroy_resources(cg_renderchain_t *chain)
 {
-   unsigned i;
+   int i;
 
    for (i = 0; i < TEXTURES; i++)
    {
@@ -1804,7 +1814,7 @@ static bool d3d9_cg_frame(void *data, const void *frame,
    
    if (black_frame_insertion && !d3d->menu->enabled)
    {
-      unsigned n;
+      int n;
       for (n = 0; n < video_info->black_frame_insertion; ++n) 
       {   
         bool ret = (IDirect3DDevice9_Present(d3d->dev,

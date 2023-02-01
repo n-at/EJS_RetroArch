@@ -239,7 +239,6 @@ endif
 OBJ += frontend/frontend_driver.o \
        retroarch.o \
        runloop.o \
-       driver.o \
        ui/ui_companion_driver.o \
        camera/camera_driver.o \
        record/record_driver.o \
@@ -258,6 +257,7 @@ endif
 
 OBJ += \
        tasks/task_save.o \
+       tasks/task_movie.o \
        tasks/task_file_transfer.o \
        tasks/task_image.o \
        tasks/task_playlist_manager.o \
@@ -431,6 +431,7 @@ endif
 
 ifeq ($(HAVE_RUNAHEAD), 1)
    DEFINES += -DHAVE_RUNAHEAD
+   OBJ     += runahead.o
 endif
 
 ifeq ($(HAVE_CC_RESAMPLER), 1)
@@ -1587,7 +1588,6 @@ ifeq ($(HAVE_METAL), 1)
    DEF_FLAGS += -fobjc-arc
    OBJ += \
 	  gfx/common/metal/metal_renderer.o \
-	  gfx/common/metal_common.o \
 	  gfx/drivers/metal.o \
 	  gfx/drivers_font/metal_raster_font.o \
 	  gfx/drivers_display/gfx_display_metal.o
