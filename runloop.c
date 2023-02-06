@@ -72,6 +72,10 @@
 #include <encodings/utf.h>
 
 #include <libretro.h>
+#ifdef HAVE_VULKAN
+#include <libretro_vulkan.h>
+#endif
+
 #define VFS_FRONTEND
 #include <vfs/vfs_implementation.h>
 
@@ -86,7 +90,6 @@
 #include <retro_miscellaneous.h>
 #include <queues/message_queue.h>
 #include <lists/dir_list.h>
-#include <retro_dirent.h>
 
 #ifdef EMSCRIPTEN
 #include <emscripten/emscripten.h>
@@ -1961,7 +1964,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                   char tmp_path[PATH_MAX_LENGTH];
 
                   if (string_is_empty(dir_system))
-                     RARCH_WARN("[Environ]: SYSTEM DIR is empty, assume CONTENT DIR \"%s\".\n",
+                     RARCH_WARN("[Environ]: SYSTEM DIR is empty, assume CONTENT DIR %s\n",
                            fullpath);
 
                   strlcpy(tmp_path, fullpath, sizeof(tmp_path));
@@ -1975,99 +1978,9 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             }
             else
             {
-#ifdef HAVE_MENU
-               menu_handle_t *menu                   = menu_state_get_ptr()->driver_data;
-#endif
-               struct retro_system_info *system_info = &runloop_st->system.info;
-               char dir_system_subdir[PATH_MAX_LENGTH];
-
-               /* First try library name */
-               if (     system_info
-                     && !string_is_empty(system_info->library_name))
-               {
-                  bool entry_is_dir = false;
-
-                  fill_pathname_join(dir_system_subdir,
-                        dir_system,
-                        system_info->library_name,
-                        sizeof(dir_system_subdir));
-
-                  /* Inspect if the subdir has dirs under it, and ignore
-                   * it if so. Because for example PPSSPP already uses a
-                   * subdir named after 'library_name', so it would have
-                   * to be 'system/PPSSPP/PPSSPP' otherwise. */
-                  if (path_is_valid(dir_system_subdir))
-                  {
-                     struct RDIR *entry = retro_opendir(dir_system_subdir);
-                     if (entry)
-                     {
-                        while (retro_readdir(entry))
-                        {
-                           const char *entry_name = retro_dirent_get_name(entry);
-                           if (strstr(entry_name, "."))
-                              continue;
-
-                           if (retro_dirent_is_dir(entry, NULL))
-                           {
-                              entry_is_dir = true;
-                              break;
-                           }
-                        }
-                        retro_closedir(entry);
-                     }
-                  }
-
-                  if (entry_is_dir)
-                     dir_system_subdir[0] = '\0';
-                  else
-                     RARCH_DBG("[Environ]: SYSTEM_DIRECTORY candidate: \"%s\".\n",
-                           dir_system_subdir);
-               }
-
-#ifdef HAVE_MENU
-               /* Then playlist name */
-               if (     menu
-                     && !path_is_valid(dir_system_subdir))
-               {
-                  playlist_t *playlist_cached = playlist_get_cached();
-                  const char *db_name         = NULL;
-                  char db_name_noext[PATH_MAX_LENGTH];
-
-                  db_name_noext[0]            = '\0';
-
-                  playlist_get_db_name(playlist_cached,
-                        menu->rpl_entry_selection_ptr,
-                        &db_name);
-
-                  if (!string_is_empty(db_name))
-                  {
-                     strlcpy(db_name_noext, db_name, sizeof(db_name_noext));
-                     path_remove_extension(db_name_noext);
-                     fill_pathname_join(dir_system_subdir,
-                           dir_system,
-                           db_name_noext,
-                           sizeof(dir_system_subdir));
-
-                     RARCH_DBG("[Environ]: SYSTEM_DIRECTORY candidate: \"%s\".\n",
-                           dir_system_subdir);
-                  }
-               }
-#endif
-
-               /* Use subdir if valid */
-               if (path_is_valid(dir_system_subdir))
-               {
-                  *(const char**)data = dir_system_subdir;
-                  RARCH_LOG("[Environ]: SYSTEM_DIRECTORY: \"%s\".\n",
-                        dir_system_subdir);
-               }
-               /* Fallback to global system */
-               else
-               {
-                  *(const char**)data = dir_system;
-                  RARCH_LOG("[Environ]: SYSTEM_DIRECTORY: \"%s\".\n",
-                        dir_system);
-               }
+               *(const char**)data = dir_system;
+               RARCH_LOG("[Environ]: SYSTEM_DIRECTORY: \"%s\".\n",
+                     dir_system);
             }
          }
          break;
@@ -3431,6 +3344,24 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                RARCH_ERR("[Environ]: Failed to retrieve extended game info.\n");
                *game_info_ext = NULL;
                return false;
+            }
+         }
+         break;
+
+      case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT:
+         {
+            struct retro_hw_render_context_negotiation_interface *iface =
+                  (struct retro_hw_render_context_negotiation_interface*)data;
+
+#ifdef HAVE_VULKAN
+            if (iface->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN)
+            {
+               iface->interface_version = RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION;
+            }
+            else
+#endif
+            {
+               iface->interface_version = 0;
             }
          }
          break;
