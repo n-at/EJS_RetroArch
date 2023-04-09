@@ -200,8 +200,8 @@ for f in `ls -v *_${platform}.${EXT}`; do
    echo Buildbot: building ${name} for ${platform}
    name=`echo "$f" | sed "s/\(_libretro_${platform}\|\).${EXT}$//"`
    async=0
-   pthread=0
    wasm=1
+   pthread=${pthread:-0}
    lto=0
    whole_archive=
    big_stack=
@@ -375,7 +375,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
    elif [ $PLATFORM = "emscripten" ] ; then
       mkdir -p ../pkg/emscripten/
 
-      out_dir="../../out"
+      out_dir="../../EmulatorJS/data/cores"
 
       mkdir -p $out_dir
       

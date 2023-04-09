@@ -220,6 +220,9 @@ enum
    OZONE_ENTRIES_ICONS_TEXTURE_RESUME,
    OZONE_ENTRIES_ICONS_TEXTURE_SAVESTATE,
    OZONE_ENTRIES_ICONS_TEXTURE_LOADSTATE,
+   OZONE_ENTRIES_ICONS_TEXTURE_RECORDREPLAY,
+   OZONE_ENTRIES_ICONS_TEXTURE_PLAYREPLAY,
+   OZONE_ENTRIES_ICONS_TEXTURE_HALTREPLAY,
    OZONE_ENTRIES_ICONS_TEXTURE_UNDO,
    OZONE_ENTRIES_ICONS_TEXTURE_CORE_INFO,
    OZONE_ENTRIES_ICONS_TEXTURE_BLUETOOTH,
@@ -1795,6 +1798,8 @@ static uintptr_t ozone_entries_icon_get_texture(
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_ACHIEVEMENT_LIST];
       case MENU_ENUM_LABEL_STATE_SLOT:
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SETTING];
+      case MENU_ENUM_LABEL_REPLAY_SLOT:
+         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SETTING];
       case MENU_ENUM_LABEL_SAVESTATE_LIST:
       case MENU_ENUM_LABEL_SAVE_STATE:
       case MENU_ENUM_LABEL_CORE_CREATE_BACKUP:
@@ -1892,10 +1897,6 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_UPDATE_OVERLAYS:
       case MENU_ENUM_LABEL_ONSCREEN_OVERLAY_SETTINGS:
       case MENU_ENUM_LABEL_CONTENT_SHOW_OVERLAYS:
-#ifdef HAVE_VIDEO_LAYOUT
-      case MENU_ENUM_LABEL_ONSCREEN_VIDEO_LAYOUT_SETTINGS:
-      case MENU_ENUM_LABEL_CONTENT_SHOW_VIDEO_LAYOUT:
-#endif
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_OVERLAY];
       case MENU_ENUM_LABEL_UPDATE_CG_SHADERS:
       case MENU_ENUM_LABEL_UPDATE_GLSL_SHADERS:
@@ -1994,6 +1995,7 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_CHEAT_FILE_SAVE_AS:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_SAVESTATE_SUBMENU:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_SAVE_LOAD_STATE:
+      case MENU_ENUM_LABEL_QUICK_MENU_SHOW_REPLAY:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SAVING];
       case MENU_ENUM_LABEL_LOGGING_SETTINGS:
       case MENU_ENUM_LABEL_SETTINGS_SHOW_LOGGING:
@@ -2239,6 +2241,12 @@ static uintptr_t ozone_entries_icon_get_texture(
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SAVESTATE];
       case MENU_SETTING_ACTION_LOADSTATE:
          return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_LOADSTATE];
+      case MENU_SETTING_ACTION_PLAYREPLAY:
+         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_PLAYREPLAY];
+      case MENU_SETTING_ACTION_RECORDREPLAY:
+         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_RECORDREPLAY];
+      case MENU_SETTING_ACTION_HALTREPLAY:
+         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_HALTREPLAY];
       case MENU_SETTING_ACTION_CORE_OPTIONS:
          if (string_starts_with(enum_path, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_SETTINGS)))
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_VIDEO];
@@ -2510,6 +2518,12 @@ static const char *ozone_entries_icon_texture_path(unsigned id)
          return "savestate.png";
       case OZONE_ENTRIES_ICONS_TEXTURE_LOADSTATE:
          return "loadstate.png";
+      case OZONE_ENTRIES_ICONS_TEXTURE_RECORDREPLAY:
+         return "savestate.png";
+      case OZONE_ENTRIES_ICONS_TEXTURE_PLAYREPLAY:
+         return "loadstate.png";
+      case OZONE_ENTRIES_ICONS_TEXTURE_HALTREPLAY:
+         return "close.png";
       case OZONE_ENTRIES_ICONS_TEXTURE_UNDO:
          return "undo.png";
       case OZONE_ENTRIES_ICONS_TEXTURE_CORE_INFO:
@@ -7830,6 +7844,20 @@ static void ozone_start_cursor_wiggle(
    ozone->flags2                        |= OZONE_FLAG2_CURSOR_WIGGLING;
 }
 
+static void ozone_set_thumbnail_delay(bool on)
+{
+   if (on)
+   {
+      gfx_thumbnail_set_stream_delay(OZONE_THUMBNAIL_STREAM_DELAY);
+      gfx_thumbnail_set_fade_duration(-1.0f);
+   }
+   else
+   {
+      gfx_thumbnail_set_stream_delay(0);
+      gfx_thumbnail_set_fade_duration(1);
+   }
+}
+
 /* Common thumbnail switch requires FILE_TYPE_RPL_ENTRY,
  * which only works with playlists, therefore activate it
  * manually for Quick Menu, Explore and Database */
@@ -7900,11 +7928,13 @@ static enum menu_action ozone_parse_menu_entry_action(
          {
             ozone_show_fullscreen_thumbnails(ozone);
             ozone->flags2 |= OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS;
+            ozone_set_thumbnail_delay(false);
             new_action     = MENU_ACTION_NOOP;
          }
          else if ((ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                || (ozone->flags2 & OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS))
          {
+            ozone_set_thumbnail_delay(true);
             ozone_hide_fullscreen_thumbnails(ozone, true);
             ozone->flags2 &= ~OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS;
             new_action     = MENU_ACTION_NOOP;
@@ -8090,8 +8120,10 @@ static enum menu_action ozone_parse_menu_entry_action(
                && (ozone->flags & OZONE_FLAG_FULLSCREEN_THUMBNAILS_AVAILABLE)
                && (ozone->show_thumbnail_bar))
          {
-            ozone_show_fullscreen_thumbnails(ozone);
-            ozone->flags2 |= OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS;
+            if (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
+               ozone_hide_fullscreen_thumbnails(ozone, true);
+            else
+               ozone_show_fullscreen_thumbnails(ozone);
             new_action     = MENU_ACTION_NOOP;
             break;
          }
@@ -8099,6 +8131,7 @@ static enum menu_action ozone_parse_menu_entry_action(
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                || (ozone->flags2 & OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS))
          {
+            ozone_set_thumbnail_delay(true);
             ozone_hide_fullscreen_thumbnails(ozone, true);
             ozone->flags2 &= ~OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS;
             if (     (!(ozone->flags & OZONE_FLAG_IS_STATE_SLOT))
@@ -8153,6 +8186,7 @@ static enum menu_action ozone_parse_menu_entry_action(
          if (     (ozone->flags2 & OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS)
                || (ozone->flags2 & OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS))
          {
+            ozone_set_thumbnail_delay(true);
             ozone_hide_fullscreen_thumbnails(ozone, true);
             ozone->flags  &= ~OZONE_FLAG_SKIP_THUMBNAIL_RESET;
             ozone->flags2 &= ~OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS;
@@ -10256,6 +10290,7 @@ static void ozone_draw_footer(
          ozone_metadata_override_available(ozone, settings);
    bool thumbnail_cycle_enabled           =
          fullscreen_thumbnails_available &&
+         !(ozone->flags & OZONE_FLAG_IS_FILE_LIST) &&
          !((ozone->is_quick_menu && menu_is_running_quick_menu()) 
                || (ozone->flags & OZONE_FLAG_IS_STATE_SLOT));
    bool clear_setting_enabled            =

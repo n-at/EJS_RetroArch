@@ -48,6 +48,10 @@
 
 #include "ui_cocoa.h"
 
+#ifdef HAVE_MIST
+#include "steam/steam.h"
+#endif
+
 typedef struct ui_application_cocoa
 {
    void *empty;
@@ -701,6 +705,10 @@ static ui_application_t ui_application_cocoa = {
       [self updateWindowedMode];
    }
 
+   /* HACK(sgc): ensure MTKView posts a drawable resize event */
+   if (mode.width > 0)
+       [self.window setContentSize:NSMakeSize(mode.width-1, mode.height)];
+   [self.window setContentSize:NSMakeSize(mode.width, mode.height)];
    [self.window displayIfNeeded];
 }
 
@@ -787,6 +795,10 @@ static ui_application_t ui_application_cocoa = {
        ret = runloop_iterate();
 
        task_queue_check();
+
+#ifdef HAVE_MIST
+       steam_poll();
+#endif
 
        while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.002, FALSE) 
              == kCFRunLoopRunHandledSource);

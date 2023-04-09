@@ -1307,7 +1307,6 @@ MSG_HASH(
    )
 
 
-
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_OVERLAY_NEXT,
    "Superposición siguiente"
@@ -1603,6 +1602,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_WALLPAPER_OPACITY,
    "Opacidá del fondu"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_FRAMEBUFFER_OPACITY,
+   "Opacidá del menú"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_USE_PREFERRED_SYSTEM_COLOR_THEME,
@@ -3349,10 +3352,6 @@ MSG_HASH(
    "Llimpiar"
    )
 MSG_HASH(
-   MENU_ENUM_LABEL_VALUE_HELP_WHAT_IS_A_CORE,
-   "¿Qué ye un nucleu?"
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_DESCRIPTION,
    "Descripción"
    )
@@ -3440,10 +3439,6 @@ MSG_HASH(
 MSG_HASH(
    MSG_FAILED_TO_SEND_DEBUG_INFO,
    "Hebo un error al unviar la información de depuración al sirvidor."
-   )
-MSG_HASH(
-   MSG_WAITING_FOR_CLIENT,
-   "Esperando pol veceru…"
    )
 MSG_HASH(
    MSG_NETPLAY_YOU_HAVE_LEFT_THE_GAME,

@@ -935,7 +935,7 @@ static bool vulkan_init_default_filter_chain(vk_t *vk)
    info.queue                 = vk->context->queue;
    info.command_pool          = vk->swapchain[vk->context->current_frame_index].cmd_pool;
    info.num_passes            = 0;
-   info.original_format       = vk->tex_fmt;
+   info.original_format       = vulkan_remap_to_texture_format(vk->tex_fmt);
    info.max_input_size.width  = vk->tex_w;
    info.max_input_size.height = vk->tex_h;
    info.swapchain.viewport    = vk->vk_vp;
@@ -1007,7 +1007,7 @@ static bool vulkan_init_filter_chain_preset(vk_t *vk, const char *shader_path)
    info.queue                 = vk->context->queue;
    info.command_pool          = vk->swapchain[vk->context->current_frame_index].cmd_pool;
    info.num_passes            = 0;
-   info.original_format       = vk->tex_fmt;
+   info.original_format       = vulkan_remap_to_texture_format(vk->tex_fmt);
    info.max_input_size.width  = vk->tex_w;
    info.max_input_size.height = vk->tex_h;
    info.swapchain.viewport    = vk->vk_vp;
@@ -2391,6 +2391,8 @@ static bool vulkan_frame(void *data, const void *frame,
          (vulkan_filter_chain_t*)vk->filter_chain,
          1);
 #endif
+   vulkan_filter_chain_set_rotation(
+         (vulkan_filter_chain_t*)vk->filter_chain, retroarch_get_rotation());
 
    /* Render offscreen filter chain passes. */
    {
@@ -3182,7 +3184,7 @@ static void vulkan_set_texture_frame(void *data,
       const void *frame, bool rgb32, unsigned width, unsigned height,
       float alpha)
 {
-   int y;
+   size_t y;
    unsigned stride;
    uint8_t *ptr                        = NULL;
    uint8_t *dst                        = NULL;
@@ -3244,7 +3246,7 @@ static void vulkan_set_texture_frame(void *data,
    {
       for (y = 0; y < height; y++, dst += texture->stride, src += stride)
       {
-         int x;
+         size_t x;
          uint16_t *srcpix = (uint16_t*)src;
          uint32_t *dstpix = (uint32_t*)dst;
          for (x = 0; x < width; x++, srcpix++, dstpix++)
@@ -3415,13 +3417,13 @@ static const video_poke_interface_t vulkan_poke_interface = {
    vulkan_load_texture,
    vulkan_unload_texture,
    vulkan_set_video_mode,
-   vulkan_get_refresh_rate, /* get_refresh_rate */
-   NULL,
+   vulkan_get_refresh_rate,            /* get_refresh_rate */
+   NULL,                               /* set_filtering */
    vulkan_get_video_output_size,
    vulkan_get_video_output_prev,
    vulkan_get_video_output_next,
-   NULL,
-   NULL,
+   NULL,                               /* get_current_framebuffer */
+   NULL,                               /* get_proc_address */
    vulkan_set_aspect_ratio,
    vulkan_apply_state_changes,
    vulkan_set_texture_frame,
@@ -3863,9 +3865,6 @@ video_driver_t video_vulkan = {
 
 #ifdef HAVE_OVERLAY
    vulkan_get_overlay_interface,
-#endif
-#ifdef HAVE_VIDEO_LAYOUT
-   NULL,
 #endif
    vulkan_get_poke_interface,
    NULL,                         /* vulkan_wrap_type_to_enum */

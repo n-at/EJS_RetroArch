@@ -13,6 +13,9 @@ EOPTS = $(addprefix -s $(EMPTY), $(EOPT)) # Add '-s ' to each option
 OS = Emscripten
 OBJ :=
 
+DEFINES := -DRARCH_INTERNAL -DHAVE_MAIN
+DEFINES += -DHAVE_FILTERS_BUILTIN
+
 HAVE_PATCH = 1
 HAVE_DSP_FILTER = 1
 HAVE_VIDEO_FILTER = 1
@@ -21,7 +24,6 @@ HAVE_GLSL = 1
 HAVE_SCREENSHOTS = 1
 HAVE_REWIND = 1
 HAVE_AUDIOMIXER = 1
-HAVE_VIDEO_LAYOUT = 0
 HAVE_CC_RESAMPLER = 1
 HAVE_EGL    = 1
 HAVE_RJPEG  = 0
@@ -38,6 +40,8 @@ HAVE_STATIC_VIDEO_FILTERS = 1
 HAVE_STATIC_AUDIO_FILTERS = 1
 HAVE_STB_FONT = 1
 HAVE_CONFIGFILE = 1
+HAVE_COMMAND = 1
+HAVE_STDIN_CMD = 1
 HAVE_CHEATS = 1
 HAVE_IBXM = 1
 HAVE_CORE_INFO_CACHE = 1
@@ -80,6 +84,11 @@ HEAP_MEMORY ?= 536870912
 # 1073741824 -- 1 GiB
 # 1610612736 -- 1.5 GiB
 # 2147483648 -- 2 GiB
+ifeq ($(LIBRETRO), tyrquake)
+   LTO = 0
+endif
+
+MEMORY ?= 134217728
 
 PRECISE_F32 = 1
 
@@ -131,11 +140,11 @@ ifeq ($(FS_DEBUG), 1)
 endif
 
 ifneq ($(PTHREAD), 0)
+   LDFLAGS += -s WASM_MEM_MAX=1073741824 -pthread -s PTHREAD_POOL_SIZE=$(PTHREAD)
    CFLAGS += -pthread
-   CXXFLAGS += -pthread
-   LDFLAGS += -pthread -s PTHREAD_POOL_SIZE=4
+   HAVE_THREADS=1
 else
-   LDFLAGS += -s ALLOW_MEMORY_GROWTH=1
+   HAVE_THREADS=0
 endif
 
 ifeq ($(ASYNC), 1)
@@ -183,7 +192,7 @@ else
    CFLAGS += -O3
 endif
 
-CFLAGS += -Wall -Wunused-function -Wno-unused-command-line-argument -I. -Ilibretro-common/include -std=gnu99 $(LIBS) -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
+CFLAGS += -Wall -I. -Ilibretro-common/include -std=gnu99 $(LIBS)
 
 RARCH_OBJ := $(addprefix $(OBJDIR)/,$(OBJ))
 

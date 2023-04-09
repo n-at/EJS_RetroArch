@@ -150,6 +150,7 @@ struct bsv_movie
    size_t frame_ptr;
    size_t min_file_pos;
    size_t state_size;
+   int64_t identifier;
 
    /* Staging variables for keyboard events */
    uint8_t key_event_count;
@@ -162,6 +163,10 @@ struct bsv_movie
 };
 
 typedef struct bsv_movie bsv_movie_t;
+
+#define REPLAY_TOKEN_INVALID          '\0'
+#define REPLAY_TOKEN_REGULAR_FRAME    'f'
+#define REPLAY_TOKEN_CHECKPOINT_FRAME 'c'
 #endif
 
 /**
@@ -1011,11 +1016,13 @@ void bsv_movie_deinit(input_driver_state_t *input_st);
 
 bool movie_start_playback(input_driver_state_t *input_st, char *path);
 bool movie_start_record(input_driver_state_t *input_st, char *path);
-bool movie_stop_playback();
+bool movie_stop_playback(input_driver_state_t *input_st);
 bool movie_stop_record(input_driver_state_t *input_st);
-bool movie_toggle_record(input_driver_state_t *input_st, settings_t *settings);
 bool movie_stop(input_driver_state_t *input_st);
 
+size_t replay_get_serialize_size(void);
+bool replay_get_serialized_data(void* buffer);
+bool replay_set_serialized_data(void* buffer);
 #endif
 
 /**

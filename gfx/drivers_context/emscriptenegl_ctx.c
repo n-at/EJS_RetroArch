@@ -86,28 +86,27 @@ static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
 
    if (input_width == 0 || input_height == 0)
    {
-      input_width          = emscripten->initial_width;
-      input_height         = emscripten->initial_height;
-      emscripten->fb_width = emscripten->fb_height = 0;
+      input_width                    = emscripten->initial_width;
+      input_height                   = emscripten->initial_height;
+      emscripten->fb_width           = emscripten->fb_height = 0;
    }
 
-   *width      = (unsigned)input_width;
-   *height     = (unsigned)input_height;
-   *resize     = false;
+   *width                            = (unsigned)input_width;
+   *height                           = (unsigned)input_height;
+   *resize                           = false;
 
 
    emscripten->fb_width  = (unsigned)input_width;
    emscripten->fb_height = (unsigned)input_height;
-   *quit       = false;
+   *quit                 = false;
 }
 
 static void gfx_ctx_emscripten_swap_buffers(void *data)
 {
-   emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
-
-   /* doesn't really do anything in WebGL, but it might 
-    * if we use WebGL workers in the future */
 #ifdef HAVE_EGL
+   /* Doesn't really do anything in WebGL, but it might 
+    * if we use WebGL workers in the future */
+   emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
    egl_swap_buffers(&emscripten->egl);
 #endif
 }
@@ -165,8 +164,6 @@ static void *gfx_ctx_emscripten_init(void *video_driver)
 
    if (!emscripten)
       return NULL;
-
-   (void)video_driver;
 
    /* TODO/FIXME - why is this conditional here - shouldn't these always
     * be grabbed? */
@@ -233,7 +230,6 @@ static bool gfx_ctx_emscripten_bind_api(void *data,
    if (api == GFX_CTX_OPENGL_ES_API)
       return egl_bind_api(EGL_OPENGL_ES_API);
 #endif
-
    return false;
 }
 
@@ -263,9 +259,8 @@ static bool gfx_ctx_emscripten_write_egl_image(void *data,
 
 static void gfx_ctx_emscripten_bind_hw_render(void *data, bool enable)
 {
-   emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
-
 #ifdef HAVE_EGL
+   emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
    egl_bind_hw_render(&emscripten->egl, enable);
 #endif
 }
