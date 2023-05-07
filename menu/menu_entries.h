@@ -156,9 +156,9 @@ typedef struct menu_entry
    enum msg_hash_enums enum_idx;
    uint8_t setting_type;
    uint8_t flags;
+   char sublabel[MENU_SUBLABEL_MAX_LENGTH];
    char path[255];
    char label[255];
-   char sublabel[MENU_SUBLABEL_MAX_LENGTH];
    char rich_label[255];
    char value[255];
    char password_value[255];
@@ -166,9 +166,7 @@ typedef struct menu_entry
 
 int menu_entries_get_title(char *title, size_t title_len);
 
-int menu_entries_get_label(char *label, size_t label_len);
-
-int menu_entries_get_core_title(char *title_msg, size_t title_msg_len);
+void menu_entries_get_core_title(char *title_msg, size_t title_msg_len);
 
 file_list_t *menu_entries_get_selection_buf_ptr(size_t idx);
 
@@ -176,8 +174,6 @@ file_list_t *menu_entries_get_menu_stack_ptr(size_t idx);
 
 void menu_entries_get_last_stack(const char **path, const char **label,
       unsigned *file_type, enum msg_hash_enums *enum_idx, size_t *entry_idx);
-
-menu_file_list_cbs_t *menu_entries_get_last_stack_actiondata(void);
 
 void menu_entries_pop_stack(size_t *ptr, size_t idx, bool animate);
 
@@ -200,8 +196,6 @@ bool menu_entries_append(file_list_t *list,
 
 bool menu_entries_ctl(enum menu_entries_ctl_state state, void *data);
 
-bool menu_entries_search_push(const char *search_term);
-
 bool menu_entries_search_pop(void);
 
 menu_search_terms_t *menu_entries_search_get_terms(void);
@@ -209,8 +203,6 @@ menu_search_terms_t *menu_entries_search_get_terms(void);
 /* Convenience function: Appends list of current
  * search terms to specified string */
 void menu_entries_search_append_terms_string(char *s, size_t len);
-
-menu_search_terms_t *menu_entries_search_get_terms_internal(void);
 
 /* Searches current menu list for specified 'needle'
  * string. If string is found, returns true and sets

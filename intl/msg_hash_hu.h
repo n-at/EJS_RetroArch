@@ -583,6 +583,10 @@ MSG_HASH(
    "Fordítás dátuma"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_RETROARCH_VERSION,
+   "RetroArch verzió"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GIT_VERSION,
    "Git verzió"
    )
@@ -2468,6 +2472,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_FASTFORWARD_MUTE,
    "A hang automatikus elnémítása gyorsításkor."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AUDIO_FASTFORWARD_SPEEDUP,
+   "Hang gyorsított lejátszása gyorsításkor"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUDIO_FASTFORWARD_SPEEDUP,
+   "A hang gyorsított lejátszása gyorsításkor. Megakadályozza a recsegést, de megemeli a hangmagasságot."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_VOLUME,
@@ -6271,10 +6283,6 @@ MSG_HASH(
    "Ranglisták"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_LEADERBOARDS_ENABLE,
-   "Játékspecifikus ranglisták. Csak Hardcore módban van hatása."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_RICHPRESENCE_ENABLE,
    "Állapotüzenetek"
    )
@@ -9977,16 +9985,8 @@ MSG_HASH(
    "Bélyegképek a játéklistában"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_RGUI_INLINE_THUMBNAILS,
-   "A kisméretű bélyegképek megjelenítése a játéklistákban. Kikapcsolva a felső bélyegkép a RetroPad Y gombjával rakható ki teljes képernyőre."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_THUMBNAILS_RGUI,
    "Felső bélyegkép"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_THUMBNAILS_RGUI,
-   "A játéklista jobb felső sarkában megjelenő bélyegkép típusa. A RetroPad Y gombjával rakható ki teljes képernyőre."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LEFT_THUMBNAILS_RGUI,

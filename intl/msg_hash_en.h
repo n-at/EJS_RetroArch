@@ -1003,10 +1003,6 @@ MSG_HASH(
    "Leader-boards"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_LEADERBOARDS_ENABLE,
-   "Game specific leader-boards. Has no effect if 'Hardcore Mode' is disabled."
-   )
-MSG_HASH(
    MENU_ENUM_SUBLABEL_CHEEVOS_RICHPRESENCE_ENABLE,
    "Periodically send contextual game information to the RetroAchievements website. Has no effect if 'Hardcore Mode' is enabled."
    )
@@ -1563,14 +1559,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_RGUI_TRANSPARENCY,
    "Enable background display of running content while Quick Menu is active. Disabling transparency may alter theme colours."
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_MENU_RGUI_INLINE_THUMBNAILS,
-   "Enable display of inline downscaled thumbnails while viewing playlists. When disabled, 'Top Thumbnail' may still be toggled full-screen by pressing RetroPad Y."
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_THUMBNAILS_RGUI,
-   "Type of thumbnail to display at the top right of playlists. This thumbnail may be toggled full-screen by pressing RetroPad Y."
    )
 
 /* RGUI: Settings Options */

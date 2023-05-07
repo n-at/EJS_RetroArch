@@ -1439,7 +1439,7 @@ static struct config_array_setting *populate_settings_array(settings_t *settings
    SETTING_ARRAY("cheevos_username",         settings->arrays.cheevos_username, false, NULL, true);
    SETTING_ARRAY("cheevos_password",         settings->arrays.cheevos_password, false, NULL, true);
    SETTING_ARRAY("cheevos_token",            settings->arrays.cheevos_token, false, NULL, true);
-   SETTING_ARRAY("cheevos_leaderboards_enable", settings->arrays.cheevos_leaderboards_enable, true, "true", true);
+   SETTING_ARRAY("cheevos_leaderboards_enable", settings->arrays.cheevos_leaderboards_enable, true, "", true); /* deprecated */
 #endif
    SETTING_ARRAY("video_context_driver",     settings->arrays.video_context_driver,   false, NULL, true);
    SETTING_ARRAY("audio_driver",             settings->arrays.audio_driver,           false, NULL, true);
@@ -1771,6 +1771,7 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("audio_mixer_mute_enable",       audio_get_bool_ptr(AUDIO_ACTION_MIXER_MUTE_ENABLE), true, false, false);
 #endif
    SETTING_BOOL("audio_fastforward_mute",        &settings->bools.audio_fastforward_mute, true, DEFAULT_AUDIO_FASTFORWARD_MUTE, false);
+   SETTING_BOOL("audio_fastforward_speedup",     &settings->bools.audio_fastforward_speedup, true, DEFAULT_AUDIO_FASTFORWARD_SPEEDUP, false);
    SETTING_BOOL("location_allow",                &settings->bools.location_allow, true, false, false);
    SETTING_BOOL("video_font_enable",             &settings->bools.video_font_enable, true, DEFAULT_FONT_ENABLE, false);
    SETTING_BOOL("core_updater_auto_extract_archive", &settings->bools.network_buildbot_auto_extract_archive, true, DEFAULT_NETWORK_BUILDBOT_AUTO_EXTRACT_ARCHIVE, false);
@@ -1963,6 +1964,10 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("cheevos_visibility_unlock",    &settings->bools.cheevos_visibility_unlock, true, DEFAULT_CHEEVOS_VISIBILITY_UNLOCK, false);
    SETTING_BOOL("cheevos_visibility_mastery",   &settings->bools.cheevos_visibility_mastery, true, DEFAULT_CHEEVOS_VISIBILITY_MASTERY, false);
    SETTING_BOOL("cheevos_visibility_account",   &settings->bools.cheevos_visibility_account, true, DEFAULT_CHEEVOS_VISIBILITY_ACCOUNT, false);
+   SETTING_BOOL("cheevos_visibility_lboard_start", &settings->bools.cheevos_visibility_lboard_start, true, DEFAULT_CHEEVOS_VISIBILITY_LBOARD_START, false);
+   SETTING_BOOL("cheevos_visibility_lboard_submit", &settings->bools.cheevos_visibility_lboard_submit, true, DEFAULT_CHEEVOS_VISIBILITY_LBOARD_SUBMIT, false);
+   SETTING_BOOL("cheevos_visibility_lboard_cancel", &settings->bools.cheevos_visibility_lboard_cancel, true, DEFAULT_CHEEVOS_VISIBILITY_LBOARD_CANCEL, false);
+   SETTING_BOOL("cheevos_visibility_lboard_trackers", &settings->bools.cheevos_visibility_lboard_trackers, true, DEFAULT_CHEEVOS_VISIBILITY_LBOARD_TRACKERS, false);
 #endif
 #ifdef HAVE_OVERLAY
    SETTING_BOOL("input_overlay_enable",         &settings->bools.input_overlay_enable, true, config_overlay_enable_default(), false);
@@ -2655,12 +2660,6 @@ void config_set_defaults(void *data)
    configuration_set_string(settings,
          settings->arrays.ai_service_url,
          DEFAULT_AI_SERVICE_URL);
-
-#ifdef HAVE_CHEEVOS
-   configuration_set_string(settings,
-         settings->arrays.cheevos_leaderboards_enable,
-         "true");
-#endif
 
 #ifdef HAVE_MATERIALUI
    if (g_defaults.menu_materialui_menu_color_theme_enable)
@@ -3467,16 +3466,17 @@ static bool config_load_file(global_t *global,
    }
 
 #ifdef HAVE_NETWORKGAMEPAD
-   for (i = 0; i < MAX_USERS; i++)
    {
       char tmp[64];
-      bool tmp_bool = false;
-      size_t _len   = strlcpy(tmp, "network_remote_enable_user_p", sizeof(tmp));
-      snprintf(tmp + _len, sizeof(tmp) - _len, "%u", i + 1);
-
-      if (config_get_bool(conf, tmp, &tmp_bool))
-         configuration_set_bool(settings,
-               settings->bools.network_remote_enable_user[i], tmp_bool);
+      size_t _len = strlcpy(tmp, "network_remote_enable_user_p", sizeof(tmp));
+      for (i = 0; i < MAX_USERS; i++)
+      {
+         bool tmp_bool = false;
+         snprintf(tmp + _len, sizeof(tmp) - _len, "%u", i + 1);
+         if (config_get_bool(conf, tmp, &tmp_bool))
+            configuration_set_bool(settings,
+                  settings->bools.network_remote_enable_user[i], tmp_bool);
+      }
    }
 #endif
 
@@ -3514,26 +3514,27 @@ static bool config_load_file(global_t *global,
             *size_settings[i].ptr  = *size_settings[i].ptr * 1024 * 1024;
    }
 
-   for (i = 0; i < MAX_USERS; i++)
    {
-      char buf[64];
       char prefix[24];
-      size_t _len;
-      buf[0]    = '\0';
-      _len      = strlcpy(prefix, "input_player", sizeof(prefix));
-      snprintf(prefix + _len, sizeof(prefix) - _len, "%u", i + 1);
+      size_t _len = strlcpy(prefix, "input_player", sizeof(prefix));
+      for (i = 0; i < MAX_USERS; i++)
+      {
+         char buf[64];
+         buf[0]    = '\0';
+         snprintf(prefix + _len, sizeof(prefix) - _len, "%u", i + 1);
 
-      strlcpy(buf, prefix, sizeof(buf));
-      strlcat(buf, "_analog_dpad_mode", sizeof(buf));
-      CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], buf);
+         strlcpy(buf, prefix, sizeof(buf));
+         strlcat(buf, "_analog_dpad_mode", sizeof(buf));
+         CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], buf);
 
-      strlcpy(buf, prefix, sizeof(buf));
-      strlcat(buf, "_joypad_index", sizeof(buf));
-      CONFIG_GET_INT_BASE(conf, settings, uints.input_joypad_index[i], buf);
+         strlcpy(buf, prefix, sizeof(buf));
+         strlcat(buf, "_joypad_index", sizeof(buf));
+         CONFIG_GET_INT_BASE(conf, settings, uints.input_joypad_index[i], buf);
 
-      strlcpy(buf, prefix, sizeof(buf));
-      strlcat(buf, "_mouse_index", sizeof(buf));
-      CONFIG_GET_INT_BASE(conf, settings, uints.input_mouse_index[i], buf);
+         strlcpy(buf, prefix, sizeof(buf));
+         strlcat(buf, "_mouse_index", sizeof(buf));
+         CONFIG_GET_INT_BASE(conf, settings, uints.input_mouse_index[i], buf);
+      }
    }
 
    /* LED map for use by the led driver */
@@ -3811,6 +3812,41 @@ static bool config_load_file(global_t *global,
     * and up (with 0 being skipped) */
    if (settings->floats.fastforward_ratio < 0.0f)
       configuration_set_float(settings, settings->floats.fastforward_ratio, 0.0f);
+
+#ifdef HAVE_CHEEVOS
+   if (!string_is_empty(settings->arrays.cheevos_leaderboards_enable))
+   {
+      if (string_is_equal(settings->arrays.cheevos_leaderboards_enable, "true"))
+      {
+         settings->bools.cheevos_visibility_lboard_start = true;
+         settings->bools.cheevos_visibility_lboard_submit = true;
+         settings->bools.cheevos_visibility_lboard_cancel = true;
+         settings->bools.cheevos_visibility_lboard_trackers = true;
+      }
+      else if (string_is_equal(settings->arrays.cheevos_leaderboards_enable, "trackers"))
+      {
+         settings->bools.cheevos_visibility_lboard_start = false;
+         settings->bools.cheevos_visibility_lboard_submit = true;
+         settings->bools.cheevos_visibility_lboard_cancel = false;
+         settings->bools.cheevos_visibility_lboard_trackers = true;
+      }
+      else if (string_is_equal(settings->arrays.cheevos_leaderboards_enable, "notifications"))
+      {
+         settings->bools.cheevos_visibility_lboard_start = true;
+         settings->bools.cheevos_visibility_lboard_submit = true;
+         settings->bools.cheevos_visibility_lboard_cancel = true;
+         settings->bools.cheevos_visibility_lboard_trackers = false;
+      }
+      else
+      {
+         settings->bools.cheevos_visibility_lboard_start = false;
+         settings->bools.cheevos_visibility_lboard_submit = false;
+         settings->bools.cheevos_visibility_lboard_cancel = false;
+         settings->bools.cheevos_visibility_lboard_trackers = false;
+      }
+      settings->arrays.cheevos_leaderboards_enable[0] = '\0';
+   }
+#endif
 
 #ifdef HAVE_LAKKA
    configuration_set_bool(settings,

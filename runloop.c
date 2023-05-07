@@ -241,6 +241,10 @@
 #include "lakka.h"
 #endif
 
+#if defined(HAVE_COCOATOUCH) && TARGET_OS_IOS
+#include "JITSupport.h"
+#endif
+
 #define SHADER_FILE_WATCH_DELAY_MSEC 500
 
 #define QUIT_DELAY_USEC 3 * 1000000 /* 3 seconds */
@@ -670,6 +674,7 @@ void runloop_runtime_log_deinit(
             runloop_st->core_runtime_usec,
             &hours, &minutes, &seconds);
 
+      /* TODO/FIXME - localize */
       snprintf(log, sizeof(log),
             "[Core]: Content ran for a total of:"
             " %02u hours, %02u minutes, %02u seconds.",
@@ -739,8 +744,16 @@ static bool dynamic_verify_hw_context(
                   !string_is_equal(video_ident, "glcore"))
                return false;
             break;
-         case RETRO_HW_CONTEXT_DIRECT3D:
-            if (!(string_is_equal(video_ident, "d3d11") && major == 11))
+         case RETRO_HW_CONTEXT_D3D10:
+            if (!string_is_equal(video_ident, "d3d10"))
+               return false;
+            break;
+         case RETRO_HW_CONTEXT_D3D11:
+            if (!string_is_equal(video_ident, "d3d11"))
+               return false;
+            break;
+         case RETRO_HW_CONTEXT_D3D12:
+            if (!string_is_equal(video_ident, "d3d12"))
                return false;
             break;
          default:
@@ -834,27 +847,26 @@ static bool dynamic_request_hw_context(enum retro_hw_context_type type,
          break;
 #endif
 
-#if defined(HAVE_D3D9) || defined(HAVE_D3D11)
-      case RETRO_HW_CONTEXT_DIRECT3D:
-         switch (major)
-         {
-#ifdef HAVE_D3D9
-            case 9:
-               RARCH_LOG("Requesting D3D9 context.\n");
-               break;
-#endif
-#ifdef HAVE_D3D11
-            case 11:
-               RARCH_LOG("Requesting D3D11 context.\n");
-               break;
-#endif
-            default:
-               RARCH_LOG("Requesting unknown context.\n");
-               return false;
-         }
+#if defined(HAVE_D3D11)
+      case RETRO_HW_CONTEXT_D3D11:
+         RARCH_LOG("Requesting D3D11 context.\n");
          break;
 #endif
-
+#ifdef HAVE_D3D10
+      case RETRO_HW_CONTEXT_D3D10:
+         RARCH_LOG("Requesting D3D10 context.\n");
+         break;
+#endif
+#ifdef HAVE_D3D12
+      case RETRO_HW_CONTEXT_D3D12:
+         RARCH_LOG("Requesting D3D12 context.\n");
+         break;
+#endif
+#if defined(HAVE_D3D9)
+      case RETRO_HW_CONTEXT_D3D9:
+         RARCH_LOG("Requesting D3D9 context.\n");
+         break;
+#endif
       default:
          RARCH_LOG("Requesting unknown context.\n");
          return false;
@@ -2245,10 +2257,15 @@ bool runloop_environment_cb(unsigned cmd, void *data)
              *cb = RETRO_HW_CONTEXT_VULKAN;
              RARCH_LOG("[Environ]: GET_PREFERRED_HW_RENDER - Context callback set to RETRO_HW_CONTEXT_VULKAN.\n");
          }
-         else if (!strncmp(video_driver_name, "d3d", 3))
+         else if (string_is_equal(video_driver_name, "d3d11"))
          {
-             *cb = RETRO_HW_CONTEXT_DIRECT3D;
-             RARCH_LOG("[Environ]: GET_PREFERRED_HW_RENDER - Context callback set to RETRO_HW_CONTEXT_DIRECT3D.\n");
+             *cb = RETRO_HW_CONTEXT_D3D11;
+             RARCH_LOG("[Environ]: GET_PREFERRED_HW_RENDER - Context callback set to RETRO_HW_CONTEXT_D3D11.\n");
+         }
+         else if (string_is_equal(video_driver_name, "d3d12"))
+         {
+             *cb = RETRO_HW_CONTEXT_D3D12;
+             RARCH_LOG("[Environ]: GET_PREFERRED_HW_RENDER - Context callback set to RETRO_HW_CONTEXT_D3D12.\n");
          }
          else
          {
@@ -3357,14 +3374,22 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
 #ifdef HAVE_VULKAN
             if (iface->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN)
-            {
                iface->interface_version = RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION;
-            }
             else
 #endif
             {
                iface->interface_version = 0;
             }
+         }
+         break;
+
+      case RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
+         {
+#if defined(HAVE_COCOATOUCH) && TARGET_OS_IOS
+            *(bool*)data             = jb_has_debugger_attached();
+#else
+            *(bool*)data             = true;
+#endif
          }
          break;
 
@@ -5013,6 +5038,7 @@ void core_options_reset(void)
 
 void core_options_flush(void)
 {
+   size_t _len;
    runloop_state_t *runloop_st     = &runloop_state;
    core_option_manager_t *coreopts = runloop_st->core_options;
    const char *path_core_options   = path_get(RARCH_PATH_CORE_OPTIONS);
@@ -5085,25 +5111,24 @@ void core_options_flush(void)
    if (success)
    {
       /* Log result */
+      _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_OPTIONS_FLUSHED),
+            sizeof(msg));
       RARCH_LOG(
             "[Core]: Saved core options to \"%s\".\n",
             path_core_options ? path_core_options : "UNKNOWN");
-
-      snprintf(msg, sizeof(msg), "%s \"%s\"",
-            msg_hash_to_str(MSG_CORE_OPTIONS_FLUSHED),
-            core_options_file);
    }
    else
    {
       /* Log result */
+      _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_OPTIONS_FLUSH_FAILED),
+            sizeof(msg));
       RARCH_LOG(
             "[Core]: Failed to save core options to \"%s\".\n",
             path_core_options ? path_core_options : "UNKNOWN");
-
-      snprintf(msg, sizeof(msg), "%s \"%s\"",
-            msg_hash_to_str(MSG_CORE_OPTIONS_FLUSH_FAILED),
-            core_options_file);
    }
+
+   snprintf(msg + _len, sizeof(msg) - _len, " \"%s\"",
+         core_options_file);
 
    runloop_msg_queue_push(
          msg, 1, 100, true,
@@ -5742,13 +5767,12 @@ static enum runloop_state_enum runloop_check_state(
             && (menu_st->flags & MENU_ST_FLAG_SCREENSAVER_SUPPORTED)
             && (!(menu_st->flags & MENU_ST_FLAG_SCREENSAVER_ACTIVE))
             && ((menu_st->current_time_us - menu_st->input_last_time_us)
-                  > ((retro_time_t)screensaver_timeout * 1000000)))
+             > ((retro_time_t)screensaver_timeout * 1000000)))
       {
-         menu_ctx_environment_t menu_environ;
-         menu_environ.type           = MENU_ENVIRON_ENABLE_SCREENSAVER;
-         menu_environ.data           = NULL;
          menu_st->flags             |= MENU_ST_FLAG_SCREENSAVER_ACTIVE;
-         menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+         if (menu_st->driver_ctx->environ_cb)
+            menu_st->driver_ctx->environ_cb(MENU_ENVIRON_ENABLE_SCREENSAVER,
+                     NULL, menu_st->userdata);
       }
 
       /* Iterate the menu driver for one frame. */
@@ -6440,11 +6464,8 @@ static enum runloop_state_enum runloop_check_state(
                   cur_state_slot);
          _len = strlcpy(msg, msg_hash_to_str(MSG_STATE_SLOT), sizeof(msg));
 
-         snprintf(msg         + _len,
-                  sizeof(msg) - _len,
-                  ": %d",
-                  settings->ints.state_slot);
-
+         snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d", settings->ints.state_slot);
          if (cur_state_slot < 0)
             strlcat(msg, " (Auto)", sizeof(msg));
 
@@ -6503,11 +6524,8 @@ static enum runloop_state_enum runloop_check_state(
                   cur_replay_slot);
          _len = strlcpy(msg, msg_hash_to_str(MSG_REPLAY_SLOT), sizeof(msg));
 
-         snprintf(msg         + _len,
-                  sizeof(msg) - _len,
-                  ": %d",
-                  settings->ints.replay_slot);
-
+         snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d", settings->ints.replay_slot);
          if (cur_replay_slot < 0)
             strlcat(msg, " (Auto)", sizeof(msg));
 
@@ -7265,12 +7283,14 @@ bool runloop_get_savestate_path(char *path, size_t len, int state_slot)
    if (string_is_empty(name_savestate))
       return false;
 
-   if (state_slot > 0)
-      snprintf(path, len, "%s%d",  name_savestate, state_slot);
-   else if (state_slot < 0)
+   if (state_slot < 0)
       fill_pathname_join_delim(path, name_savestate, "auto", '.', len);
    else
-      strlcpy(path, name_savestate, len);
+   {
+      size_t _len = strlcpy(path, name_savestate, len);
+      if (state_slot > 0)
+         snprintf(path + _len, len - _len, "%d", state_slot);
+   }
 
    return true;
 }
@@ -7285,6 +7305,7 @@ bool runloop_get_current_replay_path(char *path, size_t len)
 
 bool runloop_get_replay_path(char *path, size_t len, unsigned slot)
 {
+   size_t _len;
    runloop_state_t *runloop_st = &runloop_state;
    const char *name_replay  = NULL;
 
@@ -7295,10 +7316,9 @@ bool runloop_get_replay_path(char *path, size_t len, unsigned slot)
    if (string_is_empty(name_replay))
       return false;
 
+   _len = strlcpy(path, name_replay, len);
    if (slot >= 0)
-      snprintf(path, len, "%s%d",  name_replay, slot);
-   else
-      strlcpy(path, name_replay, len);
+      snprintf(path + _len, len - _len, "%d",  slot);
 
    return true;
 }

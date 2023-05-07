@@ -5023,10 +5023,6 @@ MSG_HASH(
    "ランキング"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_LEADERBOARDS_ENABLE,
-   "ゲーム固有のリーダーボードです. ハードコアモードが無効のときには効果ありません."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_RICHPRESENCE_ENABLE,
    "詳細なプレゼンス"
    )
@@ -7839,10 +7835,6 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_THUMBNAILS_RGUI,
    "上のサムネイル"
-   )
-MSG_HASH(
-   MENU_ENUM_SUBLABEL_THUMBNAILS_RGUI,
-   "プレイリストの右上に表示するサムネイルの種類です. このサムネイルは, レトロパッドのYボタンでフルスクリーンに切り替えることができます."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LEFT_THUMBNAILS_RGUI,

@@ -46,7 +46,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CONTENTLESS_CORES_TAB,
-   "Автономні Ядра"
+   "Ядра без Змісту"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ADD_TAB,
@@ -98,7 +98,7 @@ MSG_HASH( /* FIXME Is a specific image format used? Is it determined automatical
 #ifdef HAVE_LAKKA
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_EJECT_DISC,
-   "Вийняти диск"
+   "Вийняти Диск"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_EJECT_DISC,
@@ -292,7 +292,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_GOTO_CONTENTLESS_CORES,
-   "Автономні Ядра"
+   "Ядра без Змісту"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_GOTO_CONTENTLESS_CORES,
@@ -343,7 +343,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_DOWNLOAD_CORE_CONTENT,
-   "Завантажте безкоштовний контент для вибраного ядра."
+   "Завантажити безкоштовний зміст для вибраного ядра."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOAD_CORE_SYSTEM_FILES,
@@ -422,7 +422,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_SYSTEM_INFORMATION,
-   "Переглянути інформацію про пристрій."
+   "Перегляд інформації, специфічної для пристрою."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_MANAGER,
@@ -453,7 +453,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_INFO_CORE_VERSION,
-   "Версія ядра"
+   "Версія Ядра"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_INFO_SYSTEM_NAME,
@@ -583,6 +583,10 @@ MSG_HASH(
    "Дата збірки"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_RETROARCH_VERSION,
+   "Версія Arch Retroch"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GIT_VERSION,
    "Git-версія"
    )
@@ -600,7 +604,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CPU_ARCHITECTURE,
-   "Архітектура процесора"
+   "Архітектура ЦП"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CPU_CORES,
@@ -2020,11 +2024,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_SCALE_INTEGER_OVERSCALE,
-   "Збільшувати цілочисельне масштабування"
+   "Масштаб Цілочисельной Шкали"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_VIDEO_SCALE_INTEGER_OVERSCALE,
-   "Примусово округлювати вверх, а не вниз, при цілочисельному масштабуванні."
+   "Примусово масштабувати ціле число для округлення до наступного більшого цілого числа замість округлення вниз."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_ASPECT_RATIO_INDEX,
@@ -2292,6 +2296,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_FASTFORWARD_MUTE,
    "Автоматично вимикати звук, коли використовується швидка перемотка."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AUDIO_FASTFORWARD_SPEEDUP,
+   "Прискорити Під Час Перемотування Вперед"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUDIO_FASTFORWARD_SPEEDUP,
+   "Прискорювати звук під час перемотування вперед. Запобігає потріскуванню, але змінює висоту тону."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_VOLUME,
@@ -2648,7 +2660,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_BUTTON_AXIS_THRESHOLD,
-   "Зрушення по осі Кнопки Ввода"
+   "Зрушення по Осі Кнопки Вводу"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_BUTTON_AXIS_THRESHOLD,
@@ -3166,15 +3178,15 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_B,
-   "Кнопка B (нижня)"
+   "Кнопка B (Знизу)"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_Y,
-   "Кнопка Y (ліва)"
+   "Кнопка Y (Зліва)"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_SELECT,
-   "Кнопка Select"
+   "Кнопка Вибрати"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_START,
@@ -3198,11 +3210,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_A,
-   "Кнопка (права)"
+   "Кнопка A (Справа)"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_X,
-   "Кнопка X (вгорі)"
+   "Кнопка X (Вгорі)"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_JOYPAD_L,
@@ -4020,6 +4032,38 @@ MSG_HASH(
 
 /* Settings > Achievements > Visibility */
 
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_START,
+   "Стартове Повідомлення лідерської дошки"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_START,
+   "Показує опис лідерської дошки, коли вона стає активною."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_SUBMIT,
+   "Надіслані Повідомлення лідерської дошки"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_SUBMIT,
+   "Показує повідомлення зі значенням, яке буде надіслано після завершення спроби потрапити до лідерської дошки."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_CANCEL,
+   "Невдалі Повідомлення лідерської дошки"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_CANCEL,
+   "Показує повідомлення, коли спроба потрапити до лідерської дошки закінчується невдачею."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_TRACKERS,
+   "Відстежувачі лідерської дошки"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_TRACKERS,
+   "Показує на екрані відстежувачів з поточним значенням активної лідерської дошки."
+   )
 
 /* Settings > Network */
 
@@ -4184,6 +4228,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_LIST,
    "Керувати списками відтворення"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MANAGE,
+   "Керувати"
    )
 
 /* Settings > Playlists > Playlist Management */
@@ -7840,6 +7888,18 @@ MSG_HASH(
 MSG_HASH(
    MSG_SCREENSHOT_SAVED,
    "Знімок екрана збережено"
+   )
+MSG_HASH(
+   MSG_LEADERBOARD_STARTED,
+   "Розпочалася спроба потрапити до лідерської дошки"
+   )
+MSG_HASH(
+   MSG_LEADERBOARD_FAILED,
+   "Невдала спроба потрапити до лідерської дошки"
+   )
+MSG_HASH(
+   MSG_LEADERBOARD_SUBMISSION,
+   "Надіслано %s для %s" /* Submitted [value] for [leaderboard name] */
    )
 MSG_HASH(
    MSG_TOGGLE_CONTENT_METADATA,

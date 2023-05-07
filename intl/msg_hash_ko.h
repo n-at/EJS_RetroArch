@@ -599,6 +599,10 @@ MSG_HASH(
    "빌드 일시"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_RETROARCH_VERSION,
+   "RetroArch 버전"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GIT_VERSION,
    "Git 버전"
    )
@@ -2510,6 +2514,14 @@ MSG_HASH(
    "빨리 감기를 사용할 때 오디오를 음소거합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AUDIO_FASTFORWARD_SPEEDUP,
+   "빨리 감기 중 오디오도 빨리 감기"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUDIO_FASTFORWARD_SPEEDUP,
+   "빨리 감기 중 오디오의 속도를 올립니다. 소리 깨짐 효과를 방지하지만 음높이가 올라갑니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_VOLUME,
    "오디오 볼륨 레벨 (dB)"
    )
@@ -3911,6 +3923,10 @@ MSG_HASH(
    "종료 기능을 가진 코어가 종료될 때 더미 코어를 불러와 RetroArch까지 종료되는 것을 방지합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_DUMMY_ON_CORE_SHUTDOWN,
+   "일부 코어는 종료 기능을 가지고 있을 수 있습니다. 이 옵션을 비활성화해둘 경우, 해당 종료 기능을 실행하면 RetroArch 전체가 종료됩니다.\n이 옵션을 활성화하면 종료 대신 더미 코어를 불러와 RetroArch가 종료되지 않고 메뉴를 표시할 수 있게 합니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_SET_SUPPORTS_NO_CONTENT_ENABLE,
    "자동으로 코어 시작"
    )
@@ -3921,6 +3937,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CHECK_FOR_MISSING_FIRMWARE,
    "콘텐츠를 불러오기 전에 필요한 펌웨어가 모두 있는지 확인합니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_CHECK_FOR_MISSING_FIRMWARE,
+   "일부 코어는 펌웨어 또는 BIOS 파일을 필요로 합니다. 이 옵션을 활성화하면, RetroArch는 필요한 펌웨어 파일이 모두 갖춰지지 않은 코어의 실행을 차단합니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CORE_OPTION_CATEGORY_ENABLE,
@@ -4028,6 +4048,10 @@ MSG_HASH(
    "종료 시 구성 파일의 변경 내용을 저장합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_CONFIG_SAVE_ON_EXIT,
+   "종료 시 구성 파일에 변경사항을 저장합니다. 메뉴에서 설정을 변경할 경우 유용합니다. 구성 파일을 덮어쓰며, #include와 주석은 보존되지 않습니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_REMAP_SAVE_ON_EXIT,
    "종료 시 입력설정 파일 저장하기"
    )
@@ -4125,6 +4149,18 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUTOSAVE_INTERVAL,
    "비휘발성 SRAM을 정기적으로 자동 저장합니다. 기본값은 비활성이며 기간은 초 단위입니다. 0으로 설정시 자동저장이 비활성 됩니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_REPLAY_CHECKPOINT_INTERVAL,
+   "리플레이 체크포인트 간격"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_REPLAY_CHECKPOINT_INTERVAL,
+   "리플레이 녹화 중에 자동으로 게임의 상태저장을 수행할 시간 간격(초)입니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_REPLAY_CHECKPOINT_INTERVAL,
+   "리플레이 녹화 중에 게임의 상태저장을 일정 간격으로 자동 실행합니다. 기본값은 비활성이며 기간은 초 단위입니다. 0으로 설정시 자동 상태저장이 비활성 됩니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVESTATE_AUTO_INDEX,
@@ -4370,6 +4406,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_FASTFORWARD_RATIO,
    "빨리 감기를 사용할 때 콘텐츠가 실행되는 최대 속도입니다. (예: 60fps 콘텐츠의 경우 5.0x = 300fps) 0.0x로 설정하면 빨리 감기 속도는 무제한이 됩니다. (FPS 제한 없음)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_FASTFORWARD_RATIO,
+   "컨텐츠를 빨리 감기 할 때 사용될 최대 실행 속도 배율입니다. (예: 60fps 컨텐츠에 5.0배 => 빨리 감기 시 최대 300fps로 실행)\n이 속도를 넘지 않기 위해 RetroArch는 슬립을 사용하므로, 속도 제한이 정확하지 않을 수 있습니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_FASTFORWARD_FRAMESKIP,
@@ -6295,10 +6335,6 @@ MSG_HASH(
    "리더보드"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_CHEEVOS_LEADERBOARDS_ENABLE,
-   "게임별 리더보드를 사용합니다. '도전과제 하드코어 모드'를 비활성화한 경우 작동하지 않습니다."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_RICHPRESENCE_ENABLE,
    "세부 내역"
    )
@@ -6465,6 +6501,38 @@ MSG_HASH(
    "특정 도전 과제를 달성할 수 있을 때 화면에 지표를 표시합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_START,
+   "리더보드 시작 메시지"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_START,
+   "리더보드가 활성화될 때 리더보드의 설명을 표시합니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_SUBMIT,
+   "리더보드 제출 메시지"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_SUBMIT,
+   "리더보드 시도가 완료되어 결과가 제출되었을 때 메시지를 표시합니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_CANCEL,
+   "리더보드 실패 메시지"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_CANCEL,
+   "리더보드 시도가 실패했을 때 메시지를 표시합니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_LBOARD_TRACKERS,
+   "리더보드 트래커"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_VISIBILITY_LBOARD_TRACKERS,
+   "활성 리더보드의 현재 값을 화면에 표시합니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_ACCOUNT,
    "로그인 메시지"
    )
@@ -6592,6 +6660,10 @@ MSG_HASH(
    "넷플레이를 관전 모드로 실행합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_NETPLAY_START_AS_SPECTATOR,
+   "넷플레이를 관전 모드로 시작할지 설정합니다. 설정할 경우, 넷플레이가 관전 모드로 시작됩니다. 모드는 언제든지 변경할 수 있습니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_FADE_CHAT,
    "페이드 채팅"
    )
@@ -6648,6 +6720,10 @@ MSG_HASH(
    "넷플레이 중 호스트와 클라이언트가 동기화되어있는지 확인하는 프레임의 빈도(프레임)를 설정합니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_NETPLAY_CHECK_FRAMES,
+   "넷플레이 중 호스트와 클라이언트가 동기화되어있는지 확인하는 프레임의 빈도입니다. 대부분의 코어에서, 이 값은 특별한 효과가 없고 무시될 것입니다. 비결정식 코어의 경우, 이 값은 넷플레이 피어들이 얼마나 자주 동기화될 것인지 결정합니다. 버그가 많은 코어에서 이 값을 0 이외의 값으로 설정하는 것은 심각한 성능 문제를 일으킬 수 있습니다. 0으로 설정하면 동기화 [...]"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_INPUT_LATENCY_FRAMES_MIN,
    "입력 대기 프레임"
    )
@@ -6656,12 +6732,20 @@ MSG_HASH(
    "넷플레이 시 네트워크 지연을 숨기기 위해 사용할 지연 프레임 수입니다. 입력 지연을 얻는 대신 지터링과 CPU 사용률을 줄입니다."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_HELP_NETPLAY_INPUT_LATENCY_FRAMES_MIN,
+   "넷플레이 시 네트워크 지연을 숨기기 위해 사용할 입력 지연 프레임 수입니다.\n이 옵션은 넷플레이 중에 로컬 입력을 지연시켜, 실행되는 프레임이 네트워크에서 받아오는 프레임과 더 가까워지게 합니다. 이는 화면 떨림 등의 증상을 줄이고 넷플레이의 CPU 사용량을 감소시키지만, 대신 체감 가능한 수준의 입력 지연을 발생시킵니다."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_INPUT_LATENCY_FRAMES_RANGE,
    "입력 대기 프레임 범위"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY_INPUT_LATENCY_FRAMES_RANGE,
    "네트워크 지연을 숨기기 위해 사용하는 입력 대기 프레임 범위입니다. 예측 불가능한 입력 지연으로 지터를 줄이고 넷플레이의 CPU 사용을 줄입니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_NETPLAY_INPUT_LATENCY_FRAMES_RANGE,
+   "넷플레이 중 네트워크 지연을 숨기기 위해 사용하는 입력 대기 프레임 범위입니다.\n설정할 경우, 넷플레이는 CPU 사용 시간, 입력 지연, 네트워크 지연을 균등하게 유지하기 위해 입력 지연 시간을 동적으로 조절합니다. 이는 화면 떨림 등의 증상을 줄이고 넷플레이의 CPU 사용량을 감소시키지만, 대신 예측 불가능한 입력 지연을 발생시킵니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_NAT_TRAVERSAL,
@@ -6993,6 +7077,10 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_PLAYLIST_PORTABLE_PATHS,
    "활성 및 '파일 탐색기' 디렉토리가 선택되면 '파일 탐색기' 매개 변수의 현재 값이 실행목록에 저장됩니다. 동일 옵션이 활성화 된 다른 시스템에서 실행목록을 불러오면 '파일 탐색기' 매개 변수 값이 실행목록 값과 비교되고 다를 경우 자동으로 교정됩니다."
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MANAGE,
+   "관리"
+   )
 
 /* Settings > Playlists > Playlist Management */
 
@@ -7120,6 +7208,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ACCOUNTS_RETRO_ACHIEVEMENTS,
    "고전 게임에서 도전과제를 사용할 수 있습니다. 자세한 정보는 https://retroachievements.org에서 확인하세요."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_ACCOUNTS_RETRO_ACHIEVEMENTS,
+   "RetroAchievements 계정의 로그인 정보입니다. retroachievements.org를 방문하여 무료 계정을 만드십시오.\n가입이 완료된 후에, 사용자명과 비밀번호를 RetroArch에 입력하여 사용할 수 있습니다."
    )
 
 /* Settings > User > Accounts > RetroAchievements */
@@ -7395,6 +7487,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_SAVEFILE_DIRECTORY,
    "모든 세이브 파일이 저장될 디렉토리. 설정하지 않을 경우 콘텐츠 파일의 작업 디렉토리에 저장됩니다."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_SAVEFILE_DIRECTORY,
+   "모든 세이브 파일(*.srm)을 이 디렉토리에 저장합니다. .rt나 .psrm 등의 관련 파일도 모두 포함됩니다. 이 설정은 명령줄 옵션으로 덮어씌워질 수 있습니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVESTATE_DIRECTORY,
@@ -9906,7 +10002,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_MENU_RGUI_INLINE_THUMBNAILS,
-   "실행목록을 볼 때 목록에 축소된 미리보기를 표시할 수 있습니다. 사용 안할 시 '상단 미리보기'를 패드 Y버튼을 눌러 전체화면으로 표시할 수 있습니다."
+   "실행목록을 볼 때 목록에 축소된 미리보기를 표시합니다. RetroPad 선택 버튼으로 켜고 끌 수 있습니다. 비활성화하더라도, 미리보기의 전체화면 표시는 RetroPad 시작 버튼을 눌러 켜고 끌 수 있습니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_THUMBNAILS_RGUI,
@@ -9914,7 +10010,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_THUMBNAILS_RGUI,
-   "오른쪽 상단에 표시할 미리보기의 종류입니다. Y 버튼을 누르면 이 미리보기가 전체화면으로 표시됩니다."
+   "오른쪽 상단에 표시될 미리보기의 종류입니다. RetroPad Y 버튼을 누르면 미리보기 종류를 전환할 수 있습니다."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LEFT_THUMBNAILS_RGUI,
@@ -13306,6 +13402,18 @@ MSG_HASH(
    "도전과제 해제"
    )
 MSG_HASH(
+   MSG_LEADERBOARD_STARTED,
+   "리더보드 시도 시작됨"
+   )
+MSG_HASH(
+   MSG_LEADERBOARD_FAILED,
+   "리더보드 시도 실패함"
+   )
+MSG_HASH(
+   MSG_LEADERBOARD_SUBMISSION,
+   "%s 제출함 (%s)" /* Submitted [value] for [leaderboard name] */
+   )
+MSG_HASH(
    MSG_CHANGE_THUMBNAIL_TYPE,
    "미리보기 형식 변경"
    )
@@ -13403,7 +13511,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MSG_DEVICE_CONFIGURED_IN_PORT_NR,
-   "%u 포트에 %s 구성됨"
+   "%s가 포트 %u에 구성됨"
    )
 MSG_HASH(
    MSG_DEVICE_DISCONNECTED_FROM_PORT,

@@ -218,14 +218,6 @@ typedef struct menu_input
    bool cancel_inhibit;
 } menu_input_t;
 
-typedef struct menu_input_ctx_hitbox
-{
-   int32_t x1;
-   int32_t x2;
-   int32_t y1;
-   int32_t y2;
-} menu_input_ctx_hitbox_t;
-
 typedef struct key_desc
 {
    /* libretro key id */
@@ -294,16 +286,6 @@ bool menu_input_dialog_start_search(void);
 bool menu_input_dialog_get_display_kb(void);
 
 void menu_input_dialog_end(void);
-
-bool menu_input_key_bind_poll_find_hold(
-      unsigned max_users,
-      struct menu_bind_state *new_state,
-      struct retro_keybind * output);
-
-void menu_input_set_pointer_visibility(
-      menu_input_pointer_hw_state_t *pointer_hw_state,
-      menu_input_t *menu_input,
-      retro_time_t current_time);
 
 RETRO_END_DECLS
 

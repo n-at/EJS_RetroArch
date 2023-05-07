@@ -610,11 +610,19 @@ bool input_driver_button_combo(
          break;
       case INPUT_COMBO_HOLD_START:
          {
-            rarch_timer_t *timer = &input_driver_st.combo_timers[INPUT_COMBO_HOLD_START];
+            rarch_timer_t *timer        = &input_driver_st.combo_timers[INPUT_COMBO_HOLD_START];
+            runloop_state_t *runloop_st = runloop_state_get_ptr();
 
-            if (!BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_START))
+            /* Allow using the same button for 'enable_hotkey' if set,
+             * and stop timer if holding fast-forward or slow-motion */
+            if (     !BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_START)
+                  && !( BIT256_GET_PTR(p_input, RARCH_ENABLE_HOTKEY)
+                     && !(input_driver_st.flags & INP_FLAG_BLOCK_HOTKEY)
+                     && !(runloop_st->flags & RUNLOOP_FLAG_SLOWMOTION)
+                     && !(runloop_st->flags & RUNLOOP_FLAG_FASTMOTION))
+               )
             {
-               /* timer only runs while start is held down */
+               /* Timer only runs while start is held down */
                timer->timer_end   = true;
                timer->timer_begin = false;
                timer->timeout_end = 0;
@@ -637,30 +645,37 @@ bool input_driver_button_combo(
 
             if (!timer->timer_end && (timer->timeout_us <= 0))
             {
-               /* start has been held down long enough,
+               /* Start has been held down long enough,
                 * stop timer and enter menu */
                timer->timer_end   = true;
                timer->timer_begin = false;
                timer->timeout_end = 0;
                return true;
             }
-
          }
          break;
       case INPUT_COMBO_HOLD_SELECT:
          {
-            rarch_timer_t *timer = &input_driver_st.combo_timers[INPUT_COMBO_HOLD_SELECT];
+            rarch_timer_t *timer        = &input_driver_st.combo_timers[INPUT_COMBO_HOLD_SELECT];
+            runloop_state_t *runloop_st = runloop_state_get_ptr();
 
-            if (!BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_SELECT))
+            /* Allow using the same button for 'enable_hotkey' if set,
+             * and stop timer if holding fast-forward or slow-motion */
+            if (     !BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_SELECT)
+                  && !( BIT256_GET_PTR(p_input, RARCH_ENABLE_HOTKEY)
+                     && !(input_driver_st.flags & INP_FLAG_BLOCK_HOTKEY)
+                     && !(runloop_st->flags & RUNLOOP_FLAG_SLOWMOTION)
+                     && !(runloop_st->flags & RUNLOOP_FLAG_FASTMOTION))
+               )
             {
-               /* timer only runs while select is held down */
+               /* Timer only runs while select is held down */
                timer->timer_end   = true;
                timer->timer_begin = false;
                timer->timeout_end = 0;
                return false;
             }
 
-            /* user started holding down the select button, start the timer */
+            /* User started holding down the select button, start the timer */
             if (!timer->timer_begin)
             {
                uint64_t current_usec = cpu_features_get_time_usec();
@@ -676,7 +691,7 @@ bool input_driver_button_combo(
 
             if (!timer->timer_end && (timer->timeout_us <= 0))
             {
-               /* select has been held down long enough,
+               /* Select has been held down long enough,
                 * stop timer and enter menu */
                timer->timer_end   = true;
                timer->timer_begin = false;
@@ -2507,19 +2522,19 @@ void input_config_get_bind_string_joykey(
          switch (GET_HAT_DIR(bind->joykey))
          {
             case HAT_UP_MASK:
-               snprintf(buf + len, size - len, "up (%s)",   na_str);
+               snprintf(buf + len, size - len, "up (%s)",    na_str);
                break;
             case HAT_DOWN_MASK:
-               snprintf(buf + len, size - len, "down (%s)", na_str);
+               snprintf(buf + len, size - len, "down (%s)",  na_str);
                break;
             case HAT_LEFT_MASK:
-               snprintf(buf + len, size - len, "left (%s)", na_str);
+               snprintf(buf + len, size - len, "left (%s)",  na_str);
                break;
             case HAT_RIGHT_MASK:
-               snprintf(buf + len, size - len, "right (%s)",na_str);
+               snprintf(buf + len, size - len, "right (%s)", na_str);
                break;
             default:
-               snprintf(buf + len, size - len, "? (%s)",    na_str);
+               snprintf(buf + len, size - len, "? (%s)",     na_str);
                break;
          }
       }
@@ -2568,17 +2583,17 @@ void input_config_get_bind_string_joyaxis(
    }
    else
    {
-      const char *na_str   =
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE);
       if (AXIS_NEG_GET(bind->joyaxis) != AXIS_DIR_NONE)
       {
          unsigned axis = AXIS_NEG_GET(bind->joyaxis);
-         snprintf(buf, size, "%s-%u (%s)", prefix, axis, na_str);
+         snprintf(buf, size, "%s-%u (%s)", prefix, axis,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE));
       }
       else if (AXIS_POS_GET(bind->joyaxis) != AXIS_DIR_NONE)
       {
          unsigned axis = AXIS_POS_GET(bind->joyaxis);
-         snprintf(buf, size, "%s+%u (%s)", prefix, axis, na_str);
+         snprintf(buf, size, "%s+%u (%s)", prefix, axis,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE));
       }
    }
 }
@@ -6344,12 +6359,12 @@ void input_keyboard_event(bool down, unsigned code,
                 (code == RETROK_DELETE)   || /* RETRO_DEVICE_ID_JOYPAD_Y */
                  BIT512_GET(input_st->keyboard_mapping_bits, code))))
       {
-         menu_ctx_environment_t menu_environ;
-         menu_environ.type           = MENU_ENVIRON_DISABLE_SCREENSAVER;
-         menu_environ.data           = NULL;
+         struct menu_state *menu_st  = menu_state_get_ptr();
          menu_st->flags             &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
          menu_st->input_last_time_us = menu_st->current_time_us;
-         menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+         if (menu_st->driver_ctx->environ_cb)
+            menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_SCREENSAVER,
+                  NULL, menu_st->userdata);
       }
       return;
    }

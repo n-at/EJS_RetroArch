@@ -287,6 +287,7 @@ enum
    RA_OPT_MAX_FRAMES_SCREENSHOT,
    RA_OPT_MAX_FRAMES_SCREENSHOT_PATH,
    RA_OPT_SET_SHADER,
+   RA_OPT_DATABASE_SCAN,
    RA_OPT_ACCESSIBILITY,
    RA_OPT_LOAD_MENU_ON_ERROR
 };
@@ -957,7 +958,7 @@ void drivers_init(
    if (flags & DRIVER_LED_MASK)
       led_driver_init(settings->arrays.led_driver);
 
-   /* Initialize MIDI  driver */
+   /* Initialize MIDI driver */
    if (flags & DRIVER_MIDI_MASK)
       midi_driver_init(settings);
 
@@ -2253,39 +2254,29 @@ bool command_event(enum event_command cmd, void *data)
             settings->bools.run_ahead_enabled =
                !(settings->bools.run_ahead_enabled);
 
-            if (!settings->bools.run_ahead_enabled)
-            {
-               runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_DISABLED),
-                     1, 100, false,
-                     NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-            }
-            else
+            if (settings->bools.run_ahead_enabled)
             {
                char msg[256];
-
-               if (!settings->bools.run_ahead_secondary_instance)
-               {
-                  snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_RUNAHEAD_ENABLED),
+               if (settings->bools.run_ahead_secondary_instance)
+                  snprintf(msg, sizeof(msg),
+                        msg_hash_to_str(MSG_RUNAHEAD_ENABLED_WITH_SECOND_INSTANCE),
                         settings->uints.run_ahead_frames);
-
-                  runloop_msg_queue_push(
-                        msg, 1, 100, false,
-                        NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-               }
                else
-               {
-                  snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_RUNAHEAD_ENABLED_WITH_SECOND_INSTANCE),
+                  snprintf(msg, sizeof(msg),
+                        msg_hash_to_str(MSG_RUNAHEAD_ENABLED),
                         settings->uints.run_ahead_frames);
-
-                  runloop_msg_queue_push(
-                        msg, 1, 100, false,
-                        NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-               }
+               runloop_msg_queue_push(msg, 1, 100, false,
+                     NULL, MESSAGE_QUEUE_ICON_DEFAULT,
+                     MESSAGE_QUEUE_CATEGORY_INFO);
 
                /* Disable preemptive frames */
                settings->bools.preemptive_frames_enable = false;
                preempt_deinit(runloop_st);
             }
+            else
+               runloop_msg_queue_push(msg_hash_to_str(MSG_RUNAHEAD_DISABLED),
+                     1, 100, false,
+                     NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
          }
 #endif
          break;
@@ -2304,11 +2295,9 @@ bool command_event(enum event_command cmd, void *data)
             settings->bools.preemptive_frames_hide_warnings = old_warn;
 
             if (old_inited && !runloop_st->preempt_data)
-            {
                runloop_msg_queue_push(msg_hash_to_str(MSG_PREEMPT_DISABLED),
                      1, 100, false,
                      NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
-            }
             else if (runloop_st->preempt_data)
             {
                char msg[256];
@@ -2512,11 +2501,10 @@ bool command_event(enum event_command cmd, void *data)
          return false;
       case CMD_EVENT_PLAY_REPLAY:
       {
-         bool res = false;
 #ifdef HAVE_BSV_MOVIE
          input_driver_state_t *input_st = input_state_get_ptr();
          char replay_path[PATH_MAX_LENGTH];
-         res = true;
+         bool res = true;
          /* TODO: Consider extending the current replay if we start recording during a playback */
          if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_RECORDING)
             res = false;
@@ -2526,7 +2514,7 @@ bool command_event(enum event_command cmd, void *data)
             res = false;
          if (res)
             res = movie_start_playback(input_st, replay_path);
-         if(!res)
+         if (!res)
          {
             const char *movie_fail_str        =
                msg_hash_to_str(MSG_FAILED_TO_LOAD_MOVIE_FILE);
@@ -2542,14 +2530,13 @@ bool command_event(enum event_command cmd, void *data)
       }
       case CMD_EVENT_RECORD_REPLAY:
       {
-         bool res = false;
 #ifdef HAVE_BSV_MOVIE
-         input_driver_state_t *input_st = input_state_get_ptr();
-         int replay_slot = settings->ints.replay_slot;
          char replay_path[PATH_MAX_LENGTH];
+         bool res                       = true;
+         input_driver_state_t *input_st = input_state_get_ptr();
+         int replay_slot                = settings->ints.replay_slot;
          if (settings->bools.replay_auto_index)
             replay_slot += 1;
-         res = true;
          /* TODO: Consider cloning and extending the current replay if we start recording during a recording */
          if (input_st->bsv_movie_state.flags & BSV_FLAG_MOVIE_RECORDING)
             res = false;
@@ -2557,14 +2544,11 @@ bool command_event(enum event_command cmd, void *data)
             res = movie_stop(input_st);
          if (!runloop_get_replay_path(replay_path, sizeof(replay_path), replay_slot))
             res = false;
-         if(res)
+         if (res)
             res = movie_start_record(input_st, replay_path);
-
-         if(res && settings->bools.replay_auto_index)
-         {
+         if (res && settings->bools.replay_auto_index)
             configuration_set_int(settings, settings->ints.replay_slot, replay_slot);
-         }
-         if(!res)
+         if (!res)
          {
              const char *movie_rec_fail_str        =
                msg_hash_to_str(MSG_FAILED_TO_START_MOVIE_RECORD);
@@ -2573,17 +2557,16 @@ bool command_event(enum event_command cmd, void *data)
                NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
             RARCH_ERR("%s.\n", movie_rec_fail_str);
          }
-#endif
          return res;
+#else
+         break;
+#endif
       }
       case CMD_EVENT_HALT_REPLAY:
-      {
 #ifdef HAVE_BSV_MOVIE
-         input_driver_state_t *input_st = input_state_get_ptr();
-         movie_stop(input_st);
+         movie_stop(input_state_get_ptr());
 #endif
-         return true;
-      }
+         break;
       case CMD_EVENT_SAVE_STATE:
       case CMD_EVENT_SAVE_STATE_TO_RAM:
          {
@@ -4324,6 +4307,9 @@ void retroarch_override_setting_set(
       case RARCH_OVERRIDE_SETTING_LOG_TO_FILE:
          p_rarch->flags |= RARCH_FLAGS_HAS_SET_LOG_TO_FILE;
          break;
+      case RARCH_OVERRIDE_SETTING_DATABASE_SCAN:
+         p_rarch->flags |= RARCH_FLAGS_CLI_DATABASE_SCAN;
+         break;
       case RARCH_OVERRIDE_SETTING_NONE:
       default:
          break;
@@ -4397,6 +4383,9 @@ void retroarch_override_setting_unset(
          break;
       case RARCH_OVERRIDE_SETTING_LOG_TO_FILE:
          p_rarch->flags &= ~RARCH_FLAGS_HAS_SET_LOG_TO_FILE;
+         break;
+      case RARCH_OVERRIDE_SETTING_DATABASE_SCAN:
+         p_rarch->flags &= ~RARCH_FLAGS_CLI_DATABASE_SCAN;
          break;
       case RARCH_OVERRIDE_SETTING_NONE:
       default:
@@ -4958,17 +4947,17 @@ static void retroarch_print_version(void)
 
    frontend_driver_attach_console();
 
-   fprintf(stdout, "%s: %s -- v%s",
+   fprintf(stdout, "%s - %s\n",
          msg_hash_to_str(MSG_PROGRAM),
-         msg_hash_to_str(MSG_LIBRETRO_FRONTEND),
-         PACKAGE_VERSION);
+         msg_hash_to_str(MSG_LIBRETRO_FRONTEND));
+
+   fprintf(stdout, "Version: %s", PACKAGE_VERSION);
 #ifdef HAVE_GIT_VERSION
-   printf(" -- %s --\n", retroarch_git_version);
-#else
-   printf("\n");
+   fprintf(stdout, " (Git %s)", retroarch_git_version);
 #endif
+   fprintf(stdout, " " __DATE__ "\n");
+
    retroarch_get_capabilities(RARCH_CAPABILITIES_COMPILER, str, sizeof(str), 0);
-   strlcat(str, " Built: " __DATE__, sizeof(str));
    fprintf(stdout, "%s\n", str);
 }
 
@@ -5002,8 +4991,7 @@ static void retroarch_print_help(const char *arg0)
          "Show version.\n"
          "      --features                 "
          "Print available features compiled into program.\n"
-         ,
-         sizeof(buf));
+         , sizeof(buf));
 #ifdef HAVE_MENU
    strlcat(buf,
          "      --menu                     "
@@ -5012,8 +5000,7 @@ static void retroarch_print_help(const char *arg0)
          "  starts directly in menu. If no arguments are passed to\n"
          "                                 "
          "  the program, it is equivalent to using --menu as only argument.\n"
-         ,
-         sizeof(buf));
+         , sizeof(buf));
 #endif
 
 #ifdef HAVE_CONFIGFILE
@@ -5081,14 +5068,24 @@ static void retroarch_print_help(const char *arg0)
          "  files are loaded as multiple arguments. If a content\n"
          "                                 "
          "  file is skipped, use a blank (\"\") command line argument.\n"
+         , sizeof(buf));
+   strlcat(buf,
          "                                 "
          "  Content must be loaded in an order which depends on the\n"
          "                                 "
          "  particular subsystem used. See verbose log output to learn\n"
          "                                 "
-         , sizeof(buf));
-   strlcat(buf,
          "  how a particular subsystem wants content to be loaded.\n"
+         , sizeof(buf));
+
+#ifdef HAVE_LIBRETRODB
+   strlcat(buf,
+         "      --scan=PATH|FILE           "
+         "Import content from path.\n"
+         , sizeof(buf));
+#endif
+
+   strlcat(buf,
          "  -f, --fullscreen               "
          "Start the program in fullscreen regardless of config setting.\n"
          "      --set-shader=PATH          "
@@ -5133,7 +5130,8 @@ static void retroarch_print_help(const char *arg0)
          "Check frames when using netplay.\n"
          , sizeof(buf));
 #ifdef HAVE_NETWORK_CMD
-   strlcat(buf, "      --command                  "
+   strlcat(buf,
+         "      --command                  "
          "Sends a command over UDP to an already running program process.\n"
          "                                 "
          "  Available commands are listed if command is invalid.\n"
@@ -5152,23 +5150,26 @@ static void retroarch_print_help(const char *arg0)
          , sizeof(buf));
 #endif
 
-   strlcat(buf, "  -r, --record=FILE              "
+   strlcat(buf,
+         "  -r, --record=FILE              "
          "Path to record video file. Using mkv extension is recommended.\n"
          "      --recordconfig             "
          "Path to settings used during recording.\n"
          "      --size=WIDTHxHEIGHT        "
          "Overrides output video size when recording.\n"
-         ,
-         sizeof(buf));
+         , sizeof(buf));
 
    fputs(buf, stdout);
    buf[0] = '\0';
 
-   strlcat(buf, "  -D, --detach                   "
+   strlcat(buf,
+         "  -D, --detach                   "
          "Detach program from the running console. Not relevant for all platforms.\n"
          "      --max-frames=NUMBER        "
          "Runs for the specified number of frames, then exits.\n"
          , sizeof(buf));
+
+
 
 #ifdef HAVE_PATCH
    strlcat(buf,
@@ -5193,8 +5194,10 @@ static void retroarch_print_help(const char *arg0)
 #endif
 
 #ifdef HAVE_ACCESSIBILITY
-   strlcat(buf, "      --accessibility            "
-         "Enables accessibilty for blind users using text-to-speech.\n", sizeof(buf));
+   strlcat(buf,
+         "      --accessibility            "
+         "Enables accessibilty for blind users using text-to-speech.\n"
+         , sizeof(buf));
 #endif
 
    strlcat(buf,
@@ -5206,8 +5209,7 @@ static void retroarch_print_help(const char *arg0)
          "Path for save files (*.srm). (DEPRECATED, use --appendconfig and savefile_directory)\n"
          "  -S, --savestate=PATH           "
          "Path for the save state files (*.state). (DEPRECATED, use --appendconfig and savestate_directory)\n"
-         ,
-         sizeof(buf));
+         , sizeof(buf));
 
    fputs(buf, stdout);
 }
@@ -5350,6 +5352,11 @@ end:
 }
 #endif
 
+#ifdef HAVE_LIBRETRODB
+void handle_dbscan_finished(retro_task_t *task,
+      void *task_data, void *user_data, const char *err);
+#endif
+
 /**
  * retroarch_parse_input_and_config:
  * @argc                 : Count of (commandline) arguments.
@@ -5378,6 +5385,10 @@ static bool retroarch_parse_input_and_config(
    settings_t          *settings   = config_get_ptr();
 #ifdef HAVE_ACCESSIBILITY
    access_state_t *access_st       = access_state_get_ptr();
+#endif
+#ifdef HAVE_LIBRETRODB
+   retro_task_callback_t cb_task_dbscan
+                                   = NULL;
 #endif
 
    const struct option opts[]      = {
@@ -5434,6 +5445,9 @@ static bool retroarch_parse_input_and_config(
       { "accessibility",      0, NULL, RA_OPT_ACCESSIBILITY},
       { "load-menu-on-error", 0, NULL, RA_OPT_LOAD_MENU_ON_ERROR },
       { "entryslot",          1, NULL, 'e' },
+#ifdef HAVE_LIBRETRODB
+      { "scan",               1, NULL, RA_OPT_DATABASE_SCAN },
+#endif
       { NULL, 0, NULL, 0 }
    };
 
@@ -5600,6 +5614,16 @@ static bool retroarch_parse_input_and_config(
 
                /* Cache log file path override */
                rarch_log_file_set_override(optarg);
+               break;
+
+            case RA_OPT_MENU:
+               explicit_menu = true;
+               break;
+            case RA_OPT_DATABASE_SCAN:
+#ifdef HAVE_LIBRETRODB
+               verbosity_enable();
+               retroarch_override_setting_set(RARCH_OVERRIDE_SETTING_DATABASE_SCAN, NULL);
+#endif
                break;
 
             /* Must handle '?' otherwise you get an infinite loop */
@@ -5985,6 +6009,38 @@ static bool retroarch_parse_input_and_config(
                         "entry state slot index. Ignoring.\n", optarg);
                }
                break;
+            case RA_OPT_DATABASE_SCAN:
+#ifdef HAVE_LIBRETRODB
+               {
+                  settings_t *settings           = config_get_ptr();
+                  bool show_hidden_files         = settings->bools.show_hidden_files;
+                  const char *directory_playlist = settings->paths.directory_playlist;
+                  const char *path_content_db    = settings->paths.path_content_database;
+                  int reinit_flags               = DRIVERS_CMD_ALL &
+                        ~(DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK | DRIVER_INPUT_MASK | DRIVER_MIDI_MASK);
+
+                  drivers_init(settings, reinit_flags, false);
+                  retroarch_init_task_queue();
+
+                  if (explicit_menu)
+                     cb_task_dbscan = handle_dbscan_finished;
+
+                  task_push_dbscan(
+                        directory_playlist,
+                        path_content_db,
+                        optarg, path_is_directory(optarg),
+                        show_hidden_files,
+                        cb_task_dbscan);
+
+                  if (!explicit_menu)
+                  {
+                     task_queue_wait(NULL, NULL);
+                     driver_uninit(DRIVERS_CMD_ALL);
+                     exit(0);
+                  }
+               }
+#endif
+               break;
             default:
                RARCH_ERR("%s\n", msg_hash_to_str(MSG_ERROR_PARSING_ARGUMENTS));
                retroarch_fail(1, "retroarch_parse_input()");
@@ -6196,6 +6252,7 @@ bool retroarch_main_init(int argc, char *argv[])
 
          RARCH_LOG_OUTPUT("%s", str_output);
       }
+
       {
          char str_output[256];
          char str[128];
@@ -6203,14 +6260,21 @@ bool retroarch_main_init(int argc, char *argv[])
 
 #ifdef HAVE_GIT_VERSION
          snprintf(str_output, sizeof(str_output),
-               "%s: %s" "\n" FILE_PATH_LOG_INFO " Built: " __DATE__ "\n" FILE_PATH_LOG_INFO " Version: " PACKAGE_VERSION "\n" FILE_PATH_LOG_INFO " Git: %s" "\n" FILE_PATH_LOG_INFO " =================================================\n",
+               "%s: %s" "\n"
+               FILE_PATH_LOG_INFO " Version: " PACKAGE_VERSION "\n"
+               FILE_PATH_LOG_INFO " Git: %s" "\n"
+               FILE_PATH_LOG_INFO " Built: " __DATE__ "\n"
+               FILE_PATH_LOG_INFO " =================================================\n",
                msg_hash_to_str(MSG_CAPABILITIES),
                str,
                retroarch_git_version
                );
 #else
          snprintf(str_output, sizeof(str_output),
-               "%s: %s" "\n" FILE_PATH_LOG_INFO " Built: " __DATE__ "\n" FILE_PATH_LOG_INFO " Version: " PACKAGE_VERSION "\n" FILE_PATH_LOG_INFO " =================================================\n",
+               "%s: %s" "\n"
+               FILE_PATH_LOG_INFO " Version: " PACKAGE_VERSION "\n"
+               FILE_PATH_LOG_INFO " Built: " __DATE__ "\n"
+               FILE_PATH_LOG_INFO " =================================================\n",
                msg_hash_to_str(MSG_CAPABILITIES),
                str);
 #endif
@@ -6450,17 +6514,6 @@ error:
 
    return false;
 }
-
-#if 0
-static bool retroarch_is_on_main_thread(shtread_tls_t *tls)
-{
-#ifdef HAVE_THREAD_STORAGE
-   return sthread_tls_get(tls) == MAGIC_POINTER;
-#else
-   return true;
-#endif
-}
-#endif
 
 void retroarch_init_task_queue(void)
 {
@@ -6760,6 +6813,8 @@ bool retroarch_override_setting_is_set(
 #endif
       case RARCH_OVERRIDE_SETTING_LOG_TO_FILE:
          return ((p_rarch->flags & RARCH_FLAGS_HAS_SET_LOG_TO_FILE) > 0);
+      case RARCH_OVERRIDE_SETTING_DATABASE_SCAN:
+         return ((p_rarch->flags & RARCH_FLAGS_CLI_DATABASE_SCAN) > 0);
       case RARCH_OVERRIDE_SETTING_NONE:
       default:
          break;

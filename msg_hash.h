@@ -423,6 +423,9 @@ enum msg_hash_enums
    MSG_TAKING_SCREENSHOT,
    MSG_SCREENSHOT_SAVED,
    MSG_ACHIEVEMENT_UNLOCKED,
+   MSG_LEADERBOARD_STARTED,
+   MSG_LEADERBOARD_FAILED,
+   MSG_LEADERBOARD_SUBMISSION,
    MSG_CHANGE_THUMBNAIL_TYPE,
    MSG_TOGGLE_FULLSCREEN_THUMBNAILS,
    MSG_TOGGLE_CONTENT_METADATA,
@@ -1754,6 +1757,10 @@ enum msg_hash_enums
    MENU_LABEL(CHEEVOS_VISIBILITY_UNLOCK),
    MENU_LABEL(CHEEVOS_VISIBILITY_MASTERY),
    MENU_LABEL(CHEEVOS_VISIBILITY_ACCOUNT),
+   MENU_LABEL(CHEEVOS_VISIBILITY_LBOARD_START),
+   MENU_LABEL(CHEEVOS_VISIBILITY_LBOARD_SUBMIT),
+   MENU_LABEL(CHEEVOS_VISIBILITY_LBOARD_CANCEL),
+   MENU_LABEL(CHEEVOS_VISIBILITY_LBOARD_TRACKERS),
 
    MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SUMMARY_ALLGAMES,
    MENU_ENUM_LABEL_VALUE_CHEEVOS_VISIBILITY_SUMMARY_HASCHEEVOS,
@@ -2087,6 +2094,7 @@ enum msg_hash_enums
    MENU_LABEL(AUDIO_MUTE),
    MENU_LABEL(AUDIO_MIXER_MUTE),
    MENU_LABEL(AUDIO_FASTFORWARD_MUTE),
+   MENU_LABEL(AUDIO_FASTFORWARD_SPEEDUP),
    MENU_LABEL(AUDIO_SYNC),
    MENU_LBL_H(AUDIO_VOLUME),
    MENU_LABEL(AUDIO_MIXER_VOLUME),
@@ -2945,6 +2953,7 @@ enum msg_hash_enums
    MENU_LABEL(HELP),
    MENU_ENUM_LABEL_VALUE_CLEAR_SETTING,
    MENU_ENUM_LABEL_VALUE_SCAN_ENTRY,
+   MENU_ENUM_LABEL_VALUE_MANAGE,
    MENU_LABEL(CHEAT_DATABASE_PATH),
    MENU_LABEL(CURSOR_DIRECTORY),
    MENU_LABEL(OSK_OVERLAY_DIRECTORY),
@@ -3210,6 +3219,7 @@ enum msg_hash_enums
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_LAKKA_VERSION,
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_DYNAMIC_SUPPORT,
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_BUILD_DATE,
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_RETROARCH_VERSION,
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GIT_VERSION,
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_CPU_MODEL,
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_CPU_FEATURES,
@@ -3975,40 +3985,14 @@ enum msg_hash_enums
 
 const char *msg_hash_to_str(enum msg_hash_enums msg);
 
-const char *msg_hash_to_str_ru(enum msg_hash_enums msg);
-
-const char *msg_hash_to_str_jp(enum msg_hash_enums msg);
-int msg_hash_get_help_jp_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_ko(enum msg_hash_enums msg);
-int msg_hash_get_help_ko_enum(enum msg_hash_enums msg, char *s, size_t len);
-
 const char *msg_hash_to_str_pt_br(enum msg_hash_enums msg);
 int msg_hash_get_help_pt_br_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_pt_pt(enum msg_hash_enums msg);
-int msg_hash_get_help_pt_pt_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_vn(enum msg_hash_enums msg);
-int msg_hash_get_help_vn_enum(enum msg_hash_enums msg, char *s, size_t len);
 
 const char *msg_hash_to_str_chs(enum msg_hash_enums msg);
 int msg_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len);
 
-int msg_hash_get_help_cht_enum(enum msg_hash_enums msg, char *s, size_t len);
-
 const char *msg_hash_to_str_us(enum msg_hash_enums msg);
 int msg_hash_get_help_us_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_el(enum msg_hash_enums msg);
-int msg_hash_get_help_el_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_tr(enum msg_hash_enums msg);
-int msg_hash_get_help_tr_enum(enum msg_hash_enums msg, char *s, size_t len);
-
-const char *msg_hash_to_str_val(enum msg_hash_enums msg);
-
-const char *msg_hash_to_str_ca(enum msg_hash_enums msg);
 
 int msg_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len);
 
@@ -4045,8 +4029,6 @@ void msg_hash_set_uint(enum msg_hash_action type, unsigned val);
  *   rendering implementation */
 const char *msg_hash_get_wideglyph_str(void);
 const char *msg_hash_get_wideglyph_str_chs(void);
-const char *msg_hash_get_wideglyph_str_jp(void);
-const char *msg_hash_get_wideglyph_str_ko(void);
 
 uint32_t msg_hash_calculate(const char *s);
 

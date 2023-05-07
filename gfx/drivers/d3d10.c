@@ -1063,8 +1063,7 @@ static void *d3d10_gfx_init(const video_info_t* video,
    }
 
 #if 0
-   if (video_driver_get_hw_context()->context_type == RETRO_HW_CONTEXT_DIRECT3D &&
-         video_driver_get_hw_context()->version_major == 11)
+   if (video_driver_get_hw_context()->context_type == RETRO_HW_CONTEXT_D3D10)
    {
       d3d10->hw.enable                  = true;
       d3d10->hw.iface.interface_type    = RETRO_HW_RENDER_INTERFACE_D3D10;
@@ -1539,7 +1538,7 @@ static bool d3d10_gfx_frame(
    if (    (d3d10->flags & D3D10_ST_FLAG_MENU_ENABLE) 
          && d3d10->menu.texture.handle)
    {
-      UINT offset = 0, stride = 0;
+      UINT offset = 0, stride = sizeof(d3d10_vertex_t);
       if (d3d10->flags & D3D10_ST_FLAG_MENU_FULLSCREEN)
          context->lpVtbl->RSSetViewports(context, 1, &d3d10->viewport);
 

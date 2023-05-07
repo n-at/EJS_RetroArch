@@ -20,9 +20,8 @@
 #include "../config.h"
 #endif
 
-#include <locale.h>
-
 #include <retro_timers.h>
+#include <file/file_path.h>
 #include <lists/dir_list.h>
 #include <string/stdstring.h>
 #include <compat/strcasestr.h>
@@ -343,18 +342,6 @@ static bool menu_should_pop_stack(const char *label)
    return false;
 }
 
-size_t menu_navigation_get_selection(void)
-{
-   struct menu_state *menu_st  = &menu_driver_state;
-   return menu_st->selection_ptr;
-}
-
-void menu_navigation_set_selection(size_t val)
-{
-   struct menu_state *menu_st  = &menu_driver_state;
-   menu_st->selection_ptr      = val;
-}
-
 void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
       size_t i, void *userdata, bool use_representation)
 {
@@ -516,17 +503,6 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
    }
 }
 
-menu_file_list_cbs_t *menu_entries_get_last_stack_actiondata(void)
-{
-   struct menu_state *menu_st  = &menu_driver_state;
-   if (menu_st->entries.list)
-   {
-      const file_list_t *list  = MENU_LIST_GET(menu_st->entries.list, 0);
-      return (menu_file_list_cbs_t*)list->list[list->size - 1].actiondata;
-   }
-   return NULL;
-}
-
 file_list_t *menu_entries_get_menu_stack_ptr(size_t idx)
 {
    struct menu_state   *menu_st   = &menu_driver_state;
@@ -563,22 +539,17 @@ size_t menu_entries_get_size(void)
    return MENU_LIST_GET_SELECTION(menu_list, 0)->size;
 }
 
-menu_search_terms_t *menu_entries_search_get_terms_internal(void)
+static menu_search_terms_t *menu_entries_search_get_terms_internal(void)
 {
-   struct menu_state *menu_st  = &menu_driver_state;
-   file_list_t *list           = MENU_LIST_GET(menu_st->entries.list, 0);
-   menu_file_list_cbs_t *cbs   = NULL;
-
-   if (!list ||
-       (list->size < 1))
-      return NULL;
-
-   cbs = (menu_file_list_cbs_t*)list->list[list->size - 1].actiondata;
-
-   if (!cbs)
-      return NULL;
-
-   return &cbs->search;
+   struct menu_state *menu_st   = &menu_driver_state;
+   file_list_t *list            = MENU_LIST_GET(menu_st->entries.list, 0);
+   if (list && (list->size >= 1))
+   {
+      menu_file_list_cbs_t *cbs = NULL;
+      if ((cbs = (menu_file_list_cbs_t*)list->list[list->size - 1].actiondata))
+         return &cbs->search;
+   }
+   return NULL;
 }
 
 /* Searches current menu list for specified 'needle'
@@ -597,7 +568,7 @@ bool menu_entries_list_search(const char *needle, size_t *idx)
    if (   !list
        || string_is_empty(needle)
        || !idx)
-      return match_found;
+      return false;
 
    /* Check if we are searching for a single
     * Latin alphabet character */
@@ -625,10 +596,10 @@ bool menu_entries_list_search(const char *needle, size_t *idx)
        * of the list (e.g. 'Parent Directory'). These
        * have no bearing on the actual content of the
        * list, and should be excluded from the search */
-      if ((entry.type == FILE_TYPE_SCAN_DIRECTORY) ||
-          (entry.type == FILE_TYPE_MANUAL_SCAN_DIRECTORY) ||
-          (entry.type == FILE_TYPE_USE_DIRECTORY) ||
-          (entry.type == FILE_TYPE_PARENT_DIRECTORY))
+      if (   (entry.type == FILE_TYPE_SCAN_DIRECTORY)
+          || (entry.type == FILE_TYPE_MANUAL_SCAN_DIRECTORY)
+          || (entry.type == FILE_TYPE_USE_DIRECTORY)
+          || (entry.type == FILE_TYPE_PARENT_DIRECTORY))
          continue;
 
       /* Get displayed entry label */
@@ -680,32 +651,6 @@ bool menu_entries_list_search(const char *needle, size_t *idx)
 
    return match_found;
 }
-
-/* Time format strings with AM-PM designation require special
- * handling due to platform dependence */
-static void strftime_am_pm(char *s, size_t len, const char* format,
-      const struct tm* timeptr)
-{
-   char *local = NULL;
-
-   /* Ensure correct locale is set
-    * > Required for localised AM/PM strings */
-   setlocale(LC_TIME, "");
-
-   strftime(s, len, format, timeptr);
-#if !(defined(__linux__) && !defined(ANDROID))
-   local = local_to_utf8_string_alloc(s);
-   if (local)
-   {
-	   if (!string_is_empty(local))
-		   strlcpy(s, local, len);
-
-      free(local);
-      local = NULL;
-   }
-#endif
-}
-
 
 /* Display the date and time - time_mode will influence how
  * the time representation will look like.
@@ -1179,20 +1124,6 @@ int menu_entries_get_title(char *s, size_t len)
    return 0;
 }
 
-/* Get current menu label */
-int menu_entries_get_label(char *s, size_t len)
-{
-   struct menu_state   *menu_st = &menu_driver_state;
-   const file_list_t *list      = MENU_LIST_GET(menu_st->entries.list, 0);
-
-   if (list && list->size)
-   {
-      strlcpy(s, list->list[list->size - 1].label, len);
-      return 1;
-   }
-   return 0;
-}
-
 /* Used to close an active message box (help or info)
  * TODO/FIXME: The way that message boxes are handled
  * is complete garbage. generic_menu_iterate() and
@@ -1200,7 +1131,7 @@ int menu_entries_get_label(char *s, size_t len)
  * I consider this current 'close_messagebox' a hack,
  * but at least it prevents undefined/dangerous
  * behaviour... */
-void menu_input_pointer_close_messagebox(struct menu_state *menu_st)
+static void menu_input_pointer_close_messagebox(struct menu_state *menu_st)
 {
    const char *label            = NULL;
    const file_list_t *list      = MENU_LIST_GET(menu_st->entries.list, 0);
@@ -1233,8 +1164,7 @@ void menu_input_pointer_close_messagebox(struct menu_state *menu_st)
    }
 }
 
-
-float menu_input_get_dpi(
+static float menu_input_get_dpi(
       menu_handle_t *menu,
       gfx_display_t *p_disp,
       unsigned video_width,
@@ -1297,7 +1227,7 @@ float menu_input_get_dpi(
    return dpi;
 }
 
-bool input_event_osk_show_symbol_pages(
+static bool input_event_osk_show_symbol_pages(
       menu_handle_t *menu)
 {
 #if defined(HAVE_LANGEXTRA)
@@ -1306,11 +1236,11 @@ bool input_event_osk_show_symbol_pages(
          menu->driver_ctx &&
          menu->driver_ctx->set_texture);
    unsigned language     = *msg_hash_get_uint(MSG_HASH_USER_LANGUAGE);
-   return !menu_has_fb ||
-         ((language == RETRO_LANGUAGE_JAPANESE) ||
-          (language == RETRO_LANGUAGE_KOREAN) ||
-          (language == RETRO_LANGUAGE_CHINESE_SIMPLIFIED) ||
-          (language == RETRO_LANGUAGE_CHINESE_TRADITIONAL));
+   return    (!menu_has_fb)
+          || ((language == RETRO_LANGUAGE_JAPANESE)
+          ||  (language == RETRO_LANGUAGE_KOREAN)
+          ||  (language == RETRO_LANGUAGE_CHINESE_SIMPLIFIED)
+          ||  (language == RETRO_LANGUAGE_CHINESE_TRADITIONAL));
 #else  /* HAVE_RGUI */
    return true;
 #endif /* HAVE_RGUI */
@@ -1355,7 +1285,7 @@ static void menu_list_free_list(
    file_list_free(list);
 }
 
-bool menu_list_pop_stack(
+static void menu_list_pop_stack(
       const menu_ctx_driver_t *menu_driver_ctx,
       void *menu_userdata,
       menu_list_t *list,
@@ -1364,27 +1294,25 @@ bool menu_list_pop_stack(
 {
    file_list_t *menu_list = MENU_LIST_GET(list, (unsigned)idx);
 
-   if (!menu_list)
-      return false;
-
-   if (menu_list->size != 0)
+   if (menu_list)
    {
-      menu_ctx_list_t list_info;
+      if (menu_list->size != 0)
+      {
+         menu_ctx_list_t list_info;
 
-      list_info.list      = menu_list;
-      list_info.idx       = menu_list->size - 1;
-      list_info.list_size = menu_list->size - 1;
+         list_info.list      = menu_list;
+         list_info.idx       = menu_list->size - 1;
+         list_info.list_size = menu_list->size - 1;
 
-      menu_driver_list_free(menu_driver_ctx, &list_info);
+         menu_driver_list_free(menu_driver_ctx, &list_info);
+      }
+
+      file_list_pop(menu_list, directory_ptr);
+      if (  menu_driver_ctx &&
+            menu_driver_ctx->list_set_selection)
+         menu_driver_ctx->list_set_selection(menu_userdata,
+               menu_list);
    }
-
-   file_list_pop(menu_list, directory_ptr);
-   if (  menu_driver_ctx &&
-         menu_driver_ctx->list_set_selection)
-      menu_driver_ctx->list_set_selection(menu_userdata,
-            menu_list);
-
-   return true;
 }
 
 static int menu_list_flush_stack_type(const char *needle, const char *label,
@@ -1393,7 +1321,7 @@ static int menu_list_flush_stack_type(const char *needle, const char *label,
    return needle ? !string_is_equal(needle, label) : (type != final_type);
 }
 
-void menu_list_flush_stack(
+static void menu_list_flush_stack(
       const menu_ctx_driver_t *menu_driver_ctx,
       void *menu_userdata,
       struct menu_state *menu_st,
@@ -1536,8 +1464,7 @@ error:
    return NULL;
 }
 
-
-int menu_input_key_bind_set_mode_common(
+static int menu_input_key_bind_set_mode_common(
       struct menu_state *menu_st,
       struct menu_bind_state *binds,
       enum menu_input_binds_ctl_state state,
@@ -1603,7 +1530,7 @@ int menu_input_key_bind_set_mode_common(
 }
 
 #ifdef ANDROID
-bool menu_input_key_bind_poll_find_hold_pad(
+static bool menu_input_key_bind_poll_find_hold_pad(
       struct menu_bind_state *new_state,
       struct retro_keybind * output,
       unsigned p)
@@ -1688,7 +1615,7 @@ bool menu_input_key_bind_poll_find_hold_pad(
    return false;
 }
 
-bool menu_input_key_bind_poll_find_hold(
+static bool menu_input_key_bind_poll_find_hold(
       unsigned max_users,
       struct menu_bind_state *new_state,
       struct retro_keybind * output)
@@ -1708,7 +1635,7 @@ bool menu_input_key_bind_poll_find_hold(
 }
 #endif
 
-bool menu_input_key_bind_poll_find_trigger_pad(
+static bool menu_input_key_bind_poll_find_trigger_pad(
       struct menu_bind_state *state,
       struct menu_bind_state *new_state,
       struct retro_keybind * output,
@@ -1809,7 +1736,7 @@ bool menu_input_key_bind_poll_find_trigger_pad(
    return false;
 }
 
-bool menu_input_key_bind_poll_find_trigger(
+static bool menu_input_key_bind_poll_find_trigger(
       unsigned max_users,
       struct menu_bind_state *state,
       struct menu_bind_state *new_state,
@@ -1831,13 +1758,13 @@ bool menu_input_key_bind_poll_find_trigger(
 }
 
 
-void menu_input_key_bind_poll_bind_get_rested_axes(
+static void menu_input_key_bind_poll_bind_get_rested_axes(
       const input_device_driver_t *joypad,
       const input_device_driver_t *sec_joypad,
       struct menu_bind_state *state)
 {
    unsigned a;
-   unsigned port                           = state->port;
+   unsigned port          = state->port;
 
    if (joypad)
    {
@@ -1867,9 +1794,7 @@ void menu_input_key_bind_poll_bind_get_rested_axes(
    }
 }
 
-void input_event_osk_iterate(
-      void *osk_grid,
-      enum osk_type osk_idx)
+static void input_event_osk_iterate(void *osk_grid, enum osk_type osk_idx)
 {
 #ifndef HAVE_LANGEXTRA
    /* If HAVE_LANGEXTRA is not defined, define some ASCII-friendly pages. */
@@ -1937,7 +1862,7 @@ void input_event_osk_iterate(
    }
 }
 
-void menu_input_get_mouse_hw_state(
+static void menu_input_get_mouse_hw_state(
       gfx_display_t *p_disp,
       menu_handle_t *menu,
       input_driver_state_t *input_st,
@@ -2142,7 +2067,7 @@ void menu_input_get_mouse_hw_state(
    last_cancel_pressed             = hw_state->cancel_pressed;
 }
 
-void menu_input_get_touchscreen_hw_state(
+static void menu_input_get_touchscreen_hw_state(
       gfx_display_t *p_disp,
       menu_handle_t *menu,
       input_driver_state_t *input_st,
@@ -2298,7 +2223,7 @@ void menu_input_get_touchscreen_hw_state(
    last_cancel_pressed = hw_state->cancel_pressed;
 }
 
-void menu_entries_settings_deinit(struct menu_state *menu_st)
+static void menu_entries_settings_deinit(struct menu_state *menu_st)
 {
    menu_setting_free(menu_st->entries.list_settings);
    if (menu_st->entries.list_settings)
@@ -2385,18 +2310,6 @@ static bool menu_driver_displaylist_push_internal(
 
       menu_entries_ctl(MENU_ENTRIES_CTL_CLEAR, info->list);
 
-#if 0
-#ifdef HAVE_SCREENSHOTS
-      if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
-         menu_entries_append(info->list,
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_TAKE_SCREENSHOT),
-               msg_hash_to_str(MENU_ENUM_LABEL_TAKE_SCREENSHOT),
-               MENU_ENUM_LABEL_TAKE_SCREENSHOT,
-               MENU_SETTING_ACTION_SCREENSHOT, 0, 0, NULL);
-      else
-         info->flags |= MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
-#endif
-#endif
       menu_displaylist_ctl(DISPLAYLIST_IMAGES_HISTORY, info, settings);
       return true;
    }
@@ -2465,7 +2378,7 @@ static bool menu_driver_displaylist_push_internal(
    return false;
 }
 
-bool menu_driver_displaylist_push(
+static bool menu_driver_displaylist_push(
       struct menu_state *menu_st,
       settings_t *settings,
       file_list_t *entry_list,
@@ -2494,7 +2407,6 @@ bool menu_driver_displaylist_push(
       enum_idx    = cbs->enum_idx;
 
    info.list      = entry_list;
-   info.menu_list = entry_stack;
    info.type      = type;
    info.enum_idx  = enum_idx;
 
@@ -2584,7 +2496,7 @@ static void menu_input_key_bind_poll_bind_state_internal(
  * Sublabel: each entry has a sublabel, which consists of one or more lines of additional information.
  * This function callback lets us render that text.
  */
-void menu_cbs_init(
+static void menu_cbs_init(
       struct menu_state *menu_st,
       const menu_ctx_driver_t *menu_driver_ctx,
       file_list_t *list,
@@ -2675,6 +2587,51 @@ void menu_cbs_init(
 }
 
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
+static void menu_driver_set_last_shader_path_int(
+      const char *shader_path,
+      enum rarch_shader_type *type,
+      char *shader_dir, size_t dir_len,
+      char *shader_file, size_t file_len)
+{
+   const char *file_name = NULL;
+
+   if (   !type
+       || !shader_dir
+       || (dir_len < 1)
+       || !shader_file
+       || (file_len < 1))
+      return;
+
+   /* Reset existing cache */
+   *type          = RARCH_SHADER_NONE;
+   shader_dir[0]  = '\0';
+   shader_file[0] = '\0';
+
+   /* If path is empty, do nothing */
+   if (string_is_empty(shader_path))
+      return;
+
+   /* Get shader type */
+   /* If type is invalid, do nothing */
+   if ((*type = video_shader_parse_type(shader_path)) == RARCH_SHADER_NONE)
+      return;
+
+   /* Cache parent directory */
+   fill_pathname_parent_dir(shader_dir, shader_path, dir_len);
+
+   /* If parent directory is empty, then file name
+    * is only valid if 'shader_path' refers to an
+    * existing file in the root of the file system */
+   if (string_is_empty(shader_dir) &&
+       !path_is_valid(shader_path))
+      return;
+
+   /* Cache file name */
+   file_name = path_basename_nocompression(shader_path);
+   if (!string_is_empty(file_name))
+      strlcpy(shader_file, file_name, file_len);
+}
+
 void menu_driver_set_last_shader_preset_path(const char *path)
 {
    menu_handle_t *menu         = menu_driver_state.driver_data;
@@ -2709,13 +2666,46 @@ enum rarch_shader_type menu_driver_get_last_shader_preset_type(void)
    return menu->last_shader_selection.preset_type;
 }
 
-enum rarch_shader_type menu_driver_get_last_shader_pass_type(void)
+static void menu_driver_get_last_shader_path_int(
+      settings_t *settings, enum rarch_shader_type type,
+      const char *shader_dir, const char *shader_file_name,
+      const char **dir_out, const char **file_name_out)
 {
-   menu_handle_t *menu         = menu_driver_state.driver_data;
-   if (!menu)
-      return RARCH_SHADER_NONE;
-   return menu->last_shader_selection.pass_type;
+   bool remember_last_dir       = settings->bools.video_shader_remember_last_dir;
+   const char *video_shader_dir = settings->paths.directory_video_shader;
+
+   /* File name is NULL by default */
+   if (file_name_out)
+      *file_name_out = NULL;
+
+   /* If any of the following are true:
+    * - Directory caching is disabled
+    * - No directory has been cached
+    * - Cached directory is invalid
+    * - Last selected shader is incompatible with
+    *   the current video driver
+    * ...use default settings */
+   if (   (!remember_last_dir)
+       || (type == RARCH_SHADER_NONE)
+       || string_is_empty(shader_dir)
+       || !path_is_directory(shader_dir)
+       || !video_shader_is_supported(type))
+   {
+      if (dir_out)
+         *dir_out = video_shader_dir;
+      return;
+   }
+
+   /* Assign last set directory */
+   if (dir_out)
+      *dir_out = shader_dir;
+
+   /* Assign file name */
+   if (    file_name_out
+       && !string_is_empty(shader_file_name))
+      *file_name_out = shader_file_name;
 }
+
 
 void menu_driver_get_last_shader_preset_path(
       const char **directory, const char **file_name)
@@ -2758,60 +2748,17 @@ void menu_driver_get_last_shader_pass_path(
          shader_dir, shader_file_name,
          directory, file_name);
 }
-void menu_driver_get_last_shader_path_int(
-      settings_t *settings, enum rarch_shader_type type,
-      const char *shader_dir, const char *shader_file_name,
-      const char **dir_out, const char **file_name_out)
-{
-   bool remember_last_dir       = settings->bools.video_shader_remember_last_dir;
-   const char *video_shader_dir = settings->paths.directory_video_shader;
-
-   /* File name is NULL by default */
-   if (file_name_out)
-      *file_name_out = NULL;
-
-   /* If any of the following are true:
-    * - Directory caching is disabled
-    * - No directory has been cached
-    * - Cached directory is invalid
-    * - Last selected shader is incompatible with
-    *   the current video driver
-    * ...use default settings */
-   if (!remember_last_dir ||
-       (type == RARCH_SHADER_NONE) ||
-       string_is_empty(shader_dir) ||
-       !path_is_directory(shader_dir) ||
-       !video_shader_is_supported(type))
-   {
-      if (dir_out)
-         *dir_out = video_shader_dir;
-      return;
-   }
-
-   /* Assign last set directory */
-   if (dir_out)
-      *dir_out = shader_dir;
-
-   /* Assign file name */
-   if (file_name_out &&
-       !string_is_empty(shader_file_name))
-      *file_name_out = shader_file_name;
-}
 
 int menu_shader_manager_clear_num_passes(struct video_shader *shader)
 {
-   bool refresh                = false;
-
-   if (!shader)
-      return 0;
-
-   shader->passes = 0;
-
-   menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-
-   video_shader_resolve_parameters(shader);
-
-   shader->flags |= SHDR_FLAG_MODIFIED;
+   if (shader)
+   {
+      bool refresh   = false;
+      shader->passes = 0;
+      menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+      video_shader_resolve_parameters(shader);
+      shader->flags |= SHDR_FLAG_MODIFIED;
+   }
 
    return 0;
 }
@@ -2822,14 +2769,14 @@ int menu_shader_manager_clear_parameter(struct video_shader *shader,
    struct video_shader_parameter *param = shader ?
       &shader->parameters[i] : NULL;
 
-   if (!param)
-      return 0;
+   if (param)
+   {
+      param->current = param->initial;
+      param->current = MIN(MAX(param->minimum,
+               param->current), param->maximum);
 
-   param->current = param->initial;
-   param->current = MIN(MAX(param->minimum,
-            param->current), param->maximum);
-
-   shader->flags |= SHDR_FLAG_MODIFIED;
+      shader->flags |= SHDR_FLAG_MODIFIED;
+   }
 
    return 0;
 }
@@ -2888,42 +2835,42 @@ void menu_shader_manager_clear_pass_path(struct video_shader *shader,
  *
  * Returns: type of shader.
  **/
-enum rarch_shader_type menu_shader_manager_get_type(
+static enum rarch_shader_type menu_shader_manager_get_type(
       const struct video_shader *shader)
 {
-   enum rarch_shader_type type       = RARCH_SHADER_NONE;
+   enum rarch_shader_type type = RARCH_SHADER_NONE;
    /* All shader types must be the same, or we cannot use it. */
-   size_t i                         = 0;
 
-   if (!shader)
-      return RARCH_SHADER_NONE;
-
-   type = video_shader_parse_type(shader->path);
-
-   if (!shader->passes)
-      return type;
-
-   if (type == RARCH_SHADER_NONE)
+   if (shader)
    {
-      type = video_shader_parse_type(shader->pass[0].source.path);
-      i    = 1;
-   }
+      type = video_shader_parse_type(shader->path);
 
-   for (; i < shader->passes; i++)
-   {
-      enum rarch_shader_type pass_type =
-         video_shader_parse_type(shader->pass[i].source.path);
-
-      switch (pass_type)
+      if (shader->passes)
       {
-         case RARCH_SHADER_CG:
-         case RARCH_SHADER_GLSL:
-         case RARCH_SHADER_SLANG:
-            if (type != pass_type)
-               return RARCH_SHADER_NONE;
-            break;
-         default:
-            break;
+         size_t i                 = 0;
+         if (type == RARCH_SHADER_NONE)
+         {
+            type = video_shader_parse_type(shader->pass[0].source.path);
+            i    = 1;
+         }
+
+         for (; i < shader->passes; i++)
+         {
+            enum rarch_shader_type pass_type =
+               video_shader_parse_type(shader->pass[i].source.path);
+
+            switch (pass_type)
+            {
+               case RARCH_SHADER_CG:
+               case RARCH_SHADER_GLSL:
+               case RARCH_SHADER_SLANG:
+                  if (type != pass_type)
+                     return RARCH_SHADER_NONE;
+                  break;
+               default:
+                  break;
+            }
+         }
       }
    }
 
@@ -2958,6 +2905,91 @@ void menu_shader_manager_apply_changes(
 
    menu_shader_manager_set_preset(NULL, type, NULL, true);
 }
+
+static bool menu_shader_manager_save_preset_internal(
+      bool save_reference,
+      const struct video_shader *shader,
+      const char *basename,
+      const char *dir_video_shader,
+      bool apply,
+      const char **target_dirs,
+      size_t num_target_dirs)
+{
+   char fullname[PATH_MAX_LENGTH];
+   char buffer[PATH_MAX_LENGTH];
+   const char *preset_ext         = NULL;
+   bool ret                       = false;
+   enum rarch_shader_type type    = RARCH_SHADER_NONE;
+   char *preset_path              = NULL;
+   size_t i                       = 0;
+   if (!shader || !shader->passes)
+      return false;
+   if ((type = menu_shader_manager_get_type(shader)) == RARCH_SHADER_NONE)
+      return false;
+
+   preset_ext = video_shader_get_preset_extension(type);
+
+   if (!string_is_empty(basename))
+      strlcpy(fullname, basename, sizeof(fullname));
+   else
+      strlcpy(fullname, "retroarch", sizeof(fullname));
+   strlcat(fullname, preset_ext, sizeof(fullname));
+
+   if (path_is_absolute(fullname))
+   {
+      preset_path = fullname;
+      if ((ret    = video_shader_write_preset(preset_path, shader, save_reference)))
+         RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
+      else
+         RARCH_ERR("[Shaders]: Failed writing shader preset to \"%s\".\n", preset_path);
+   }
+   else
+   {
+      char basedir[PATH_MAX_LENGTH];
+
+      for (i = 0; i < num_target_dirs; i++)
+      {
+         if (string_is_empty(target_dirs[i]))
+            continue;
+
+         fill_pathname_join(buffer, target_dirs[i],
+               fullname, sizeof(buffer));
+
+         strlcpy(basedir, buffer, sizeof(basedir));
+         path_basedir(basedir);
+
+         if (!path_is_directory(basedir))
+         {
+            if (!(ret = path_mkdir(basedir)))
+            {
+               RARCH_WARN("[Shaders]: Failed to create preset directory \"%s\".\n", basedir);
+               continue;
+            }
+         }
+
+         preset_path = buffer;
+
+         if ((ret = video_shader_write_preset(preset_path,
+               shader, save_reference)))
+         {
+            RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
+            break;
+         }
+         else
+            RARCH_WARN("[Shaders]: Failed writing shader preset to \"%s\".\n", preset_path);
+      }
+
+      if (!ret)
+         RARCH_ERR("[Shaders]: Failed to write shader preset. Make sure shader directory "
+               "and/or config directory are writable.\n");
+   }
+
+   if (ret && apply)
+      menu_shader_manager_set_preset(NULL, type, preset_path, true);
+
+   return ret;
+}
+
 
 /**
  * menu_shader_manager_save_preset:
@@ -3001,6 +3033,181 @@ bool menu_shader_manager_save_preset(const struct video_shader *shader,
          ARRAY_SIZE(preset_dirs));
 }
 
+static bool menu_shader_manager_operate_auto_preset(
+      enum auto_shader_operation op,
+      const struct video_shader *shader,
+      const char *dir_video_shader,
+      const char *dir_menu_config,
+      enum auto_shader_type type, bool apply)
+{
+   char old_presets_directory[PATH_MAX_LENGTH];
+   char config_directory[PATH_MAX_LENGTH];
+   char tmp[PATH_MAX_LENGTH];
+   char file[PATH_MAX_LENGTH];
+   settings_t *settings                           = config_get_ptr();
+   bool video_shader_preset_save_reference_enable = settings->bools.video_shader_preset_save_reference_enable;
+   struct retro_system_info *system               = &runloop_state_get_ptr()->system.info;
+   static enum rarch_shader_type shader_types[]   =
+   {
+      RARCH_SHADER_GLSL, RARCH_SHADER_SLANG, RARCH_SHADER_CG
+   };
+   const char *core_name            = system ? system->library_name : NULL;
+   const char *rarch_path_basename  = path_get(RARCH_PATH_BASENAME);
+   const char *auto_preset_dirs[3]  = {0};
+   bool has_content                 = !string_is_empty(rarch_path_basename);
+
+   old_presets_directory[0] = config_directory[0] = tmp[0] = file[0] = '\0';
+
+   if (type != SHADER_PRESET_GLOBAL && string_is_empty(core_name))
+      return false;
+
+   if (    !has_content
+       && ((type == SHADER_PRESET_GAME)
+       ||  (type == SHADER_PRESET_PARENT)))
+      return false;
+
+   if (!path_is_empty(RARCH_PATH_CONFIG))
+   {
+      strlcpy(config_directory,
+            path_get(RARCH_PATH_CONFIG),
+            sizeof(config_directory));
+      path_basedir(config_directory);
+   }
+
+   /* We are only including this directory for compatibility purposes with
+    * versions 1.8.7 and older. */
+   if (op != AUTO_SHADER_OP_SAVE && !string_is_empty(dir_video_shader))
+      fill_pathname_join_special(
+            old_presets_directory,
+            dir_video_shader,
+            "presets",
+            sizeof(old_presets_directory));
+
+   auto_preset_dirs[0] = dir_menu_config;
+   auto_preset_dirs[1] = config_directory;
+   auto_preset_dirs[2] = old_presets_directory;
+
+   switch (type)
+   {
+      case SHADER_PRESET_GLOBAL:
+         strlcpy(file, "global", sizeof(file));
+         break;
+      case SHADER_PRESET_CORE:
+         fill_pathname_join_special(file, core_name, core_name, sizeof(file));
+         break;
+      case SHADER_PRESET_PARENT:
+         fill_pathname_parent_dir_name(tmp,
+               rarch_path_basename, sizeof(tmp));
+         fill_pathname_join_special(file, core_name, tmp, sizeof(file));
+         break;
+      case SHADER_PRESET_GAME:
+         {
+            const char *game_name = path_basename(rarch_path_basename);
+            if (string_is_empty(game_name))
+               return false;
+            fill_pathname_join_special(file, core_name, game_name, sizeof(file));
+            break;
+         }
+      default:
+         return false;
+   }
+
+   switch (op)
+   {
+      case AUTO_SHADER_OP_SAVE:
+         return menu_shader_manager_save_preset_internal(
+               video_shader_preset_save_reference_enable,
+               shader, file,
+               dir_video_shader,
+               apply,
+               auto_preset_dirs,
+               ARRAY_SIZE(auto_preset_dirs));
+      case AUTO_SHADER_OP_REMOVE:
+         {
+            /* remove all supported auto-shaders of given type */
+            char *end;
+            size_t i, j, m;
+
+            char preset_path[PATH_MAX_LENGTH];
+
+            /* n = amount of relevant shader presets found
+             * m = amount of successfully deleted shader presets */
+            size_t n = m = 0;
+
+            for (i = 0; i < ARRAY_SIZE(auto_preset_dirs); i++)
+            {
+               if (string_is_empty(auto_preset_dirs[i]))
+                  continue;
+
+               fill_pathname_join(preset_path,
+                     auto_preset_dirs[i], file, sizeof(preset_path));
+               end = preset_path + strlen(preset_path);
+
+               for (j = 0; j < ARRAY_SIZE(shader_types); j++)
+               {
+                  const char *preset_ext;
+
+                  if (!video_shader_is_supported(shader_types[j]))
+                     continue;
+
+                  preset_ext = video_shader_get_preset_extension(shader_types[j]);
+                  strlcpy(end, preset_ext, sizeof(preset_path) - (end - preset_path));
+
+                  if (path_is_valid(preset_path))
+                  {
+                     n++;
+
+                     if (!filestream_delete(preset_path))
+                     {
+                        m++;
+                        RARCH_LOG("[Shaders]: Deleted shader preset from \"%s\".\n", preset_path);
+                     }
+                     else
+                        RARCH_WARN("[Shaders]: Failed to remove shader preset at \"%s\".\n", preset_path);
+                  }
+               }
+            }
+
+            return n == m;
+         }
+      case AUTO_SHADER_OP_EXISTS:
+         {
+            /* test if any supported auto-shaders of given type exists */
+            char *end;
+            size_t i, j;
+
+            char preset_path[PATH_MAX_LENGTH];
+
+            for (i = 0; i < ARRAY_SIZE(auto_preset_dirs); i++)
+            {
+               if (string_is_empty(auto_preset_dirs[i]))
+                  continue;
+
+               fill_pathname_join(preset_path,
+                     auto_preset_dirs[i], file, sizeof(preset_path));
+               end = preset_path + strlen(preset_path);
+
+               for (j = 0; j < ARRAY_SIZE(shader_types); j++)
+               {
+                  const char *preset_ext;
+
+                  if (!video_shader_is_supported(shader_types[j]))
+                     continue;
+
+                  preset_ext = video_shader_get_preset_extension(shader_types[j]);
+                  strlcpy(end, preset_ext, sizeof(preset_path) - (end - preset_path));
+
+                  if (path_is_valid(preset_path))
+                     return true;
+               }
+            }
+         }
+         break;
+   }
+
+   return false;
+}
+
 /**
  * menu_shader_manager_remove_auto_preset:
  * @type                     : type of shader preset to delete
@@ -3012,10 +3219,7 @@ bool menu_shader_manager_remove_auto_preset(
       const char *dir_video_shader,
       const char *dir_menu_config)
 {
-   struct retro_system_info *system = &runloop_state_get_ptr()->system.info;
-   settings_t *settings             = config_get_ptr();
    return menu_shader_manager_operate_auto_preset(
-         system, settings->bools.video_shader_preset_save_reference_enable,
          AUTO_SHADER_OP_REMOVE, NULL,
          dir_video_shader,
          dir_menu_config,
@@ -3033,10 +3237,7 @@ bool menu_shader_manager_auto_preset_exists(
       const char *dir_video_shader,
       const char *dir_menu_config)
 {
-   struct retro_system_info *system = &runloop_state_get_ptr()->system.info;
-   settings_t *settings             = config_get_ptr();
    return menu_shader_manager_operate_auto_preset(
-         system, settings->bools.video_shader_preset_save_reference_enable,
          AUTO_SHADER_OP_EXISTS, NULL,
          dir_video_shader,
          dir_menu_config,
@@ -3064,10 +3265,7 @@ bool menu_shader_manager_save_auto_preset(
       const char *dir_menu_config,
       bool apply)
 {
-   struct retro_system_info *system = &runloop_state_get_ptr()->system.info;
-   settings_t *settings             = config_get_ptr();
    return menu_shader_manager_operate_auto_preset(
-         system, settings->bools.video_shader_preset_save_reference_enable,
          AUTO_SHADER_OP_SAVE, shader,
          dir_video_shader,
          dir_menu_config,
@@ -3075,7 +3273,7 @@ bool menu_shader_manager_save_auto_preset(
 }
 #endif
 
-enum action_iterate_type action_iterate_type(const char *label)
+static enum action_iterate_type action_iterate_type(const char *label)
 {
    if (string_is_equal(label, "info_screen"))
       return ITERATE_TYPE_INFO;
@@ -3146,7 +3344,7 @@ bool menu_driver_search_filter_enabled(const char *label, unsigned type)
    return filter_enabled;
 }
 
-void menu_input_key_bind_poll_bind_state(
+static void menu_input_key_bind_poll_bind_state(
       input_driver_state_t *input_st,
       const retro_keybind_set *binds,
       float input_axis_threshold,
@@ -3234,7 +3432,7 @@ void menu_input_key_bind_poll_bind_state(
    }
 }
 
-int menu_dialog_iterate(
+static int menu_dialog_iterate(
       menu_dialog_t *p_dialog,
       settings_t *settings,
       char *s, size_t len,
@@ -3436,16 +3634,7 @@ int menu_dialog_iterate(
    return 0;
 }
 
-void menu_entries_list_deinit(
-      const menu_ctx_driver_t *menu_driver_ctx,
-      struct menu_state *menu_st)
-{
-   if (menu_st->entries.list)
-      menu_list_free(menu_driver_ctx, menu_st->entries.list);
-   menu_st->entries.list          = NULL;
-}
-
-bool menu_entries_init(
+static bool menu_entries_init(
       struct menu_state *menu_st,
       const menu_ctx_driver_t *menu_driver_ctx)
 {
@@ -3456,7 +3645,7 @@ bool menu_entries_init(
    return true;
 }
 
-bool generic_menu_init_list(struct menu_state *menu_st,
+static void generic_menu_init_list(struct menu_state *menu_st,
       settings_t *settings)
 {
    menu_displaylist_info_t info;
@@ -3488,8 +3677,6 @@ bool generic_menu_init_list(struct menu_state *menu_st,
       menu_displaylist_process(&info);
 
    menu_displaylist_info_free(&info);
-
-   return true;
 }
 
 /* This function gets called at first startup on Android/iOS
@@ -3525,7 +3712,7 @@ static void bundle_decompressed(retro_task_t *task,
    command_event(CMD_EVENT_MENU_SAVE_CURRENT_CONFIG, NULL);
 }
 
-bool rarch_menu_init(
+static bool rarch_menu_init(
       struct menu_state *menu_st,
       menu_dialog_t        *p_dialog,
       const menu_ctx_driver_t *menu_driver_ctx,
@@ -3547,7 +3734,9 @@ bool rarch_menu_init(
    if (!menu_entries_init(menu_st, menu_driver_ctx))
    {
       menu_entries_settings_deinit(menu_st);
-      menu_entries_list_deinit(menu_driver_ctx, menu_st);
+      if (menu_st->entries.list)
+         menu_list_free(menu_driver_ctx, menu_st->entries.list);
+      menu_st->entries.list          = NULL;
       return false;
    }
 
@@ -3591,25 +3780,18 @@ bool rarch_menu_init(
    }
 #endif
 
-#if 0
-   /* TODO: No reason to do this here since shaders need
-    * content, and this is called in content_load() */
-#if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-   menu_shader_manager_init();
-#endif
-#endif
-
    return true;
 }
 
-void menu_input_set_pointer_visibility(
+static void menu_input_set_pointer_visibility(
       menu_input_pointer_hw_state_t *pointer_hw_state,
       menu_input_t *menu_input,
       retro_time_t current_time)
 {
-   static bool cursor_shown                        = false;
-   static bool cursor_hidden                       = false;
-   static retro_time_t end_time                    = 0;
+   static bool cursor_shown          = false;
+   static bool cursor_hidden         = false;
+   static retro_time_t end_time      = 0;
+   struct menu_state       *menu_st  = &menu_driver_state;
 
    /* Ensure that mouse cursor is hidden when not in use */
    if ((menu_input->pointer.type == MENU_POINTER_MOUSE)
@@ -3618,11 +3800,9 @@ void menu_input_set_pointer_visibility(
       /* Show cursor */
       if ((current_time > end_time) && !cursor_shown)
       {
-         menu_ctx_environment_t menu_environ;
-         menu_environ.type = MENU_ENVIRON_ENABLE_MOUSE_CURSOR;
-         menu_environ.data = NULL;
-
-         menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+         if (menu_st->driver_ctx->environ_cb)
+            menu_st->driver_ctx->environ_cb(MENU_ENVIRON_ENABLE_MOUSE_CURSOR,
+                     NULL, menu_st->userdata);
          cursor_shown  = true;
          cursor_hidden = false;
       }
@@ -3634,11 +3814,9 @@ void menu_input_set_pointer_visibility(
       /* Hide cursor */
       if ((current_time > end_time) && !cursor_hidden)
       {
-         menu_ctx_environment_t menu_environ;
-         menu_environ.type = MENU_ENVIRON_DISABLE_MOUSE_CURSOR;
-         menu_environ.data = NULL;
-
-         menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+         if (menu_st->driver_ctx->environ_cb)
+            menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_MOUSE_CURSOR,
+                  NULL, menu_st->userdata);
          cursor_shown  = false;
          cursor_hidden = true;
       }
@@ -3698,7 +3876,7 @@ void menu_entries_build_scroll_indices(
       if (type == FILE_TYPE_DIRECTORY)
          is_dir = true;
 
-      if ((current_is_dir && !is_dir) || (first > current))
+      if ((current_is_dir && !is_dir) || (first != current))
       {
          /* Add scroll index */
          menu_st->scroll.index_list[menu_st->scroll.index_size]   = i;
@@ -3716,13 +3894,12 @@ void menu_entries_build_scroll_indices(
       menu_st->scroll.index_size++;
 }
 
-void menu_display_common_image_upload(
-      const menu_ctx_driver_t *menu_driver_ctx,
-      void *menu_userdata,
-      struct texture_image *img,
-      void *user_data,
-      unsigned type)
+void menu_display_common_image_upload(void *data, void *user_data, unsigned type)
 {
+   struct texture_image                *img = (struct texture_image*)data;
+   struct menu_state               *menu_st = &menu_driver_state;
+   const menu_ctx_driver_t *menu_driver_ctx = menu_st->driver_ctx;
+   void                      *menu_userdata = menu_st->userdata;
    if (     menu_driver_ctx
          && menu_driver_ctx->load_image)
       menu_driver_ctx->load_image(menu_userdata,
@@ -3733,7 +3910,7 @@ void menu_display_common_image_upload(
    free(user_data);
 }
 
-enum menu_driver_id_type menu_driver_set_id(
+static enum menu_driver_id_type menu_driver_set_id(
       const char *driver_name)
 {
    if (!string_is_empty(driver_name))
@@ -3757,17 +3934,17 @@ const char *config_get_menu_driver_options(void)
    return char_list_new_special(STRING_LIST_MENU_DRIVERS, NULL);
 }
 
-bool menu_entries_search_push(const char *search_term)
+static bool menu_entries_search_push(const char *search_term)
 {
    size_t i;
-   menu_search_terms_t *search = menu_entries_search_get_terms_internal();
    char search_term_clipped[MENU_SEARCH_FILTER_MAX_LENGTH];
+   menu_search_terms_t *search = menu_entries_search_get_terms_internal();
 
    /* Sanity check + verify whether we have reached
     * the maximum number of allowed search terms */
-   if (!search ||
-       string_is_empty(search_term) ||
-       (search->size >= MENU_SEARCH_FILTER_MAX_TERMS))
+   if (  !search
+       || string_is_empty(search_term)
+       || (search->size >= MENU_SEARCH_FILTER_MAX_TERMS))
       return false;
 
    /* Check whether search term already exists
@@ -3797,8 +3974,8 @@ bool menu_entries_search_pop(void)
    menu_search_terms_t *search = menu_entries_search_get_terms_internal();
 
    /* Do nothing if list of search terms is empty */
-   if (!search ||
-       (search->size == 0))
+   if (   !search
+       || (search->size == 0))
       return false;
 
    /* Remove last item from the list */
@@ -3812,8 +3989,8 @@ menu_search_terms_t *menu_entries_search_get_terms(void)
 {
    menu_search_terms_t *search = menu_entries_search_get_terms_internal();
 
-   if (!search ||
-       (search->size == 0))
+   if (   !search
+       || (search->size == 0))
       return NULL;
 
    return search;
@@ -3823,9 +4000,9 @@ void menu_entries_search_append_terms_string(char *s, size_t len)
 {
    menu_search_terms_t *search = menu_entries_search_get_terms_internal();
 
-   if (search &&
-       (search->size > 0) &&
-       s)
+   if (    search
+       && (search->size > 0)
+       && s)
    {
       size_t current_len = strlen_size(s, len);
       size_t i;
@@ -3846,311 +4023,6 @@ void menu_entries_search_append_terms_string(char *s, size_t len)
    }
 }
 
-#if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-bool menu_shader_manager_save_preset_internal(
-      bool save_reference,
-      const struct video_shader *shader,
-      const char *basename,
-      const char *dir_video_shader,
-      bool apply,
-      const char **target_dirs,
-      size_t num_target_dirs)
-{
-   char fullname[PATH_MAX_LENGTH];
-   char buffer[PATH_MAX_LENGTH];
-   const char *preset_ext         = NULL;
-   bool ret                       = false;
-   enum rarch_shader_type type    = RARCH_SHADER_NONE;
-   char *preset_path              = NULL;
-   size_t i                       = 0;
-   if (!shader || !shader->passes)
-      return false;
-   if ((type = menu_shader_manager_get_type(shader)) == RARCH_SHADER_NONE)
-      return false;
-
-   preset_ext = video_shader_get_preset_extension(type);
-
-   if (!string_is_empty(basename))
-      strlcpy(fullname, basename, sizeof(fullname));
-   else
-      strlcpy(fullname, "retroarch", sizeof(fullname));
-   strlcat(fullname, preset_ext, sizeof(fullname));
-
-   if (path_is_absolute(fullname))
-   {
-      preset_path = fullname;
-      if ((ret    = video_shader_write_preset(preset_path, shader, save_reference)))
-         RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
-      else
-         RARCH_ERR("[Shaders]: Failed writing shader preset to \"%s\".\n", preset_path);
-   }
-   else
-   {
-      char basedir[PATH_MAX_LENGTH];
-
-      for (i = 0; i < num_target_dirs; i++)
-      {
-         if (string_is_empty(target_dirs[i]))
-            continue;
-
-         fill_pathname_join(buffer, target_dirs[i],
-               fullname, sizeof(buffer));
-
-         strlcpy(basedir, buffer, sizeof(basedir));
-         path_basedir(basedir);
-
-         if (!path_is_directory(basedir))
-         {
-            if (!(ret = path_mkdir(basedir)))
-            {
-               RARCH_WARN("[Shaders]: Failed to create preset directory \"%s\".\n", basedir);
-               continue;
-            }
-         }
-
-         preset_path = buffer;
-
-         if ((ret = video_shader_write_preset(preset_path,
-               shader, save_reference)))
-         {
-            RARCH_LOG("[Shaders]: Saved shader preset to \"%s\".\n", preset_path);
-            break;
-         }
-         else
-            RARCH_WARN("[Shaders]: Failed writing shader preset to \"%s\".\n", preset_path);
-      }
-
-      if (!ret)
-         RARCH_ERR("[Shaders]: Failed to write shader preset. Make sure shader directory "
-               "and/or config directory are writable.\n");
-   }
-
-   if (ret && apply)
-      menu_shader_manager_set_preset(NULL, type, preset_path, true);
-
-   return ret;
-}
-
-bool menu_shader_manager_operate_auto_preset(
-      struct retro_system_info *system,
-      bool video_shader_preset_save_reference_enable,
-      enum auto_shader_operation op,
-      const struct video_shader *shader,
-      const char *dir_video_shader,
-      const char *dir_menu_config,
-      enum auto_shader_type type, bool apply)
-{
-   char old_presets_directory[PATH_MAX_LENGTH];
-   char config_directory[PATH_MAX_LENGTH];
-   char tmp[PATH_MAX_LENGTH];
-   char file[PATH_MAX_LENGTH];
-   static enum rarch_shader_type shader_types[] =
-   {
-      RARCH_SHADER_GLSL, RARCH_SHADER_SLANG, RARCH_SHADER_CG
-   };
-   const char *core_name            = system ? system->library_name : NULL;
-   const char *rarch_path_basename  = path_get(RARCH_PATH_BASENAME);
-   const char *auto_preset_dirs[3]  = {0};
-   bool has_content                 = !string_is_empty(rarch_path_basename);
-
-   old_presets_directory[0] = config_directory[0] = tmp[0] = file[0] = '\0';
-
-   if (type != SHADER_PRESET_GLOBAL && string_is_empty(core_name))
-      return false;
-
-   if (!has_content &&
-       ((type == SHADER_PRESET_GAME) ||
-            (type == SHADER_PRESET_PARENT)))
-      return false;
-
-   if (!path_is_empty(RARCH_PATH_CONFIG))
-   {
-      strlcpy(config_directory,
-            path_get(RARCH_PATH_CONFIG),
-            sizeof(config_directory));
-      path_basedir(config_directory);
-   }
-
-   /* We are only including this directory for compatibility purposes with
-    * versions 1.8.7 and older. */
-   if (op != AUTO_SHADER_OP_SAVE && !string_is_empty(dir_video_shader))
-      fill_pathname_join_special(
-            old_presets_directory,
-            dir_video_shader,
-            "presets",
-            sizeof(old_presets_directory));
-
-   auto_preset_dirs[0] = dir_menu_config;
-   auto_preset_dirs[1] = config_directory;
-   auto_preset_dirs[2] = old_presets_directory;
-
-   switch (type)
-   {
-      case SHADER_PRESET_GLOBAL:
-         strlcpy(file, "global", sizeof(file));
-         break;
-      case SHADER_PRESET_CORE:
-         fill_pathname_join_special(file, core_name, core_name, sizeof(file));
-         break;
-      case SHADER_PRESET_PARENT:
-         fill_pathname_parent_dir_name(tmp,
-               rarch_path_basename, sizeof(tmp));
-         fill_pathname_join_special(file, core_name, tmp, sizeof(file));
-         break;
-      case SHADER_PRESET_GAME:
-         {
-            const char *game_name = path_basename(rarch_path_basename);
-            if (string_is_empty(game_name))
-               return false;
-            fill_pathname_join_special(file, core_name, game_name, sizeof(file));
-            break;
-         }
-      default:
-         return false;
-   }
-
-   switch (op)
-   {
-      case AUTO_SHADER_OP_SAVE:
-         return menu_shader_manager_save_preset_internal(
-               video_shader_preset_save_reference_enable,
-               shader, file,
-               dir_video_shader,
-               apply,
-               auto_preset_dirs,
-               ARRAY_SIZE(auto_preset_dirs));
-      case AUTO_SHADER_OP_REMOVE:
-         {
-            /* remove all supported auto-shaders of given type */
-            char *end;
-            size_t i, j, m;
-
-            char preset_path[PATH_MAX_LENGTH];
-
-            /* n = amount of relevant shader presets found
-             * m = amount of successfully deleted shader presets */
-            size_t n = m = 0;
-
-            for (i = 0; i < ARRAY_SIZE(auto_preset_dirs); i++)
-            {
-               if (string_is_empty(auto_preset_dirs[i]))
-                  continue;
-
-               fill_pathname_join(preset_path,
-                     auto_preset_dirs[i], file, sizeof(preset_path));
-               end = preset_path + strlen(preset_path);
-
-               for (j = 0; j < ARRAY_SIZE(shader_types); j++)
-               {
-                  const char *preset_ext;
-
-                  if (!video_shader_is_supported(shader_types[j]))
-                     continue;
-
-                  preset_ext = video_shader_get_preset_extension(shader_types[j]);
-                  strlcpy(end, preset_ext, sizeof(preset_path) - (end - preset_path));
-
-                  if (path_is_valid(preset_path))
-                  {
-                     n++;
-
-                     if (!filestream_delete(preset_path))
-                     {
-                        m++;
-                        RARCH_LOG("[Shaders]: Deleted shader preset from \"%s\".\n", preset_path);
-                     }
-                     else
-                        RARCH_WARN("[Shaders]: Failed to remove shader preset at \"%s\".\n", preset_path);
-                  }
-               }
-            }
-
-            return n == m;
-         }
-      case AUTO_SHADER_OP_EXISTS:
-         {
-            /* test if any supported auto-shaders of given type exists */
-            char *end;
-            size_t i, j;
-
-            char preset_path[PATH_MAX_LENGTH];
-
-            for (i = 0; i < ARRAY_SIZE(auto_preset_dirs); i++)
-            {
-               if (string_is_empty(auto_preset_dirs[i]))
-                  continue;
-
-               fill_pathname_join(preset_path,
-                     auto_preset_dirs[i], file, sizeof(preset_path));
-               end = preset_path + strlen(preset_path);
-
-               for (j = 0; j < ARRAY_SIZE(shader_types); j++)
-               {
-                  const char *preset_ext;
-
-                  if (!video_shader_is_supported(shader_types[j]))
-                     continue;
-
-                  preset_ext = video_shader_get_preset_extension(shader_types[j]);
-                  strlcpy(end, preset_ext, sizeof(preset_path) - (end - preset_path));
-
-                  if (path_is_valid(preset_path))
-                     return true;
-               }
-            }
-         }
-         break;
-   }
-
-   return false;
-}
-
-void menu_driver_set_last_shader_path_int(
-      const char *shader_path,
-      enum rarch_shader_type *type,
-      char *shader_dir, size_t dir_len,
-      char *shader_file, size_t file_len)
-{
-   const char *file_name = NULL;
-
-   if (!type ||
-       !shader_dir ||
-       (dir_len < 1) ||
-       !shader_file ||
-       (file_len < 1))
-      return;
-
-   /* Reset existing cache */
-   *type          = RARCH_SHADER_NONE;
-   shader_dir[0]  = '\0';
-   shader_file[0] = '\0';
-
-   /* If path is empty, do nothing */
-   if (string_is_empty(shader_path))
-      return;
-
-   /* Get shader type */
-   /* If type is invalid, do nothing */
-   if ((*type = video_shader_parse_type(shader_path)) == RARCH_SHADER_NONE)
-      return;
-
-   /* Cache parent directory */
-   fill_pathname_parent_dir(shader_dir, shader_path, dir_len);
-
-   /* If parent directory is empty, then file name
-    * is only valid if 'shader_path' refers to an
-    * existing file in the root of the file system */
-   if (string_is_empty(shader_dir) &&
-       !path_is_valid(shader_path))
-      return;
-
-   /* Cache file name */
-   file_name = path_basename_nocompression(shader_path);
-   if (!string_is_empty(file_name))
-      strlcpy(shader_file, file_name, file_len);
-}
-#endif
-
 void get_current_menu_value(struct menu_state *menu_st,
       char *s, size_t len)
 {
@@ -4169,7 +4041,8 @@ void get_current_menu_value(struct menu_state *menu_st,
    strlcpy(s, entry_label, len);
 }
 
-void get_current_menu_label(struct menu_state *menu_st,
+#ifdef HAVE_ACCESSIBILITY
+static void menu_driver_get_current_menu_label(struct menu_state *menu_st,
       char *s, size_t len)
 {
    menu_entry_t     entry;
@@ -4190,8 +4063,10 @@ void get_current_menu_label(struct menu_state *menu_st,
 
    strlcpy(s, entry_label, len);
 }
+#endif
 
-void get_current_menu_sublabel(struct menu_state *menu_st,
+static void menu_driver_get_current_menu_sublabel(
+      struct menu_state *menu_st,
       char *s, size_t len)
 {
    menu_entry_t     entry;
@@ -4267,12 +4142,6 @@ retro_time_t menu_driver_get_current_time(void)
    return menu_st->current_time_us;
 }
 
-const char *menu_driver_get_pending_selection(void)
-{
-   struct menu_state   *menu_st  = &menu_driver_state;
-   return menu_st->pending_selection;
-}
-
 void menu_driver_set_pending_selection(const char *pending_selection)
 {
    struct menu_state *menu_st  = &menu_driver_state;
@@ -4285,7 +4154,7 @@ void menu_driver_set_pending_selection(const char *pending_selection)
             sizeof(menu_st->pending_selection));
 }
 
-void menu_input_search_cb(void *userdata, const char *str)
+static void menu_input_search_cb(void *userdata, const char *str)
 {
    const char *label           = NULL;
    unsigned type               = MENU_SETTINGS_NONE;
@@ -4314,11 +4183,10 @@ void menu_input_search_cb(void *userdata, const char *str)
       if (menu_entries_search_push(str))
       {
          bool refresh = false;
-
          /* Reset navigation pointer */
          menu_st->selection_ptr = 0;
-         menu_driver_navigation_set(false);
-
+         if (menu_st->driver_ctx->navigation_set)
+            menu_st->driver_ctx->navigation_set(menu_st->userdata, false);
          /* Refresh menu */
          menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
          menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
@@ -4333,7 +4201,8 @@ void menu_input_search_cb(void *userdata, const char *str)
       if (menu_entries_list_search(str, &idx))
       {
          menu_st->selection_ptr = idx;
-         menu_driver_navigation_set(true);
+         if (menu_st->driver_ctx->navigation_set)
+            menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
       }
    }
 
@@ -4350,10 +4219,10 @@ const char *menu_driver_get_last_start_directory(void)
 
    /* Return default directory if there is no
     * last directory or it's invalid */
-   if (!menu ||
-       !use_last ||
-       string_is_empty(menu->last_start_content.directory) ||
-       !path_is_directory(menu->last_start_content.directory))
+   if (   !menu
+       || !use_last
+       || string_is_empty(menu->last_start_content.directory)
+       || !path_is_directory(menu->last_start_content.directory))
       return default_directory;
 
    return menu->last_start_content.directory;
@@ -4727,8 +4596,8 @@ bool menu_entries_ctl(enum menu_entries_ctl_state state, void *data)
                {
                   size_t idx                = list_size - 1;
                   menu_st->selection_ptr    = idx;
-
-                  menu_driver_navigation_set(true);
+                  if (menu_st->driver_ctx->navigation_set)
+                     menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
                }
             }
             else
@@ -4775,53 +4644,6 @@ bool menu_entries_ctl(enum menu_entries_ctl_state state, void *data)
    return true;
 }
 
-/* TODO/FIXME - seems only RGUI uses this - can this be
- * refactored away or we can have one common function used
- * across all menu drivers? */
-#ifdef HAVE_RGUI
-void menu_display_handle_thumbnail_upload(
-      retro_task_t *task,
-      void *task_data,
-      void *user_data, const char *err)
-{
-   struct menu_state    *menu_st = &menu_driver_state;
-   menu_display_common_image_upload(
-         menu_st->driver_ctx,
-         menu_st->userdata,
-         (struct texture_image*)task_data,
-         user_data,
-         MENU_IMAGE_THUMBNAIL);
-}
-
-void menu_display_handle_left_thumbnail_upload(
-      retro_task_t *task,
-      void *task_data,
-      void *user_data, const char *err)
-{
-   struct menu_state    *menu_st = &menu_driver_state;
-   menu_display_common_image_upload(
-         menu_st->driver_ctx,
-         menu_st->userdata,
-         (struct texture_image*)task_data,
-         user_data,
-         MENU_IMAGE_LEFT_THUMBNAIL);
-}
-#endif
-
-void menu_display_handle_savestate_thumbnail_upload(
-      retro_task_t *task,
-      void *task_data,
-      void *user_data, const char *err)
-{
-   struct menu_state    *menu_st = &menu_driver_state;
-   menu_display_common_image_upload(
-         menu_st->driver_ctx,
-         menu_st->userdata,
-         (struct texture_image*)task_data,
-         user_data,
-         MENU_IMAGE_SAVESTATE_THUMBNAIL);
-}
-
 /* Function that gets called when we want to load in a
  * new menu wallpaper.
  */
@@ -4830,10 +4652,7 @@ void menu_display_handle_wallpaper_upload(
       void *task_data,
       void *user_data, const char *err)
 {
-   struct menu_state    *menu_st = &menu_driver_state;
    menu_display_common_image_upload(
-         menu_st->driver_ctx,
-         menu_st->userdata,
          (struct texture_image*)task_data,
          user_data,
          MENU_IMAGE_WALLPAPER);
@@ -4855,22 +4674,6 @@ bool menu_driver_list_cache(menu_ctx_list_t *list)
    menu_st->driver_ctx->list_cache(menu_st->userdata,
          list->type, list->action);
    return true;
-}
-
-void menu_driver_navigation_set(bool scroll)
-{
-   struct menu_state       *menu_st  = &menu_driver_state;
-   if (menu_st->driver_ctx->navigation_set)
-      menu_st->driver_ctx->navigation_set(menu_st->userdata, scroll);
-}
-
-void menu_driver_populate_entries(menu_displaylist_info_t *info)
-{
-   struct menu_state       *menu_st  = &menu_driver_state;
-   if (menu_st->driver_ctx && menu_st->driver_ctx->populate_entries)
-      menu_st->driver_ctx->populate_entries(
-            menu_st->userdata, info->path,
-            info->label, info->type);
 }
 
 bool menu_driver_push_list(menu_ctx_displaylist_t *disp_list)
@@ -5006,19 +4809,6 @@ void menu_input_set_pointer_y_accel(float y_accel)
    menu_input->pointer.y_accel    = y_accel;
 }
 
-bool menu_input_key_bind_set_min_max(menu_input_ctx_bind_limits_t *lim)
-{
-   struct menu_state    *menu_st  = &menu_driver_state;
-   struct menu_bind_state *binds  = &menu_st->input_binds;
-   if (!lim)
-      return false;
-
-   binds->begin = lim->min;
-   binds->last  = lim->max;
-
-   return true;
-}
-
 const char *menu_input_dialog_get_buffer(void)
 {
    struct menu_state    *menu_st  = &menu_driver_state;
@@ -5141,7 +4931,7 @@ static const char * msvc_vercode_to_str(const unsigned vercode)
 
 /* Sets 's' to the name of the current core
  * (shown at the top of the UI). */
-int menu_entries_get_core_title(char *s, size_t len)
+void menu_entries_get_core_title(char *s, size_t len)
 {
    struct retro_system_info *system  = &runloop_state_get_ptr()->system.info;
    const char *core_name             = 
@@ -5161,8 +4951,6 @@ int menu_entries_get_core_title(char *s, size_t len)
       snprintf(s + _len, len - _len, " - %s (%s)", core_name, core_version);
    else
       snprintf(s + _len, len - _len, " - %s", core_name);
-
-   return 0;
 }
 
 static bool menu_driver_init_internal(
@@ -5170,14 +4958,13 @@ static bool menu_driver_init_internal(
       settings_t *settings,
       bool video_is_threaded)
 {
-   menu_ctx_environment_t menu_environ;
    struct menu_state *menu_st  = &menu_driver_state;;
 
    if (menu_st->driver_ctx)
    {
       const char *ident = menu_st->driver_ctx->ident;
       /* ID must be set first, since it is required for
-       * the proper determination of pixel/dpi scaling
+       * the proper determination of pixel/DPI scaling
        * parameters (and some menu drivers fetch the
        * current pixel/dpi scale during 'menu_driver_ctx->init()') */
       if (ident)
@@ -5219,11 +5006,11 @@ static bool menu_driver_init_internal(
       generic_menu_init_list(menu_st, settings);
 
    /* Initialise menu screensaver */
-   menu_environ.type              = MENU_ENVIRON_DISABLE_SCREENSAVER;
-   menu_environ.data              = NULL;
    menu_st->input_last_time_us    = cpu_features_get_time_usec();
-   menu_st->flags    &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
-   if (menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ))
+   menu_st->flags                &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
+   if (     menu_st->driver_ctx->environ_cb
+         && (menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_SCREENSAVER,
+               NULL, menu_st->userdata) == 0))
       menu_st->flags |=  MENU_ST_FLAG_SCREENSAVER_SUPPORTED;
    else
       menu_st->flags &= ~MENU_ST_FLAG_SCREENSAVER_SUPPORTED;
@@ -5299,7 +5086,7 @@ const menu_ctx_driver_t *menu_driver_find_driver(
    return (const menu_ctx_driver_t*)menu_ctx_drivers[0];
 }
 
-bool menu_input_key_bind_custom_bind_keyboard_cb(
+static bool menu_input_key_bind_custom_bind_keyboard_cb(
       void *data, unsigned code)
 {
    uint64_t current_usec;
@@ -5413,7 +5200,7 @@ bool menu_input_key_bind_set_mode(
    return true;
 }
 
-bool menu_input_key_bind_iterate(
+static bool menu_input_key_bind_iterate(
       settings_t *settings,
       menu_input_ctx_bind_t *bind,
       retro_time_t current_time)
@@ -5426,6 +5213,7 @@ bool menu_input_key_bind_iterate(
    uint64_t input_bind_hold_us    = settings->uints.input_bind_hold * 1000000;
    uint64_t input_bind_timeout_us = settings->uints.input_bind_timeout * 1000000;
 
+   /* TODO/FIXME - localize */
    snprintf(bind->s, bind->len,
          "[%s]\nPress keyboard, mouse or joypad\n(Timeout %d %s)",
          input_config_bind_map_get_desc(
@@ -5515,6 +5303,7 @@ bool menu_input_key_bind_iterate(
          new_binds.timer_hold.timeout_us = 
             new_binds.timer_hold.timeout_end - current_time;
 
+         /* TODO/FIXME - localize */
          snprintf(bind->s, bind->len,
                "[%s]\nPress keyboard, mouse or joypad\nand hold ...",
                input_config_bind_map_get_desc(
@@ -5604,7 +5393,7 @@ bool menu_input_dialog_get_display_kb(void)
     * result to RetroArch with repeated calls to input_keyboard_event
     * This prevents input_keyboard_event from calling back
     * menu_input_dialog_get_display_kb, looping indefinintely */
-   static bool typing = false;
+   static bool typing             = false;
 
    if (typing)
       return false;
@@ -5762,7 +5551,8 @@ unsigned menu_event(
 
       /* Read mouse */
 #ifdef HAVE_IOS_TOUCHMOUSE
-       if (menu_mouse_enable) {
+       if (menu_mouse_enable)
+       {
          settings->bools.menu_pointer_enable=true;
          menu_pointer_enable=true;
        }
@@ -5849,12 +5639,11 @@ unsigned menu_event(
       /* Disable screensaver if required */
       if (input_active)
       {
-         menu_ctx_environment_t menu_environ;
-         menu_environ.type           = MENU_ENVIRON_DISABLE_SCREENSAVER;
-         menu_environ.data           = NULL;
          menu_st->flags             &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
          menu_st->input_last_time_us = menu_st->current_time_us;
-         menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+         if (menu_st->driver_ctx->environ_cb)
+            menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_SCREENSAVER,
+                     NULL, menu_st->userdata);
       }
 
       /* Annul received input */
@@ -6222,8 +6011,8 @@ static int menu_input_pointer_post_iterate(
                uint16_t dx_start_abs       = dx_start < 0 ? dx_start * -1 : dx_start;
                uint16_t dy_start_abs       = dy_start < 0 ? dy_start * -1 : dy_start;
 
-               if ((dx_start_abs > dpi_threshold_drag) ||
-                   (dy_start_abs > dpi_threshold_drag))
+               if (   (dx_start_abs > dpi_threshold_drag)
+                   || (dy_start_abs > dpi_threshold_drag))
                {
                   uint16_t dpi_threshold_press_direction_min     =
                         (uint16_t)((dpi * MENU_INPUT_DPI_THRESHOLD_PRESS_DIRECTION_MIN) + 0.5f);
@@ -6365,9 +6154,9 @@ static int menu_input_pointer_post_iterate(
                    * NOTE: Of course, we must also 'reset' y acceleration
                    * whenever the onscreen keyboard or a message box is
                    * shown */
-                  if ((!menu_input->pointer.dragged &&
-                        (menu_input->pointer.press_duration > MENU_INPUT_Y_ACCEL_RESET_DELAY)) ||
-                      (osk_active || messagebox_active))
+                  if (  (!menu_input->pointer.dragged
+                      && (menu_input->pointer.press_duration > MENU_INPUT_Y_ACCEL_RESET_DELAY))
+                      || (osk_active || messagebox_active))
                   {
                      menu_input->pointer.y_accel = 0.0f;
                      accel0                      = 0.0f;
@@ -6687,7 +6476,7 @@ static int menu_input_pointer_post_iterate(
    return ret;
 }
 
-int menu_input_post_iterate(
+static int menu_input_post_iterate(
       gfx_display_t *p_disp,
       struct menu_state *menu_st,
       unsigned action,
@@ -6920,11 +6709,10 @@ void retroarch_menu_running(void)
     * first switching to the menu */
    if (menu_st->flags & MENU_ST_FLAG_SCREENSAVER_ACTIVE)
    {
-      menu_ctx_environment_t menu_environ;
-      menu_environ.type           = MENU_ENVIRON_DISABLE_SCREENSAVER;
-      menu_environ.data           = NULL;
       menu_st->flags             &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
-      menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+      if (menu_st->driver_ctx->environ_cb)
+         menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_SCREENSAVER,
+                  NULL, menu_st->userdata);
    }
    menu_st->input_last_time_us = cpu_features_get_time_usec();
 
@@ -6988,9 +6776,9 @@ void retroarch_menu_running_finished(bool quit)
             (enum input_auto_game_focus_type)settings->uints.input_auto_game_focus :
             AUTO_GAME_FOCUS_OFF;
 
-         if ((auto_game_focus_type == AUTO_GAME_FOCUS_ON) ||
-               ((auto_game_focus_type == AUTO_GAME_FOCUS_DETECT) &&
-                input_st->game_focus_state.core_requested))
+         if (      (auto_game_focus_type == AUTO_GAME_FOCUS_ON)
+               || ((auto_game_focus_type == AUTO_GAME_FOCUS_DETECT)
+               && input_st->game_focus_state.core_requested))
          {
             enum input_game_focus_cmd_type game_focus_cmd = GAME_FOCUS_CMD_ON;
             command_event(CMD_EVENT_GAME_FOCUS_TOGGLE, &game_focus_cmd);
@@ -7009,11 +6797,10 @@ void retroarch_menu_running_finished(bool quit)
     * switching off the menu */
    if (menu_st->flags & MENU_ST_FLAG_SCREENSAVER_ACTIVE)
    {
-      menu_ctx_environment_t menu_environ;
-      menu_environ.type           = MENU_ENVIRON_DISABLE_SCREENSAVER;
-      menu_environ.data           = NULL;
       menu_st->flags             &= ~MENU_ST_FLAG_SCREENSAVER_ACTIVE;
-      menu_driver_ctl(RARCH_MENU_CTL_ENVIRONMENT, &menu_environ);
+      if (menu_st->driver_ctx->environ_cb)
+         menu_st->driver_ctx->environ_cb(MENU_ENVIRON_DISABLE_SCREENSAVER,
+                  NULL, menu_st->userdata);
    }
    video_driver_set_texture_enable(false, false);
 #ifdef HAVE_OVERLAY
@@ -7115,7 +6902,9 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
             gfx_display_free();
 
             menu_entries_settings_deinit(menu_st);
-            menu_entries_list_deinit(menu_st->driver_ctx, menu_st);
+            if (menu_st->entries.list)
+               menu_list_free(menu_st->driver_ctx, menu_st->entries.list);
+            menu_st->entries.list          = NULL;
 
             if (menu_st->driver_data->core_buf)
                free(menu_st->driver_data->core_buf);
@@ -7136,19 +6925,6 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          }
          menu_st->driver_data = NULL;
          break;
-      case RARCH_MENU_CTL_ENVIRONMENT:
-         {
-            menu_ctx_environment_t *menu_environ =
-               (menu_ctx_environment_t*)data;
-
-            if (menu_st->driver_ctx->environ_cb)
-            {
-               if (menu_st->driver_ctx->environ_cb(menu_environ->type,
-                        menu_environ->data, menu_st->userdata) == 0)
-                  return true;
-            }
-         }
-         return false;
       case RARCH_MENU_CTL_POINTER_DOWN:
          {
             menu_ctx_pointer_t *point = (menu_ctx_pointer_t*)data;
@@ -7207,13 +6983,6 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
                   menu_st->userdata, (unsigned)selection, 'R');
          }
          break;
-      case RARCH_MENU_CTL_UPDATE_THUMBNAIL_IMAGE:
-         {
-            if (!menu_st->driver_ctx || !menu_st->driver_ctx->update_thumbnail_image)
-               return false;
-            menu_st->driver_ctx->update_thumbnail_image(menu_st->userdata);
-         }
-         break;
       case RARCH_MENU_CTL_REFRESH_THUMBNAIL_IMAGE:
          {
             unsigned *i = (unsigned*)data;
@@ -7250,37 +7019,17 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
             /* Always set current selection to first entry */
             menu_st->selection_ptr = 0;
 
-            /* menu_driver_navigation_set() will be called
-             * at the next 'push'.
+            /* navigation_set() will be called at the next 'push'.
              * If a push is *not* pending, have to do it here
              * instead */
             if (!(*pending_push))
             {
-               menu_driver_navigation_set(true);
-
+               if (menu_st->driver_ctx->navigation_set)
+                  menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
                if (menu_st->driver_ctx->navigation_clear)
                   menu_st->driver_ctx->navigation_clear(
                         menu_st->userdata, *pending_push);
             }
-         }
-         break;
-      case MENU_NAVIGATION_CTL_SET_LAST:
-         {
-            size_t menu_list_size     = menu_st->entries.list ? MENU_LIST_GET_SELECTION(menu_st->entries.list, 0)->size : 0;
-            size_t new_selection      = menu_list_size - 1;
-
-            menu_st->selection_ptr    = new_selection;
-
-            if (menu_st->driver_ctx->navigation_set_last)
-               menu_st->driver_ctx->navigation_set_last(menu_st->userdata);
-         }
-         break;
-      case MENU_NAVIGATION_CTL_GET_SCROLL_ACCEL:
-         {
-            size_t *sel = (size_t*)data;
-            if (!sel)
-               return false;
-            *sel = menu_st->scroll.acceleration;
          }
          break;
       default:
@@ -7318,32 +7067,30 @@ void menu_shader_manager_free(void)
  **/
 bool menu_shader_manager_init(void)
 {
-   video_driver_state_t 
-      *video_st                     = video_state_get_ptr();
+   video_driver_state_t *video_st   = video_state_get_ptr();
    enum rarch_shader_type type      = RARCH_SHADER_NONE;
    bool ret                         = true;
    bool is_preset                   = false;
    const char *path_shader          = NULL;
    struct video_shader *menu_shader = NULL;
-
    /* We get the shader preset directly from the video driver, so that
     * we are in sync with it (it could fail loading an auto-shader)
     * If we can't (e.g. get_current_shader is not implemented),
     * we'll load video_shader_get_current_shader_preset() like always */
-   video_shader_ctx_t shader_info = {0};
+   video_shader_ctx_t shader_info   = {0};
 
    video_shader_driver_get_current_shader(&shader_info);
 
    if (shader_info.data)
       /* Use the path of the originally loaded preset because it could
        * have been a preset with a #reference in it to another preset */
-      path_shader = shader_info.data->loaded_preset_path;
+      path_shader                 = shader_info.data->loaded_preset_path;
    else
-      path_shader = video_shader_get_current_shader_preset();
+      path_shader                 = video_shader_get_current_shader_preset();
 
    menu_shader_manager_free();
 
-   menu_shader          = (struct video_shader*)
+   menu_shader                    = (struct video_shader*)
       calloc(1, sizeof(*menu_shader));
 
    if (!menu_shader)
@@ -7396,9 +7143,7 @@ end:
  * Sets shader preset.
  **/
 bool menu_shader_manager_set_preset(struct video_shader *menu_shader,
-                                    enum rarch_shader_type type, 
-                                    const char *preset_path, 
-                                    bool apply)
+      enum rarch_shader_type type, const char *preset_path, bool apply)
 {
    bool refresh                  = false;
    bool ret                      = false;
@@ -7417,10 +7162,11 @@ bool menu_shader_manager_set_preset(struct video_shader *menu_shader,
     * Used when a preset is directly loaded.
     * No point in updating when the Preset was
     * created from the menu itself. */
-   if (  !menu_shader ||
-         !(video_shader_load_preset_into_shader(preset_path, menu_shader)))
+   if (     !menu_shader
+         || !(video_shader_load_preset_into_shader(preset_path, menu_shader)))
       goto end;
 
+   /* TODO/FIXME - localize */
    RARCH_LOG("[Shaders]: Menu shader set to: \"%s\".\n", preset_path);
 
    ret = true;
@@ -7452,14 +7198,13 @@ clear:
  * combine current shader with a shader preset on disk
  **/
 bool menu_shader_manager_append_preset(struct video_shader *shader, 
-                                       const char* preset_path,
-                                       const bool prepend)
+      const char* preset_path, const bool prepend)
 {
-   bool refresh = false;
-   bool ret = false;
-   settings_t* settings = config_get_ptr();
+   bool refresh                  = false;
+   bool ret                      = false;
+   settings_t* settings          = config_get_ptr();
    const char *dir_video_shader  = settings->paths.directory_video_shader;
-   enum rarch_shader_type type = menu_shader_manager_get_type(shader);
+   enum rarch_shader_type type   = menu_shader_manager_get_type(shader);
 
    if (string_is_empty(preset_path))
    {
@@ -7467,15 +7212,11 @@ bool menu_shader_manager_append_preset(struct video_shader *shader,
       goto clear;
    }
 
-    if (!video_shader_combine_preset_and_apply(settings,
-                                 type,
-                                 shader,
-                                 preset_path,
-                                 dir_video_shader,
-                                 prepend,
-                                 true))
+   if (!video_shader_combine_preset_and_apply(settings,
+            type, shader, preset_path, dir_video_shader, prepend, true))
       goto clear;
 
+   /* TODO/FIXME - localize */
    RARCH_LOG("[Shaders]: Menu shader set to: \"%s\".\n", preset_path);
 
    ret = true;
@@ -7568,17 +7309,11 @@ static int generic_menu_iterate(
          BIT64_SET(menu->state, MENU_STATE_RENDER_MESSAGEBOX);
          BIT64_SET(menu->state, MENU_STATE_POST_ITERATE);
 
-         {
-            bool pop_stack = false;
-            if (  ret == 1 ||
-                  action == MENU_ACTION_OK ||
-                  action == MENU_ACTION_CANCEL
-               )
-               pop_stack   = true;
-
-            if (pop_stack)
-               BIT64_SET(menu->state, MENU_STATE_POP_STACK);
-         }
+         if (     (ret    == 1)
+               || (action == MENU_ACTION_OK)
+               || (action == MENU_ACTION_CANCEL)
+            )
+            BIT64_SET(menu->state, MENU_STATE_POP_STACK);
          break;
       case ITERATE_TYPE_BIND:
          {
@@ -7671,7 +7406,7 @@ static int generic_menu_iterate(
                      if (string_is_equal(menu->menu_state_msg,
                               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE)))
                      {
-                        get_current_menu_sublabel(
+                        menu_driver_get_current_menu_sublabel(
                               menu_st,
                               menu->menu_state_msg, sizeof(menu->menu_state_msg));
                         if (string_is_equal(menu->menu_state_msg, ""))
@@ -7693,7 +7428,7 @@ static int generic_menu_iterate(
                               MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE)))
                   {
                      char current_sublabel[255];
-                     get_current_menu_sublabel(
+                     menu_driver_get_current_menu_sublabel(
                            menu_st,
                            current_sublabel, sizeof(current_sublabel));
                      if (string_is_equal(current_sublabel, ""))
@@ -7785,7 +7520,7 @@ static int generic_menu_iterate(
                         || type == MENU_SETTINGS_INPUT_LIBRETRO_DEVICE
                         || type == MENU_SETTINGS_INPUT_INPUT_REMAP_PORT)
                   {
-                     get_current_menu_sublabel(
+                     menu_driver_get_current_menu_sublabel(
                            menu_st,
                            menu->menu_state_msg, sizeof(menu->menu_state_msg));
 
@@ -7795,10 +7530,8 @@ static int generic_menu_iterate(
                    * is the first item in global input settings */
                   else if (type == MENU_SETTINGS_INPUT_ANALOG_DPAD_MODE
                         || type == MENU_SETTINGS_INPUT_BEGIN)
-                  {
                      ret = msg_hash_get_help_enum(MENU_ENUM_LABEL_VALUE_INPUT_ADC_TYPE,
                            menu->menu_state_msg, sizeof(menu->menu_state_msg));
-                  }
                   else
                   {
                      strlcpy(menu->menu_state_msg,
@@ -7815,9 +7548,7 @@ static int generic_menu_iterate(
          if (     action == MENU_ACTION_OK
                || action == MENU_ACTION_CANCEL
                || action == MENU_ACTION_INFO)
-         {
             BIT64_SET(menu->state, MENU_STATE_POP_STACK);
-         }
          break;
       case ITERATE_TYPE_DEFAULT:
          {
@@ -7967,7 +7698,8 @@ int generic_menu_entry_action(
                }
 
                menu_st->selection_ptr = idx;
-               menu_driver_navigation_set(true);
+               if (menu_st->driver_ctx->navigation_set)
+                  menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
 
                if (menu_driver_ctx->navigation_decrement)
                   menu_driver_ctx->navigation_decrement(menu_userdata);
@@ -7987,10 +7719,10 @@ int generic_menu_entry_action(
             {
                if ((menu_st->selection_ptr + scroll_speed) < selection_buf_size)
                {
-                  size_t idx  = menu_st->selection_ptr + scroll_speed;
-
+                  size_t idx             = menu_st->selection_ptr + scroll_speed;
                   menu_st->selection_ptr = idx;
-                  menu_driver_navigation_set(true);
+                  if (menu_st->driver_ctx->navigation_set)
+                     menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
                }
                else
                {
@@ -8000,7 +7732,15 @@ int generic_menu_entry_action(
                      menu_driver_ctl(MENU_NAVIGATION_CTL_CLEAR, &pending_push);
                   }
                   else
-                     menu_driver_ctl(MENU_NAVIGATION_CTL_SET_LAST,  NULL);
+		  {
+			  size_t menu_list_size     = menu_st->entries.list ? MENU_LIST_GET_SELECTION(menu_st->entries.list, 0)->size : 0;
+			  size_t new_selection      = menu_list_size - 1;
+
+			  menu_st->selection_ptr    = new_selection;
+
+			  if (menu_st->driver_ctx->navigation_set_last)
+				  menu_st->driver_ctx->navigation_set_last(menu_st->userdata);
+		  }
                }
 
                if (menu_driver_ctx->navigation_increment)
@@ -8026,12 +7766,11 @@ int generic_menu_entry_action(
                {
                   size_t idx             = 0;
                   if (menu_st->selection_ptr >= scroll_speed)
-                     idx = menu_st->selection_ptr - scroll_speed;
-                  else
-                     idx = 0;
+                     idx                 = menu_st->selection_ptr - scroll_speed;
 
                   menu_st->selection_ptr = idx;
-                  menu_driver_navigation_set(true);
+                  if (menu_st->driver_ctx->navigation_set)
+                     menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
 
                   if (menu_driver_ctx->navigation_decrement)
                      menu_driver_ctx->navigation_decrement(menu_userdata);
@@ -8083,13 +7822,21 @@ int generic_menu_entry_action(
                {
                   if ((menu_st->selection_ptr + scroll_speed) < selection_buf_size)
                   {
-                     size_t idx  = menu_st->selection_ptr + scroll_speed;
-
+                     size_t idx             = menu_st->selection_ptr + scroll_speed;
                      menu_st->selection_ptr = idx;
-                     menu_driver_navigation_set(true);
+                     if (menu_st->driver_ctx->navigation_set)
+                        menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
                   }
                   else
-                     menu_driver_ctl(MENU_NAVIGATION_CTL_SET_LAST,  NULL);
+		  {
+			  size_t menu_list_size     = menu_st->entries.list ? MENU_LIST_GET_SELECTION(menu_st->entries.list, 0)->size : 0;
+			  size_t new_selection      = menu_list_size - 1;
+
+			  menu_st->selection_ptr    = new_selection;
+
+			  if (menu_st->driver_ctx->navigation_set_last)
+				  menu_st->driver_ctx->navigation_set_last(menu_st->userdata);
+		  }
 
                   if (menu_driver_ctx->navigation_increment)
                      menu_driver_ctx->navigation_increment(menu_userdata);
@@ -8217,7 +7964,7 @@ int generic_menu_entry_action(
          case MENU_ACTION_RIGHT:
          case MENU_ACTION_CANCEL:
             menu_entries_get_title(title_name, sizeof(title_name));
-            get_current_menu_label(menu_st, current_label, sizeof(current_label));
+            menu_driver_get_current_menu_label(menu_st, current_label, sizeof(current_label));
             break;
          case MENU_ACTION_UP:
          case MENU_ACTION_DOWN:
@@ -8226,7 +7973,7 @@ int generic_menu_entry_action(
          case MENU_ACTION_SELECT:
          case MENU_ACTION_SEARCH:
          case MENU_ACTION_ACCESSIBILITY_SPEAK_LABEL:
-            get_current_menu_label(menu_st, current_label, sizeof(current_label));
+            menu_driver_get_current_menu_label(menu_st, current_label, sizeof(current_label));
             break;
          case MENU_ACTION_SCAN:
          case MENU_ACTION_INFO:
@@ -8307,9 +8054,9 @@ int generic_menu_entry_action(
          }
          /* If core was launched via 'Contentless Cores' menu,
           * flush to 'Contentless Cores' menu */
-         else if (string_is_equal(parent_label,
-                        msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB)) ||
-                  string_is_equal(parent_label,
+         else if (   string_is_equal(parent_label,
+                        msg_hash_to_str(MENU_ENUM_LABEL_CONTENTLESS_CORES_TAB))
+                  || string_is_equal(parent_label,
                         msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_CONTENTLESS_CORES_LIST)))
          {
             flush_target     = parent_label;
@@ -8483,49 +8230,51 @@ size_t menu_update_fullscreen_thumbnail_label(
       char *s, size_t len,
       bool is_quick_menu, const char *title)
 {
-   menu_entry_t selected_entry;
-   const char *thumbnail_label     = NULL;
-
    char tmpstr[64];
-   tmpstr[0]                       = '\0';
+   menu_entry_t selected_entry;
+   struct menu_state *menu_st      = &menu_driver_state;
+   const char *thumbnail_label     = NULL;
 
    /* > Get menu entry */
    MENU_ENTRY_INITIALIZE(selected_entry);
    selected_entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED
                          | MENU_ENTRY_FLAG_RICH_LABEL_ENABLED;
-   menu_entry_get(&selected_entry, 0, menu_navigation_get_selection(), NULL, true);
+   menu_entry_get(&selected_entry, 0, menu_st->selection_ptr, NULL, true);
 
    /* > Get entry label */
    if (!string_is_empty(selected_entry.rich_label))
       thumbnail_label = selected_entry.rich_label;
    /* > State slot label */
    else if (is_quick_menu && (
-            string_is_equal(selected_entry.label, "state_slot") ||
-            string_is_equal(selected_entry.label, "loadstate") ||
-            string_is_equal(selected_entry.label, "savestate")
+               string_is_equal(selected_entry.label, "state_slot")
+            || string_is_equal(selected_entry.label, "loadstate")
+            || string_is_equal(selected_entry.label, "savestate")
          ))
    {
-      snprintf(tmpstr, sizeof(tmpstr), "%s %d",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATE_SLOT),
+      size_t _len = strlcpy(tmpstr, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATE_SLOT),
+            sizeof(tmpstr));
+      snprintf(tmpstr + _len, sizeof(tmpstr) - _len, " %d",
             config_get_ptr()->ints.state_slot);
       thumbnail_label = tmpstr;
    }
    else if (is_quick_menu && (
-            string_is_equal(selected_entry.label, "replay_slot") ||
-            string_is_equal(selected_entry.label, "record_replay") ||
-            string_is_equal(selected_entry.label, "play_replay") ||
-            string_is_equal(selected_entry.label, "halt_replay")
+               string_is_equal(selected_entry.label, "replay_slot")
+            || string_is_equal(selected_entry.label, "record_replay")
+            || string_is_equal(selected_entry.label, "play_replay")
+            || string_is_equal(selected_entry.label, "halt_replay")
          ))
    {
-      snprintf(tmpstr, sizeof(tmpstr), "%s %d",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REPLAY_SLOT),
+      size_t _len = strlcpy(tmpstr, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_REPLAY_SLOT),
+            sizeof(tmpstr));
+      snprintf(tmpstr + _len, sizeof(tmpstr) - _len, " %d",
                config_get_ptr()->ints.replay_slot);
       thumbnail_label = tmpstr;
    }
    else if (string_to_unsigned(selected_entry.label) == MENU_ENUM_LABEL_STATE_SLOT)
    {
-      snprintf(tmpstr, sizeof(tmpstr), "%s %d",
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATE_SLOT),
+      size_t _len = strlcpy(tmpstr, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATE_SLOT),
+            sizeof(tmpstr));
+      snprintf(tmpstr + _len, sizeof(tmpstr) - _len, " %d",
             string_to_unsigned(selected_entry.path));
       thumbnail_label = tmpstr;
    }
@@ -8550,8 +8299,8 @@ bool menu_is_running_quick_menu(void)
                 | MENU_ENTRY_FLAG_RICH_LABEL_ENABLED;
    menu_entry_get(&entry, 0, 0, NULL, true);
 
-   return string_is_equal(entry.label, "resume_content") ||
-          string_is_equal(entry.label, "state_slot");
+   return    string_is_equal(entry.label, "resume_content")
+          || string_is_equal(entry.label, "state_slot");
 }
 
 bool menu_is_nonrunning_quick_menu(void)

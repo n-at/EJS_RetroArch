@@ -227,29 +227,26 @@ static int action_left_input_desc_kbd(unsigned type, const char *label,
 static int action_left_scroll(unsigned type, const char *label,
       bool wraparound)
 {
-   size_t scroll_accel   = 0;
-   unsigned scroll_speed = 0, fast_scroll_speed = 0;
-   size_t selection      = menu_navigation_get_selection();
-
-   if (!menu_driver_ctl(MENU_NAVIGATION_CTL_GET_SCROLL_ACCEL, &scroll_accel))
-      return false;
-
-   scroll_speed          = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 1);
-   fast_scroll_speed     = 10 * scroll_speed;
+   struct menu_state *menu_st    = menu_state_get_ptr();
+   size_t selection              = menu_st->selection_ptr;
+   size_t scroll_accel           = menu_st->scroll.acceleration;
+   unsigned scroll_speed         = (unsigned)((MAX(scroll_accel, 2) - 2) / 4 + 1);
+   unsigned fast_scroll_speed    = 10 * scroll_speed;
 
    if (selection > fast_scroll_speed)
    {
-      size_t idx  = selection - fast_scroll_speed;
-      menu_navigation_set_selection(idx);
-      menu_driver_navigation_set(true);
+      size_t idx                 = selection - fast_scroll_speed;
+      menu_st->selection_ptr     = idx;
+      if (menu_st->driver_ctx->navigation_set)
+         menu_st->driver_ctx->navigation_set(menu_st->userdata, true);
    }
    else
    {
-      bool pending_push = false;
+      bool pending_push          = false;
       menu_driver_ctl(MENU_NAVIGATION_CTL_CLEAR, &pending_push);
    }
 #ifdef HAVE_AUDIOMIXER
-   if (selection != menu_navigation_get_selection()) 
+   if (selection != menu_st->selection_ptr) /* Changed? */
       audio_driver_mixer_play_scroll_sound(true);
 #endif
    return 0;
@@ -284,8 +281,8 @@ static int action_left_mainmenu(unsigned type, const char *label,
 
    /* Tab switching functionality only applies
     * to XMB */
-   if ((list_info.size == 1) &&
-       string_is_equal(menu_ident, "xmb"))
+   if (  (list_info.size == 1)
+       && string_is_equal(menu_ident, "xmb"))
    {
       if ((list_info.selection != 0) || menu_nav_wraparound_enable)
          return action_left_goto_tab();
@@ -321,7 +318,7 @@ static int action_left_shader_scale_pass(unsigned type, const char *label,
    shader_pass->fbo.scale_x   = current_scale;
    shader_pass->fbo.scale_y   = current_scale;
 
-   shader->flags           |= SHDR_FLAG_MODIFIED;
+   shader->flags             |= SHDR_FLAG_MODIFIED;
 
    return 0;
 }
@@ -329,7 +326,7 @@ static int action_left_shader_scale_pass(unsigned type, const char *label,
 static int action_left_shader_filter_pass(unsigned type, const char *label,
       bool wraparound)
 {
-   unsigned delta = 2;
+   unsigned delta                        = 2;
    unsigned pass                         = type - MENU_SETTINGS_SHADER_PASS_FILTER_0;
    struct video_shader *shader           = menu_shader_get();
    struct video_shader_pass *shader_pass = shader ? &shader->pass[pass] : NULL;
@@ -1008,20 +1005,19 @@ static int menu_cbs_init_bind_left_compare_label(menu_file_list_cbs_t *cbs,
       }
    }
 
-   if (  string_starts_with_size(label, "input_player", STRLEN_CONST("input_player")) && 
-         string_ends_with_size(label, "_joypad_index", strlen(label),
+   if (     string_starts_with_size(label, "input_player", STRLEN_CONST("input_player"))
+         && string_ends_with_size(label, "_joypad_index", strlen(label),
             STRLEN_CONST("_joypad_index")))
    {
       unsigned i;
+      char lbl_setting[128];
+      size_t _len = strlcpy(lbl_setting, "input_player", sizeof(lbl_setting));
       for (i = 0; i < MAX_USERS; i++)
       {
-         char label_setting[128];
-         label_setting[0] = '\0';
+         snprintf(lbl_setting + _len, sizeof(lbl_setting) - _len, "%d", i + 1);
+         strlcat(lbl_setting, "_joypad_index", sizeof(lbl_setting));
 
-         snprintf(label_setting,
-               sizeof(label_setting), "input_player%d_joypad_index", i + 1);
-
-         if (!string_is_equal(label, label_setting))
+         if (!string_is_equal(label, lbl_setting))
             continue;
 
          BIND_ACTION_LEFT(cbs, bind_left_generic);

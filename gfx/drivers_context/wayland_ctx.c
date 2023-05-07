@@ -116,11 +116,13 @@ static bool gfx_ctx_wl_set_resize(void *data, unsigned width, unsigned height)
 {
    gfx_ctx_wayland_data_t *wl = (gfx_ctx_wayland_data_t*)data;
 
+   wl->last_buffer_scale = wl->buffer_scale;
+   wl_surface_set_buffer_scale(wl->surface, wl->buffer_scale);
+
 #ifdef HAVE_EGL
    wl_egl_window_resize(wl->win, width, height, 0, 0);
 #endif
 
-   wl_surface_set_buffer_scale(wl->surface, wl->buffer_scale);
    return true;
 }
 
@@ -416,9 +418,6 @@ static bool gfx_ctx_wl_set_video_mode(void *data,
       goto error;
    egl_set_swap_interval(&wl->egl, wl->egl.interval);
 #endif
-
-   if (!gfx_ctx_wl_set_video_mode_common_fullscreen(wl, fullscreen))
-      goto error;
 
    return true;
 
