@@ -23,6 +23,7 @@
 #include <string/stdstring.h>
 #include <encodings/utf.h>
 #include <clamping.h>
+#include <retro_endianness.h>
 
 #include "input_driver.h"
 #include "input_keymaps.h"
@@ -3706,12 +3707,9 @@ void config_read_keybinds_conf(void *data)
 }
 
 #ifdef HAVE_COMMAND
-void input_driver_init_command(
-      input_driver_state_t *input_st,
+void input_driver_init_command(input_driver_state_t *input_st,
       settings_t *settings)
 {
-   bool input_network_cmd_enable     = settings->bools.network_cmd_enable;
-   unsigned network_cmd_port         = settings->uints.network_cmd_port;
 #ifdef HAVE_STDIN_CMD
    bool input_stdin_cmd_enable       = settings->bools.stdin_cmd_enable;
 
@@ -3738,10 +3736,14 @@ void input_driver_init_command(
 
    /* Initialize the network command interface */
 #ifdef HAVE_NETWORK_CMD
-   if (input_network_cmd_enable)
    {
-      if (!(input_st->command[1] = command_network_new(network_cmd_port)))
-         RARCH_ERR("Failed to initialize the network command interface.\n");
+      bool input_network_cmd_enable = settings->bools.network_cmd_enable;
+      if (input_network_cmd_enable)
+      {
+         unsigned network_cmd_port  = settings->uints.network_cmd_port;
+         if (!(input_st->command[1] = command_network_new(network_cmd_port)))
+            RARCH_ERR("Failed to initialize the network command interface.\n");
+      }
    }
 #endif
 
@@ -3842,31 +3844,30 @@ static void input_overlay_loaded(retro_task_t *task,
    {
 #ifdef HAVE_MENU
       struct menu_state *menu_st = menu_state_get_ptr();
-      bool refresh               = false;
 
       /* Update menu entries */
       if (menu_st->overlay_types != data->overlay_types)
       {
-         menu_st->overlay_types = data->overlay_types;
-         menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
+         menu_st->overlay_types  = data->overlay_types;
+         menu_st->flags         |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
       }
 
       /* We can't display when the menu is up */
-      if (  (data->flags & OVERLAY_LOADER_HIDE_IN_MENU) &&
-            (menu_st->flags & MENU_ST_FLAG_ALIVE))
+      if (   (data->flags & OVERLAY_LOADER_HIDE_IN_MENU)
+          && (menu_st->flags & MENU_ST_FLAG_ALIVE))
          goto abort_load;
 #endif
 
       /* If 'hide_when_gamepad_connected' is enabled,
        * we can't display when a gamepad is connected */
-      if (  (data->flags & OVERLAY_LOADER_HIDE_WHEN_GAMEPAD_CONNECTED) &&
-            (input_config_get_device_name(0) != NULL))
+      if (   (data->flags & OVERLAY_LOADER_HIDE_WHEN_GAMEPAD_CONNECTED)
+          && (input_config_get_device_name(0) != NULL))
          goto abort_load;
    }
 
-   if (  !(data->flags & OVERLAY_LOADER_ENABLE)  ||
-         !video_driver_overlay_interface(&iface) ||
-         !iface)
+   if (     !(data->flags & OVERLAY_LOADER_ENABLE)
+         || !video_driver_overlay_interface(&iface)
+         || !iface)
    {
       RARCH_ERR("Overlay interface is not present in video driver,"
             " or not enabled.\n");
@@ -3912,7 +3913,11 @@ static void input_overlay_loaded(retro_task_t *task,
    free(data);
 
    if (!input_overlay_show_mouse_cursor)
-      video_driver_hide_mouse();
+   {
+      if (     video_st->poke
+            && video_st->poke->show_mouse)
+         video_st->poke->show_mouse(video_st->data, false);
+   }
 
    /* Attempt to automatically rotate overlay, if required */
    if (inp_overlay_auto_rotate)
@@ -6157,37 +6162,39 @@ void input_driver_collect_system_input(input_driver_state_t *input_st,
          unsigned i;
          unsigned ids[][2] =
          {
-            {RETROK_SPACE,     RETRO_DEVICE_ID_JOYPAD_START   },
-            {RETROK_SLASH,     RETRO_DEVICE_ID_JOYPAD_X       },
-            {RETROK_RSHIFT,    RETRO_DEVICE_ID_JOYPAD_SELECT  },
-            {RETROK_RIGHT,     RETRO_DEVICE_ID_JOYPAD_RIGHT   },
-            {RETROK_LEFT,      RETRO_DEVICE_ID_JOYPAD_LEFT    },
-            {RETROK_DOWN,      RETRO_DEVICE_ID_JOYPAD_DOWN    },
-            {RETROK_UP,        RETRO_DEVICE_ID_JOYPAD_UP      },
-            {RETROK_PAGEUP,    RETRO_DEVICE_ID_JOYPAD_L       },
-            {RETROK_PAGEDOWN,  RETRO_DEVICE_ID_JOYPAD_R       },
-            {0,                RARCH_QUIT_KEY                 },
-            {0,                RARCH_FULLSCREEN_TOGGLE_KEY    },
-            {RETROK_BACKSPACE, RETRO_DEVICE_ID_JOYPAD_B      },
             {RETROK_RETURN,    RETRO_DEVICE_ID_JOYPAD_A      },
+            {RETROK_BACKSPACE, RETRO_DEVICE_ID_JOYPAD_B      },
             {RETROK_DELETE,    RETRO_DEVICE_ID_JOYPAD_Y      },
+            {RETROK_SLASH,     RETRO_DEVICE_ID_JOYPAD_X      },
+            {RETROK_SPACE,     RETRO_DEVICE_ID_JOYPAD_START  },
+            {RETROK_RSHIFT,    RETRO_DEVICE_ID_JOYPAD_SELECT },
+            {RETROK_UP,        RETRO_DEVICE_ID_JOYPAD_UP     },
+            {RETROK_DOWN,      RETRO_DEVICE_ID_JOYPAD_DOWN   },
+            {RETROK_LEFT,      RETRO_DEVICE_ID_JOYPAD_LEFT   },
+            {RETROK_RIGHT,     RETRO_DEVICE_ID_JOYPAD_RIGHT  },
+            {RETROK_PAGEUP,    RETRO_DEVICE_ID_JOYPAD_L      },
+            {RETROK_PAGEDOWN,  RETRO_DEVICE_ID_JOYPAD_R      },
+            {RETROK_HOME,      RETRO_DEVICE_ID_JOYPAD_L3     },
+            {RETROK_END,       RETRO_DEVICE_ID_JOYPAD_R3     },
+            {0,                RARCH_QUIT_KEY                }, /* 14 */
+            {0,                RARCH_FULLSCREEN_TOGGLE_KEY   },
             {0,                RARCH_UI_COMPANION_TOGGLE     },
             {0,                RARCH_FPS_TOGGLE              },
             {0,                RARCH_NETPLAY_HOST_TOGGLE     },
             {0,                RARCH_MENU_TOGGLE             },
          };
 
-         ids[9][0]  = input_config_binds[0][RARCH_QUIT_KEY].key;
-         ids[10][0] = input_config_binds[0][RARCH_FULLSCREEN_TOGGLE_KEY].key;
-         ids[14][0] = input_config_binds[0][RARCH_UI_COMPANION_TOGGLE].key;
-         ids[15][0] = input_config_binds[0][RARCH_FPS_TOGGLE].key;
-         ids[16][0] = input_config_binds[0][RARCH_NETPLAY_HOST_TOGGLE].key;
-         ids[17][0] = input_config_binds[0][RARCH_MENU_TOGGLE].key;
+         ids[14][0] = input_config_binds[0][RARCH_QUIT_KEY].key;
+         ids[15][0] = input_config_binds[0][RARCH_FULLSCREEN_TOGGLE_KEY].key;
+         ids[16][0] = input_config_binds[0][RARCH_UI_COMPANION_TOGGLE].key;
+         ids[17][0] = input_config_binds[0][RARCH_FPS_TOGGLE].key;
+         ids[18][0] = input_config_binds[0][RARCH_NETPLAY_HOST_TOGGLE].key;
+         ids[19][0] = input_config_binds[0][RARCH_MENU_TOGGLE].key;
 
          if (settings->bools.input_menu_swap_ok_cancel_buttons)
          {
-            ids[11][1] = RETRO_DEVICE_ID_JOYPAD_A;
-            ids[12][1] = RETRO_DEVICE_ID_JOYPAD_B;
+            ids[0][1] = RETRO_DEVICE_ID_JOYPAD_B;
+            ids[1][1] = RETRO_DEVICE_ID_JOYPAD_A;
          }
 
          for (i = 0; i < ARRAY_SIZE(ids); i++)

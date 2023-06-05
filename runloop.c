@@ -149,8 +149,6 @@
 #include "menu/menu_cbs.h"
 #include "menu/menu_driver.h"
 #include "menu/menu_input.h"
-#include "menu/menu_dialog.h"
-#include "menu/menu_input_bind_dialog.h"
 #endif
 
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
@@ -2468,6 +2466,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
          {
             recording_state_t 
                *recording_st      = recording_state_get_ptr();
+            video_driver_state_t *video_st    = video_state_get_ptr();
             bool video_fullscreen = settings->bools.video_fullscreen;
             int reinit_flags      = DRIVERS_CMD_ALL &
                   ~(DRIVER_VIDEO_MASK | DRIVER_INPUT_MASK | DRIVER_MENU_MASK);
@@ -2494,7 +2493,11 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
             /* Hide mouse cursor in fullscreen mode */
             if (video_fullscreen)
-               video_driver_hide_mouse();
+            {
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, false);
+            }
          }
          break;
       }
@@ -2692,7 +2695,11 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             /* Hide mouse cursor in fullscreen after
              * a RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO call. */
             if (video_fullscreen)
-               video_driver_hide_mouse();
+            {
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, false);
+            }
 
             /* Recalibrate frame delay target when video reinits
              * and pause frame delay when video does not reinit */
@@ -2832,6 +2839,17 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                system->mmaps.descriptors[i].core = mmaps->descriptors[i];
 
             mmap_preprocess_descriptors(descriptors, mmaps->num_descriptors);
+
+#ifdef HAVE_CHEEVOS
+            rcheevos_refresh_memory();
+#endif
+#ifdef HAVE_CHEATS
+            if (cheat_manager_state.memory_initialized)
+            {
+               cheat_manager_initialize_memory(NULL, 0, true);
+               cheat_manager_apply_retro_cheats();
+            }
+#endif
 
             if (log_level != RETRO_LOG_DEBUG)
                break;
@@ -3834,11 +3852,12 @@ static retro_time_t runloop_core_runtime_tick(
 
 static bool core_unload_game(void)
 {
-   runloop_state_t *runloop_st  = &runloop_state;
+   runloop_state_t *runloop_st    = &runloop_state;
+   video_driver_state_t *video_st = video_state_get_ptr();
 
    video_driver_free_hw_context();
 
-   video_driver_set_cached_frame_ptr(NULL);
+   video_st->frame_cache_data     = NULL;
 
    if ((runloop_st->current_core.flags & RETRO_CORE_FLAG_GAME_LOADED))
    {
@@ -3935,7 +3954,7 @@ void runloop_event_deinit_core(void)
 
    core_unload_game();
 
-   video_driver_set_cached_frame_ptr(NULL);
+   video_st->frame_cache_data  = NULL;
 
    if (runloop_st->current_core.flags & RETRO_CORE_FLAG_INITED)
    {
@@ -3974,8 +3993,13 @@ void runloop_event_deinit_core(void)
    /* Restore original refresh rate, if it has been changed
     * automatically in SET_SYSTEM_AV_INFO */
    if (video_st->video_refresh_rate_original)
+   {
+      /* Set the av_info fps also to the original refresh rate */
+      /* to avoid re-initialization problems */
+      struct retro_system_av_info *av_info = &video_st->av_info;
+      av_info->timing.fps = video_st->video_refresh_rate_original;
       video_display_server_restore_refresh_rate();
-
+   }
    /* Recalibrate frame delay target */
    if (settings->bools.video_frame_delay_auto)
       video_st->frame_delay_target = 0;
@@ -4616,7 +4640,7 @@ bool runloop_event_init_core(
    /* Per-core saves: reset redirection paths */
    runloop_path_set_redirect(settings, old_savefile_dir, old_savestate_dir);
 
-   video_driver_set_cached_frame_ptr(NULL);
+   video_st->frame_cache_data              = NULL;
 
    runloop_st->current_core.retro_init();
    runloop_st->current_core.flags         |= RETRO_CORE_FLAG_INITED;
@@ -5610,8 +5634,11 @@ static enum runloop_state_enum runloop_check_state(
 
             /* Take a screenshot before we exit. */
             if (!take_screenshot(settings->paths.directory_screenshot,
-                     screenshot_path, false,
-                     video_driver_cached_frame_has_valid_framebuffer(), fullpath, false))
+                     screenshot_path,
+                     false,
+                     video_st->frame_cache_data && (video_st->frame_cache_data == RETRO_HW_FRAME_BUFFER_VALID),
+                     fullpath,
+                     false))
             {
                RARCH_ERR("Could not take a screenshot before exiting.\n");
             }
@@ -5782,14 +5809,12 @@ static enum runloop_state_enum runloop_check_state(
        * and exit the function to go to the next frame. */
       if (menu_st->flags & MENU_ST_FLAG_PENDING_QUICK_MENU)
       {
-         menu_ctx_list_t list_info;
-
          /* We are going to push a new menu; ensure
           * that the current one is cached for animation
           * purposes */
-         list_info.type   = MENU_LIST_PLAIN;
-         list_info.action = 0;
-         menu_driver_list_cache(&list_info);
+         if (menu_st->driver_ctx && menu_st->driver_ctx->list_cache)
+            menu_st->driver_ctx->list_cache(menu_st->userdata,
+                  MENU_LIST_PLAIN, MENU_ACTION_NOOP);
 
          p_disp->flags   |= GFX_DISP_FLAG_MSG_FORCE;
 
@@ -7545,10 +7570,11 @@ bool core_get_memory(retro_ctx_memory_info_t *info)
 
 bool core_load_game(retro_ctx_load_content_info_t *load_info)
 {
-   bool             game_loaded = false;
-   runloop_state_t *runloop_st  = &runloop_state;
+   bool             game_loaded   = false;
+   video_driver_state_t *video_st = video_state_get_ptr();
+   runloop_state_t *runloop_st    = &runloop_state;
 
-   video_driver_set_cached_frame_ptr(NULL);
+   video_st->frame_cache_data     = NULL;
 
 #ifdef HAVE_RUNAHEAD
    runahead_set_load_content_info(runloop_st, load_info);
@@ -7682,9 +7708,9 @@ uint64_t core_serialization_quirks(void)
 
 void core_reset(void)
 {
-   runloop_state_t *runloop_st  = &runloop_state;
-
-   video_driver_set_cached_frame_ptr(NULL);
+   runloop_state_t *runloop_st    = &runloop_state;
+   video_driver_state_t *video_st = video_state_get_ptr();
+   video_st->frame_cache_data     = NULL;
    runloop_st->current_core.retro_reset();
 }
 
@@ -7735,11 +7761,6 @@ bool core_has_set_input_descriptor(void)
    runloop_state_t *runloop_st = &runloop_state;
    return ((runloop_st->current_core.flags &
             RETRO_CORE_FLAG_HAS_SET_INPUT_DESCRIPTORS) > 0);
-}
-
-char *crt_switch_core_name(void)
-{
-   return (char*)runloop_state.system.info.library_name;
 }
 
 void runloop_path_set_basename(const char *path)
@@ -7932,13 +7953,11 @@ void runloop_path_set_redirect(settings_t *settings,
 
             /* Append library_name to the savestate location */
             if (sort_savestates_enable)
-            {
                fill_pathname_join(
                      new_savestate_dir,
                      new_savestate_dir,
                      system->library_name,
                      sizeof(new_savestate_dir));
-            }
 
             /* If path doesn't exist, try to create it.
              * If everything fails, revert to the original path. */
@@ -7986,8 +8005,8 @@ void runloop_path_set_redirect(settings_t *settings,
 
 #ifdef HAVE_NETWORKING
    /* Special save directory for netplay clients. */
-   if (netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL) &&
-         !netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_SERVER, NULL))
+   if (      netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL)
+         && !netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_SERVER, NULL))
    {
       fill_pathname_join(new_savefile_dir, new_savefile_dir, ".netplay",
          sizeof(new_savefile_dir));
@@ -8116,7 +8135,7 @@ void runloop_path_set_special(char **argv, unsigned num_content)
    if (is_dir)
    {
       strlcpy(runloop_st->name.savestate, savestate_dir,
-              sizeof(runloop_st->name.savestate)); /* TODO/FIXME - why are we setting this string here but then later overwriting it later with fil_pathname_dir? */
+              sizeof(runloop_st->name.savestate)); /* TODO/FIXME - why are we setting this string here but then later overwriting it later with fill_pathname_dir? */
       strlcpy(runloop_st->name.replay, savestate_dir,
               sizeof(runloop_st->name.replay)); /* TODO/FIXME - as above */
    }

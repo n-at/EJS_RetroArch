@@ -13,7 +13,8 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#ifndef _WAYLAND_COMMON_H
+#define _WAYLAND_COMMON_H
 
 #include <stdint.h>
 #include <boolean.h>
@@ -205,12 +206,12 @@ typedef struct gfx_ctx_wayland_data
 
    bool core_hw_context_enable;
    bool fullscreen;
-   bool pending_fullscreen;
    bool maximized;
    bool resize;
    bool configured;
    bool activated;
    bool reported_display_size;
+   bool swap_complete;
 } gfx_ctx_wayland_data_t;
 
 #ifdef HAVE_XKBCOMMON
@@ -253,3 +254,5 @@ extern const struct wl_buffer_listener shm_buffer_listener;
 extern const struct wl_data_device_listener data_device_listener;
 
 extern const struct wl_data_offer_listener data_offer_listener;
+
+#endif

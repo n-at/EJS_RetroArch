@@ -622,12 +622,6 @@ typedef struct gfx_ctx_metrics
    enum display_metric_types type;
 } gfx_ctx_metrics_t;
 
-typedef struct gfx_ctx_input
-{
-   input_driver_t **input;
-   void **input_data;
-} gfx_ctx_input_t;
-
 typedef struct gfx_ctx_ident
 {
    const char *ident;
@@ -667,7 +661,7 @@ typedef struct video_poke_interface
    void (*set_texture_enable)(void *data, bool enable, bool full_screen);
    void (*set_osd_msg)(void *data, 
          const char *msg,
-         const void *params, void *font);
+         const struct font_params *params, void *font);
 
    void (*show_mouse)(void *data, bool state);
    void (*grab_mouse_toggle)(void *data);
@@ -894,29 +888,27 @@ struct aspect_ratio_elem
 
 extern struct aspect_ratio_elem aspectratio_lut[ASPECT_RATIO_END];
 
+#if !(defined(RARCH_CONSOLE) || defined(RARCH_MOBILE))
 bool video_driver_has_windowed(void);
+#else
+#define video_driver_has_windowed() (false)
+#endif
+
+#ifdef HAVE_THREADS
+bool video_driver_is_threaded(void);
+#else
+#define video_driver_is_threaded() (false)
+#endif
 
 bool video_driver_has_focus(void);
-
-bool video_driver_cached_frame_has_valid_framebuffer(void);
-
-void video_driver_set_cached_frame_ptr(const void *data);
 
 void video_driver_set_stub_frame(void);
 
 void video_driver_unset_stub_frame(void);
 
-bool video_driver_supports_viewport_read(void);
-
-bool video_driver_prefer_viewport_read(void);
-
-bool video_driver_supports_read_frame_raw(void);
-
 float video_driver_get_core_aspect(void);
 
 void video_driver_set_viewport_core(void);
-
-void video_driver_reset_custom_viewport(settings_t *settings);
 
 void video_driver_set_rgba(void);
 
@@ -940,22 +932,13 @@ void video_driver_set_aspect_ratio(void);
 
 void video_driver_update_viewport(struct video_viewport* vp, bool force_full, bool keep_aspect);
 
-void video_driver_show_mouse(void);
-
-void video_driver_hide_mouse(void);
-
 void video_driver_apply_state_changes(void);
-
-bool video_driver_read_viewport(uint8_t *buffer, bool is_idle);
 
 void video_driver_cached_frame(void);
 
 bool video_driver_is_hw_context(void);
 
 struct retro_hw_render_callback *video_driver_get_hw_context(void);
-
-const struct retro_hw_render_context_negotiation_interface
-*video_driver_get_context_negotiation_interface(void);
 
 bool video_driver_get_viewport_info(struct video_viewport *viewport);
 
@@ -988,11 +971,6 @@ bool video_driver_set_video_mode(unsigned width,
 bool video_driver_get_video_output_size(
       unsigned *width, unsigned *height, char *desc, size_t desc_len);
 
-void video_driver_set_texture_enable(bool enable, bool full_screen);
-
-void video_driver_set_texture_frame(const void *frame, bool rgb32,
-      unsigned width, unsigned height, float alpha);
-
 void * video_driver_read_frame_raw(unsigned *width,
    unsigned *height, size_t *pitch);
 
@@ -1000,24 +978,11 @@ void video_driver_set_filtering(unsigned index, bool smooth, bool ctx_scaling);
 
 const char *video_driver_get_ident(void);
 
-void video_driver_set_viewport(unsigned width, unsigned height,
-      bool force_fullscreen, bool allow_rotate);
-
 void video_driver_get_size(unsigned *width, unsigned *height);
 
 void video_driver_set_size(unsigned width, unsigned height);
 
 float video_driver_get_aspect_ratio(void);
-
-void video_driver_set_aspect_ratio_value(float value);
-
-enum retro_pixel_format video_driver_get_pixel_format(void);
-
-void video_driver_cached_frame_set(const void *data, unsigned width,
-      unsigned height, size_t pitch);
-
-void video_driver_cached_frame_get(const void **data, unsigned *width,
-      unsigned *height, size_t *pitch);
 
 void video_driver_menu_settings(void **list_data, void *list_info_data,
       void *group_data, void *subgroup_data, const char *parent_group);
@@ -1036,10 +1001,6 @@ void video_driver_menu_settings(void **list_data, void *list_info_data,
 void video_viewport_get_scaled_integer(struct video_viewport *vp,
       unsigned width, unsigned height,
       float aspect_ratio, bool keep_aspect);
-
-struct retro_system_av_info *video_viewport_get_system_av_info(void);
-
-struct video_viewport *video_viewport_get_custom(void);
 
 /**
  * video_monitor_set_refresh_rate:
@@ -1074,18 +1035,6 @@ void video_monitor_compute_fps_statistics(uint64_t
  **/
 bool video_monitor_fps_statistics(double *refresh_rate,
       double *deviation, unsigned *sample_points);
-
-bool video_driver_monitor_adjust_system_rates(
-      float timing_skew_hz,
-      float video_refresh_rate,
-      bool vrr_runloop_enable,
-      float audio_max_timing_skew,
-      unsigned video_swap_interval,
-      double input_fps);
-
-void crt_switch_driver_refresh(void);
-
-char* crt_switch_core_name(void);
 
 #define video_driver_translate_coord_viewport_wrap(vp, mouse_x, mouse_y, res_x, res_y, res_screen_x, res_screen_y) \
    (video_driver_get_viewport_info(vp) ? video_driver_translate_coord_viewport(vp, mouse_x, mouse_y, res_x, res_y, res_screen_x, res_screen_y) : false)
@@ -1211,11 +1160,6 @@ bool video_shader_driver_get_current_shader(video_shader_ctx_t *shader);
 
 float video_driver_get_refresh_rate(void);
 
-#if defined(HAVE_GFX_WIDGETS)
-bool video_driver_has_widgets(void);
-#endif
-
-bool video_driver_is_threaded(void);
 
 bool video_context_driver_get_flags(gfx_ctx_flags_t *flags);
 
@@ -1237,8 +1181,6 @@ void video_driver_force_fallback(const char *driver);
 void video_driver_set_gpu_api_devices(enum gfx_ctx_api api, struct string_list *list);
 
 struct string_list* video_driver_get_gpu_api_devices(enum gfx_ctx_api api);
-
-enum retro_hw_context_type hw_render_context_type(const char *s);
 
 const char *hw_render_context_name(
       enum retro_hw_context_type type, int major, int minor);
@@ -1314,8 +1256,6 @@ void video_driver_set_viewport_config(
       bool video_aspect_ratio_auto);
 
 void video_driver_set_viewport_square_pixel(struct retro_game_geometry *geom);
-
-uint32_t video_driver_get_st_flags(void);
 
 bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled);
 

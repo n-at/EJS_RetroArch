@@ -68,6 +68,8 @@
    strlcpy(var, newvar, sizeof(var)); \
 }
 
+RETRO_BEGIN_DECLS
+
 enum crt_switch_type
 {
    CRT_SWITCH_NONE = 0,
@@ -84,8 +86,6 @@ enum override_type
    OVERRIDE_CONTENT_DIR,
    OVERRIDE_GAME
 };
-
-RETRO_BEGIN_DECLS
 
 typedef struct settings
 {
@@ -625,6 +625,13 @@ typedef struct settings
 #if defined(HAVE_DINPUT) || defined(HAVE_WINRAWINPUT)
       bool input_nowinkey_enable;
 #endif
+#ifdef UDEV_TOUCH_SUPPORT
+      bool input_touch_vmouse_pointer;
+      bool input_touch_vmouse_mouse;
+      bool input_touch_vmouse_touchpad;
+      bool input_touch_vmouse_trackball;
+      bool input_touch_vmouse_gesture;
+#endif
 
       /* Frame time counter */
       bool frame_time_counter_reset_after_fastforwarding;
@@ -834,6 +841,7 @@ typedef struct settings
       bool cheevos_visibility_lboard_submit;
       bool cheevos_visibility_lboard_cancel;
       bool cheevos_visibility_lboard_trackers;
+      bool cheevos_visibility_progress_tracker;
 
       /* Camera */
       bool camera_allow;

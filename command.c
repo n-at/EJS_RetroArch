@@ -379,7 +379,6 @@ bool command_get_config_param(command_t *cmd, const char* arg)
    const char *directory_cache    = settings->paths.directory_cache;
    const char *directory_system   = settings->paths.directory_system;
    const char *path_username      = settings->paths.username;
-   input_driver_state_t *input_st = input_state_get_ptr();
 
    if (string_is_equal(arg, "video_fullscreen"))
    {
@@ -402,12 +401,16 @@ bool command_get_config_param(command_t *cmd, const char* arg)
       value = directory_system;
    else if (string_is_equal(arg, "netplay_nickname"))
       value = path_username;
-   #ifdef HAVE_BSV_MOVIE
-   else if (string_is_equal(arg, "active_replay")) {
-      value = value_dynamic;
+#ifdef HAVE_BSV_MOVIE
+   else if (string_is_equal(arg, "active_replay"))
+   {
+      input_driver_state_t *input_st = input_state_get_ptr();
+      value            = value_dynamic;
       value_dynamic[0] = '\0';
       if(input_st->bsv_movie_state_handle)
-         snprintf(value_dynamic, sizeof(value_dynamic), "%lld %u", (long long)(input_st->bsv_movie_state_handle->identifier), input_st->bsv_movie_state.flags);
+         snprintf(value_dynamic, sizeof(value_dynamic), "%lld %u",
+               (long long)(input_st->bsv_movie_state_handle->identifier),
+               input_st->bsv_movie_state.flags);
       else
          snprintf(value_dynamic, sizeof(value_dynamic), "0 0");
    }
@@ -1887,10 +1890,9 @@ void command_event_save_current_config(enum override_type type)
 
 #ifdef HAVE_MENU
             {
-               bool refresh = false;
-
-               menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-               menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
+               struct menu_state *menu_st      = menu_state_get_ptr();
+               menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
+                                               |  MENU_ST_FLAG_PREVENT_POPULATE;
             }
 #endif
          }
@@ -1925,10 +1927,9 @@ void command_event_remove_current_config(enum override_type type)
 
 #ifdef HAVE_MENU
             {
-               bool refresh = false;
-
-               menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-               menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
+               struct menu_state *menu_st      = menu_state_get_ptr();
+               menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
+                                               |  MENU_ST_FLAG_PREVENT_POPULATE;
             }
 #endif
          }
@@ -2126,7 +2127,11 @@ void command_event_reinit(const int flags)
 #ifdef HAVE_MENU
    p_disp->flags |= GFX_DISP_FLAG_FB_DIRTY;
    if (video_fullscreen)
-      video_driver_hide_mouse();
+   {
+      if (     video_st->poke
+            && video_st->poke->show_mouse)
+         video_st->poke->show_mouse(video_st->data, false);
+   }
    if (     (menu_st->flags & MENU_ST_FLAG_ALIVE)
          && video_st->current_video->set_nonblock_state)
       video_st->current_video->set_nonblock_state(

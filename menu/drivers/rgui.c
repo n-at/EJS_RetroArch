@@ -4622,12 +4622,12 @@ static void rgui_render_osk(
    unsigned osk_width, osk_height;
    unsigned osk_x, osk_y;
    
-   input_driver_state_t 
-         *input_st          = input_state_get_ptr();
-   int osk_ptr              = input_st->osk_ptr;
-   char **osk_grid          = input_st->osk_grid;
-   const char *input_str    = menu_input_dialog_get_buffer();
-   const char *input_label  = menu_input_dialog_get_label_buffer();
+   input_driver_state_t *input_st = input_state_get_ptr();
+   int osk_ptr                    = input_st->osk_ptr;
+   char **osk_grid                = input_st->osk_grid;
+   const char *input_str          = menu_input_dialog_get_buffer();
+   struct menu_state *menu_st     = menu_state_get_ptr();
+   const char *input_label        = menu_st->input_dialog_kb_label;
 
    /* Sanity check 1 */
    if (osk_ptr < 0 || osk_ptr >= 44 || !osk_grid[0])
@@ -4963,6 +4963,8 @@ static void rgui_render(
    gfx_animation_t *p_anim        = anim_get_ptr();
    gfx_display_t *p_disp          = disp_get_ptr();
    struct menu_state *menu_st     = menu_state_get_ptr();
+   menu_input_t *menu_input       = &menu_st->input_state;
+   menu_list_t *menu_list         = menu_st->entries.list;
    rgui_t *rgui                   = (rgui_t*)data;
    enum gfx_animation_ticker_type
          menu_ticker_type         = (enum gfx_animation_ticker_type)settings->uints.menu_ticker_type;
@@ -5011,10 +5013,8 @@ static void rgui_render(
    /* Refresh current menu, if required */
    if (rgui->flags & RGUI_FLAG_FORCE_MENU_REFRESH)
    {
-      bool refresh = false;
-      menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-      menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
-
+      menu_st->flags          |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
+                               |  MENU_ST_FLAG_PREVENT_POPULATE;
       /* Menu entries may change as a result of the
        * refresh; skip rendering of the 'obsolete'
        * menu this frame, and force a redraw of the
@@ -5030,8 +5030,7 @@ static void rgui_render(
    {
       msg_force = p_disp->flags & GFX_DISP_FLAG_MSG_FORCE;
 
-      if (menu_entries_ctl(MENU_ENTRIES_CTL_NEEDS_REFRESH, NULL)
-            && !msg_force)
+      if (MENU_ENTRIES_NEEDS_REFRESH(menu_st) && !msg_force)
          return;
 
       if (  !display_kb && 
@@ -5084,20 +5083,14 @@ static void rgui_render(
 
    rgui->flags              &= ~RGUI_FLAG_FORCE_REDRAW;
 
-   entries_end               = menu_entries_get_size();
+   entries_end               = menu_list ? MENU_LIST_GET_SELECTION(menu_list, 0)->size : 0;
 
    /* Get offset of bottommost entry */
    bottom                    = (int)(entries_end - rgui->term_layout.height);
-   menu_entries_ctl(MENU_ENTRIES_CTL_START_GET, &old_start);
+   old_start                 = menu_st->entries.begin;
 
    if (old_start > (unsigned)bottom)
-   {
-      /* MENU_ENTRIES_CTL_SET_START requires a pointer of
-       * type size_t, so have to create a copy of 'bottom'
-       * here to avoid memory errors... */
-      size_t bottom_cpy = (size_t)bottom;
-      menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &bottom_cpy);
-   }
+      menu_st->entries.begin = (size_t)bottom;
 
    /* Handle pointer input
     * Note: This is ignored when showing a fullscreen thumbnail */
@@ -5107,45 +5100,36 @@ static void rgui_render(
       /* Update currently 'highlighted' item */
       if (rgui->pointer.y > rgui->term_layout.start_y)
       {
-         unsigned new_ptr;
-         menu_entries_ctl(MENU_ENTRIES_CTL_START_GET, &old_start);
-
+         old_start       = menu_st->entries.begin;
          /* NOTE: It's okay for this to go out of range
           * (limits are checked in rgui_pointer_up()) */
-         new_ptr = (unsigned)((rgui->pointer.y - rgui->term_layout.start_y) / rgui->font_height_stride) + old_start;
-
-         menu_input_set_pointer_selection(new_ptr);
+         menu_input->ptr = (unsigned)((rgui->pointer.y - rgui->term_layout.start_y) / rgui->font_height_stride) + old_start;
       }
 
       /* Allow drag-scrolling if items are currently off-screen */
       if (rgui->pointer.dragged && (bottom > 0))
       {
-         size_t start;
-         int16_t scroll_y_max = bottom * rgui->font_height_stride;
-
-         rgui->scroll_y      += -1 * rgui->pointer.dy;
+         int16_t scroll_y_max   = bottom * rgui->font_height_stride;
+         rgui->scroll_y        += -1 * rgui->pointer.dy;
          if (rgui->scroll_y < 0)
-            rgui->scroll_y    = 0;
+            rgui->scroll_y      = 0;
          if (rgui->scroll_y > scroll_y_max)
-            rgui->scroll_y    = scroll_y_max;
+            rgui->scroll_y      = scroll_y_max;
 
-         start                = rgui->scroll_y / rgui->font_height_stride;
-         menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &start);
+         menu_st->entries.begin = rgui->scroll_y / rgui->font_height_stride;
       }
    }
 
    /* Start position may have changed - get current
     * value and determine index of last displayed entry */
-   menu_entries_ctl(MENU_ENTRIES_CTL_START_GET, &old_start);
-   end = ((old_start + rgui->term_layout.height) <= entries_end) ?
-         old_start + rgui->term_layout.height : entries_end;
+   old_start = menu_st->entries.begin;
+   end       = ((old_start + rgui->term_layout.height) <= entries_end)
+         ? old_start + rgui->term_layout.height 
+         : entries_end;
 
    /* Do not scroll if all items are visible. */
    if (entries_end <= rgui->term_layout.height)
-   {
-      size_t start = 0;
-      menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &start);
-   }
+      menu_st->entries.begin = 0;
 
    /* Render background */
    rgui_render_background(rgui, fb_width, fb_height, fb_pitch);
@@ -5442,10 +5426,9 @@ static void rgui_render(
             title_buf, rgui->colors.title_color, rgui->colors.shadow_color);
 
       /* Print menu entries */
-      x = rgui->term_layout.start_x;
-      y = rgui->term_layout.start_y;
-
-      menu_entries_ctl(MENU_ENTRIES_CTL_START_GET, &new_start);
+      x         = rgui->term_layout.start_x;
+      y         = rgui->term_layout.start_y;
+      new_start = menu_st->entries.begin;
 
       for (i = new_start; i < end; i++, y += rgui->font_height_stride)
       {
@@ -5878,11 +5861,12 @@ bool rgui_is_video_config_equal(
 
 static void rgui_get_video_config(
       rgui_video_settings_t *video_settings,
+      settings_t *settings,
       unsigned video_aspect_ratio_idx)
 {
    /* Could use settings->video_viewport_custom directly,
     * but this seems to be the standard way of doing it... */
-   video_viewport_t *custom_vp      = video_viewport_get_custom();
+   video_viewport_t *custom_vp      = &settings->video_viewport_custom;
    video_settings->aspect_ratio_idx = video_aspect_ratio_idx;
    video_settings->viewport.width   = custom_vp->width;
    video_settings->viewport.height  = custom_vp->height;
@@ -5898,7 +5882,7 @@ static void rgui_set_video_config(
 {
    /* Could use settings->video_viewport_custom directly,
     * but this seems to be the standard way of doing it... */
-   video_viewport_t *custom_vp            = video_viewport_get_custom();
+   video_viewport_t *custom_vp            = &settings->video_viewport_custom;
    settings->uints.video_aspect_ratio_idx = video_settings->aspect_ratio_idx;
    custom_vp->width                       = video_settings->viewport.width;
    custom_vp->height                      = video_settings->viewport.height;
@@ -6302,9 +6286,9 @@ static bool rgui_set_aspect_ratio(
       return false;
 
    /* Configure 'menu display' settings */
-   gfx_display_set_width(rgui->frame_buf.width);
-   gfx_display_set_height(rgui->frame_buf.height);
-   gfx_display_set_framebuffer_pitch(rgui->frame_buf.width * sizeof(uint16_t));
+   p_disp->framebuf_width  = rgui->frame_buf.width;
+   p_disp->framebuf_height = rgui->frame_buf.height;
+   p_disp->framebuf_pitch  = rgui->frame_buf.width * sizeof(uint16_t);
    
    /* Determine terminal layout */
    rgui->term_layout.start_x      = (3 * 5) + 1;
@@ -6411,6 +6395,7 @@ static void *rgui_init(void **userdata, bool video_is_threaded)
    unsigned rgui_color_theme     = settings->uints.menu_rgui_color_theme;
    const char *dynamic_theme_dir = settings->paths.directory_dynamic_wallpapers;
    menu_handle_t *menu           = (menu_handle_t*)calloc(1, sizeof(*menu));
+   struct menu_state *menu_st    = menu_state_get_ptr();
 
    if (!menu)
       return NULL;
@@ -6448,7 +6433,7 @@ static void *rgui_init(void **userdata, bool video_is_threaded)
       goto error;
 
    /* Cache initial video settings */
-   rgui_get_video_config(&rgui->content_video_settings, settings->uints.video_aspect_ratio_idx);
+   rgui_get_video_config(&rgui->content_video_settings, settings, settings->uints.video_aspect_ratio_idx);
 
    /* Get initial 'window' dimensions */
    video_driver_get_viewport_info(&vp);
@@ -6482,7 +6467,7 @@ static void *rgui_init(void **userdata, bool video_is_threaded)
          settings->uints.menu_rgui_aspect_ratio
          );
 
-   menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &start);
+   menu_st->entries.begin      = start;
    rgui->scroll_y              = 0;
 
    if (settings->bools.menu_rgui_background_filler_thickness_enable)
@@ -6585,9 +6570,20 @@ static void rgui_free(void *data)
    rgui_thumbnail_free(&rgui->mini_left_thumbnail);
 }
 
+static void rgui_set_texture_frame(video_driver_state_t *video_st,
+      const void *frame, bool rgb32,
+      unsigned width, unsigned height, float alpha)
+{
+   if (     video_st->poke
+         && video_st->poke->set_texture_frame)
+      video_st->poke->set_texture_frame(video_st->data,
+            frame, rgb32, width, height, alpha);
+}
+
 static void rgui_set_texture(void *data)
 {
    unsigned fb_width, fb_height;
+   video_driver_state_t *video_st  = video_state_get_ptr();
    settings_t            *settings = config_get_ptr();
    gfx_display_t          *p_disp  = disp_get_ptr();
 #if defined(DINGUX)
@@ -6607,7 +6603,7 @@ static void rgui_set_texture(void *data)
    p_disp->flags         &= ~GFX_DISP_FLAG_FB_DIRTY;
 
    if (internal_upscale_level == RGUI_UPSCALE_NONE)
-      video_driver_set_texture_frame(rgui->frame_buf.data,
+      rgui_set_texture_frame(video_st, rgui->frame_buf.data,
             false, fb_width, fb_height, 1.0f);
    else
    {
@@ -6619,7 +6615,7 @@ static void rgui_set_texture(void *data)
       /* If viewport is currently the same size (or smaller)
        * than the menu framebuffer, no scaling is required */
       if ((vp.width <= fb_width) && (vp.height <= fb_height))
-         video_driver_set_texture_frame(rgui->frame_buf.data,
+         rgui_set_texture_frame(video_st, rgui->frame_buf.data,
                false, fb_width, fb_height, 1.0f);
       else
       {
@@ -6666,7 +6662,7 @@ static void rgui_set_texture(void *data)
                configuration_set_uint(settings,
                      settings->uints.menu_rgui_internal_upscale_level,
                      RGUI_UPSCALE_NONE);
-               video_driver_set_texture_frame(frame_buf->data,
+               rgui_set_texture_frame(video_st, frame_buf->data,
                      false, fb_width, fb_height, 1.0f);
                return;
             }
@@ -6689,7 +6685,7 @@ static void rgui_set_texture(void *data)
          }
          
          /* Draw upscaled texture */
-         video_driver_set_texture_frame(upscale_buf->data,
+         rgui_set_texture_frame(video_st, upscale_buf->data,
             false, out_width, out_height, 1.0f);
       }
    }
@@ -6697,13 +6693,14 @@ static void rgui_set_texture(void *data)
 
 static void rgui_navigation_clear(void *data, bool pending_push)
 {
-   size_t start           = 0;
-   rgui_t           *rgui = (rgui_t*)data;
+   size_t start               = 0;
+   struct menu_state *menu_st = menu_state_get_ptr();
+   rgui_t           *rgui     = (rgui_t*)data;
    if (!rgui)
       return;
 
-   menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &start);
-   rgui->scroll_y = 0;
+   menu_st->entries.begin     = start;
+   rgui->scroll_y             = 0;
 }
 
 static void rgui_set_thumbnail_system(void *userdata, char *s, size_t len)
@@ -6931,6 +6928,11 @@ static void rgui_scan_selected_entry_thumbnail(rgui_t *rgui, bool force_load)
 {
    bool has_thumbnail                = false;
    settings_t *settings              = config_get_ptr();
+   struct menu_state *menu_st        = menu_state_get_ptr();
+   menu_list_t *menu_list            = menu_st->entries.list;
+   size_t selection                  = menu_st->selection_ptr;
+   file_list_t *list                 = menu_list ? MENU_LIST_GET_SELECTION(menu_list, 0) : NULL;
+   size_t list_size                  = list ? list->size : 0;
    unsigned menu_rgui_thumbnail_delay= settings->uints.menu_rgui_thumbnail_delay;
    bool network_on_demand_thumbnails = settings->bools.network_on_demand_thumbnails;
    rgui->flags                      &= ~(RGUI_FLAG_THUMBNAIL_LOAD_PENDING
@@ -6943,10 +6945,6 @@ static void rgui_scan_selected_entry_thumbnail(rgui_t *rgui, bool force_load)
          || (rgui->flags & RGUI_FLAG_IS_EXPLORE_LIST)
          || (rgui->is_quick_menu))
    {
-      struct menu_state *menu_st = menu_state_get_ptr();
-      size_t selection           = menu_st->selection_ptr;
-      size_t list_size           = menu_entries_get_size();
-      file_list_t *list          = menu_entries_get_selection_buf_ptr(0);
       bool playlist_valid        = false;
       size_t playlist_index      = selection;
 
@@ -7006,10 +7004,6 @@ static void rgui_scan_selected_entry_thumbnail(rgui_t *rgui, bool force_load)
    if (     (rgui->is_quick_menu)
          || (rgui->flags & RGUI_FLAG_IS_STATE_SLOT))
    {
-      struct menu_state *menu_st = menu_state_get_ptr();
-      size_t selection           = menu_st->selection_ptr;
-      size_t list_size           = menu_entries_get_size();
-
       if (selection < list_size)
       {
          rgui_update_savestate_thumbnail_path(rgui, (unsigned)selection);
@@ -7169,7 +7163,8 @@ static void rgui_navigation_set(void *data, bool scroll)
    size_t start                   = 0;
    bool menu_show_sublabels       = false;
    struct menu_state *menu_st     = menu_state_get_ptr();
-   size_t end                     = menu_entries_get_size();
+   menu_list_t *menu_list         = menu_st->entries.list;
+   size_t end                     = menu_list ? MENU_LIST_GET_SELECTION(menu_list, 0)->size : 0;
    size_t selection               = menu_st->selection_ptr;
    rgui_t *rgui                   = (rgui_t*)data;
 
@@ -7197,14 +7192,14 @@ static void rgui_navigation_set(void *data, bool scroll)
    if      (selection < rgui->term_layout.height / 2) { }
    else if (selection >= (rgui->term_layout.height / 2)
          && selection < (end - rgui->term_layout.height / 2))
-      start        = selection - rgui->term_layout.height / 2;
+      start               = selection - rgui->term_layout.height / 2;
    else if (selection >= (end - rgui->term_layout.height / 2))
-      start        = end - rgui->term_layout.height;
+      start               = end - rgui->term_layout.height;
    else
       return;
 
-   menu_entries_ctl(MENU_ENTRIES_CTL_SET_START, &start);
-   rgui->scroll_y = start * rgui->font_height_stride;
+   menu_st->entries.begin = start;
+   rgui->scroll_y         = start * rgui->font_height_stride;
 }
 
 static void rgui_navigation_set_last(void *data)
@@ -7356,7 +7351,7 @@ static void rgui_populate_entries(
          /* Make sure that any changes made while accessing
           * the video settings menu are preserved */
          rgui_video_settings_t current_video_settings = {{0}};
-         rgui_get_video_config(&current_video_settings, settings->uints.video_aspect_ratio_idx);
+         rgui_get_video_config(&current_video_settings, settings, settings->uints.video_aspect_ratio_idx);
          if (rgui_is_video_config_equal(&current_video_settings, &rgui->menu_video_settings))
          {
             rgui_set_video_config(rgui, settings, &rgui->content_video_settings, false);
@@ -7431,7 +7426,9 @@ static int rgui_pointer_up(
 {
    rgui_t *rgui               = (rgui_t*)data;
    struct menu_state *menu_st = menu_state_get_ptr();
+   menu_list_t *menu_list     = menu_st->entries.list;
    size_t selection           = menu_st->selection_ptr;
+   size_t end                 = menu_list ? MENU_LIST_GET_SELECTION(menu_list, 0)->size : 0;
 
    if (!rgui)
       return -1;
@@ -7463,7 +7460,7 @@ static int rgui_pointer_up(
             {
                if (y < header_height)
                   return rgui_menu_entry_action(rgui, entry, selection, MENU_ACTION_CANCEL);
-               else if (ptr <= (menu_entries_get_size() - 1))
+               else if (ptr <= (end - 1))
                {
                   struct menu_state *menu_st = menu_state_get_ptr();
                   /* If currently selected item matches 'pointer' value,
@@ -7481,7 +7478,7 @@ static int rgui_pointer_up(
          break;
       case MENU_INPUT_GESTURE_LONG_PRESS:
          /* 'Reset to default' action */
-         if ((ptr <= (menu_entries_get_size() - 1)) &&
+         if ((ptr <= (end - 1)) &&
              (ptr == selection))
             return rgui_menu_entry_action(rgui, entry, selection, MENU_ACTION_START);
          break;
@@ -7790,7 +7787,7 @@ static void rgui_toggle(void *userdata, bool menu_on)
       if (aspect_ratio_lock != RGUI_ASPECT_RATIO_LOCK_NONE)
       {
          /* Cache content video settings */
-         rgui_get_video_config(&rgui->content_video_settings, settings->uints.video_aspect_ratio_idx);
+         rgui_get_video_config(&rgui->content_video_settings, settings, settings->uints.video_aspect_ratio_idx);
          /* Update menu viewport */
          rgui_update_menu_viewport(rgui, p_disp, settings->uints.menu_rgui_aspect_ratio_lock);
          /* Apply menu video settings */
@@ -7805,7 +7802,7 @@ static void rgui_toggle(void *userdata, bool menu_on)
           * has not changed video settings since menu was
           * last toggled on */
          rgui_video_settings_t current_video_settings = {{0}};
-         rgui_get_video_config(&current_video_settings, settings->uints.video_aspect_ratio_idx);
+         rgui_get_video_config(&current_video_settings, settings, settings->uints.video_aspect_ratio_idx);
 
          if (rgui_is_video_config_equal(&current_video_settings, &rgui->menu_video_settings))
             rgui_set_video_config(rgui, settings, &rgui->content_video_settings, false);
@@ -7898,7 +7895,7 @@ static enum menu_action rgui_parse_menu_entry_action(
          {
             settings_t *settings                         = config_get_ptr();
             rgui_video_settings_t current_video_settings = {{0}};
-            rgui_get_video_config(&current_video_settings, settings->uints.video_aspect_ratio_idx);
+            rgui_get_video_config(&current_video_settings, settings, settings->uints.video_aspect_ratio_idx);
             if (rgui_is_video_config_equal(&current_video_settings,
                   &rgui->menu_video_settings))
             {

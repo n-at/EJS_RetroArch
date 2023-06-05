@@ -34,10 +34,8 @@
 #endif
 
 #include "menu_defines.h"
-#include "menu_dialog.h"
 #include "menu_input.h"
 #include "../input/input_osk.h"
-#include "menu_input_bind_dialog.h"
 #include "menu_entries.h"
 #include "menu_shader.h"
 #include "../gfx/gfx_animation.h"
@@ -77,6 +75,10 @@ RETRO_BEGIN_DECLS
 #define MENU_SETTINGS_CORE_OPTION_START          0x10000
 #define MENU_SETTINGS_CHEEVOS_START              0x40000
 #define MENU_SETTINGS_NETPLAY_ROOMS_START        0x80000
+
+/* "Normalize" non-alphabetical entries so they
+ * are lumped together for purposes of jumping. */
+#define ELEM_GET_FIRST_CHAR(ret) ((ret < 'a') ? ('a' - 1) : (ret > 'z') ? ('z' + 1) : ret)
 
 enum menu_settings_type
 {
@@ -303,6 +305,53 @@ enum menu_settings_type
    MENU_SETTINGS_LAST
 };
 
+enum menu_state_flags
+{
+   MENU_ST_FLAG_ALIVE                       = (1 << 0),
+   MENU_ST_FLAG_IS_BINDING                  = (1 << 1),
+   MENU_ST_FLAG_INP_DLG_KB_DISPLAY          = (1 << 2),
+   /* When enabled, on next iteration the 'Quick Menu' 
+    * list will be pushed onto the stack */
+   MENU_ST_FLAG_PENDING_QUICK_MENU          = (1 << 3),
+   MENU_ST_FLAG_PREVENT_POPULATE            = (1 << 4),
+   /* The menu driver owns the userdata */
+   MENU_ST_FLAG_DATA_OWN                    = (1 << 5),
+   /* Flagged when menu entries need to be refreshed */
+   MENU_ST_FLAG_ENTRIES_NEED_REFRESH        = (1 << 6),
+   MENU_ST_FLAG_ENTRIES_NONBLOCKING_REFRESH = (1 << 7),
+   /* 'Close Content'-hotkey menu resetting */
+   MENU_ST_FLAG_PENDING_CLOSE_CONTENT       = (1 << 8),
+   /* Flagged when a core calls RETRO_ENVIRONMENT_SHUTDOWN,
+    * requiring the menu to be flushed on the next iteration */
+   MENU_ST_FLAG_PENDING_ENV_SHUTDOWN_FLUSH  = (1 << 9),
+   /* Screensaver status
+    * - Does menu driver support screensaver functionality?
+    * - Is screensaver currently active? */
+   MENU_ST_FLAG_SCREENSAVER_SUPPORTED       = (1 << 10),
+   MENU_ST_FLAG_SCREENSAVER_ACTIVE          = (1 << 11)
+};
+
+enum menu_scroll_mode
+{
+   MENU_SCROLL_PAGE = 0,
+   MENU_SCROLL_START_LETTER
+};
+
+enum contentless_core_runtime_status
+{
+   CONTENTLESS_CORE_RUNTIME_UNKNOWN = 0,
+   CONTENTLESS_CORE_RUNTIME_MISSING,
+   CONTENTLESS_CORE_RUNTIME_VALID
+};
+
+enum action_iterate_type
+{
+   ITERATE_TYPE_DEFAULT = 0,
+   ITERATE_TYPE_HELP,
+   ITERATE_TYPE_INFO,
+   ITERATE_TYPE_BIND
+};
+
 struct menu_list
 {
    file_list_t **menu_stack;
@@ -457,38 +506,6 @@ typedef struct
    char detect_content_path[PATH_MAX_LENGTH];
 } menu_handle_t;
 
-enum menu_state_flags
-{
-   MENU_ST_FLAG_ALIVE                       = (1 << 0),
-   MENU_ST_FLAG_IS_BINDING                  = (1 << 1),
-   MENU_ST_FLAG_INP_DLG_KB_DISPLAY          = (1 << 2),
-   /* When enabled, on next iteration the 'Quick Menu' 
-    * list will be pushed onto the stack */
-   MENU_ST_FLAG_PENDING_QUICK_MENU          = (1 << 3),
-   MENU_ST_FLAG_PREVENT_POPULATE            = (1 << 4),
-   /* The menu driver owns the userdata */
-   MENU_ST_FLAG_DATA_OWN                    = (1 << 5),
-   /* Flagged when menu entries need to be refreshed */
-   MENU_ST_FLAG_ENTRIES_NEED_REFRESH        = (1 << 6),
-   MENU_ST_FLAG_ENTRIES_NONBLOCKING_REFRESH = (1 << 7),
-   /* 'Close Content'-hotkey menu resetting */
-   MENU_ST_FLAG_PENDING_CLOSE_CONTENT       = (1 << 8),
-   /* Flagged when a core calls RETRO_ENVIRONMENT_SHUTDOWN,
-    * requiring the menu to be flushed on the next iteration */
-   MENU_ST_FLAG_PENDING_ENV_SHUTDOWN_FLUSH  = (1 << 9),
-   /* Screensaver status
-    * - Does menu driver support screensaver functionality?
-    * - Is screensaver currently active? */
-   MENU_ST_FLAG_SCREENSAVER_SUPPORTED       = (1 << 10),
-   MENU_ST_FLAG_SCREENSAVER_ACTIVE          = (1 << 11)
-};
-
-enum menu_scroll_mode
-{
-   MENU_SCROLL_PAGE = 0,
-   MENU_SCROLL_START_LETTER
-};
-
 struct menu_state
 {
    /* Timers */
@@ -564,7 +581,6 @@ struct menu_state
    char input_dialog_kb_label[256];
 #endif
    unsigned char kb_key_state[RETROK_LAST];
-
 };
 
 typedef struct menu_content_ctx_defer_info
@@ -610,57 +626,24 @@ typedef struct menu_ctx_bind
    unsigned type;
 } menu_ctx_bind_t;
 
-/**
- * config_get_menu_driver_options:
- *
- * Get an enumerated list of all menu driver names,
- * separated by '|'.
- *
- * Returns: string listing of all menu driver names,
- * separated by '|'.
- **/
-const char* config_get_menu_driver_options(void);
-
-const char *menu_driver_ident(void);
-
-bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data);
-
-void menu_driver_frame(bool menu_is_alive, video_frame_info_t *video_info);
-
-int menu_driver_deferred_push_content_list(file_list_t *list);
-
-bool menu_driver_list_cache(menu_ctx_list_t *list);
-
-bool menu_driver_push_list(menu_ctx_displaylist_t *disp_list);
-
-bool menu_driver_init(bool video_is_threaded);
-
-void menu_driver_set_thumbnail_system(char *s, size_t len);
-
-void menu_driver_get_thumbnail_system(char *s, size_t len);
-
-void menu_driver_set_thumbnail_content(char *s, size_t len);
-
-bool menu_driver_list_get_selection(menu_ctx_list_t *list);
-
-bool menu_driver_list_get_entry(menu_ctx_list_t *list);
-
-bool menu_driver_list_get_size(menu_ctx_list_t *list);
-
-bool menu_driver_screensaver_supported(void);
-
-retro_time_t menu_driver_get_current_time(void);
-
-void menu_display_timedate(gfx_display_ctx_datetime_t *datetime);
-
-void menu_display_powerstate(gfx_display_ctx_powerstate_t *powerstate);
-
-void menu_display_handle_wallpaper_upload(retro_task_t *task,
-      void *task_data,
-      void *user_data, const char *err);
-
 #if defined(HAVE_LIBRETRODB)
 typedef struct explore_state explore_state_t;
+#endif
+
+typedef struct
+{
+   char *runtime_str;
+   char *last_played_str;
+   enum contentless_core_runtime_status status;
+} contentless_core_runtime_info_t;
+
+typedef struct
+{
+   char *licenses_str;
+   contentless_core_runtime_info_t runtime;
+} contentless_core_info_entry_t;
+
+#if defined(HAVE_LIBRETRODB)
 explore_state_t *menu_explore_build_list(const char *directory_playlist,
       const char *directory_database);
 uintptr_t menu_explore_get_entry_icon(unsigned type);
@@ -677,26 +660,25 @@ void menu_explore_free(void);
 void menu_explore_set_state(explore_state_t *state);
 #endif
 
-/* Contentless cores START */
-enum contentless_core_runtime_status
-{
-   CONTENTLESS_CORE_RUNTIME_UNKNOWN = 0,
-   CONTENTLESS_CORE_RUNTIME_MISSING,
-   CONTENTLESS_CORE_RUNTIME_VALID
-};
+const char *menu_driver_ident(void);
 
-typedef struct
-{
-   char *runtime_str;
-   char *last_played_str;
-   enum contentless_core_runtime_status status;
-} contentless_core_runtime_info_t;
+bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data);
 
-typedef struct
-{
-   char *licenses_str;
-   contentless_core_runtime_info_t runtime;
-} contentless_core_info_entry_t;
+void menu_driver_frame(bool menu_is_alive, video_frame_info_t *video_info);
+
+int menu_driver_deferred_push_content_list(file_list_t *list);
+
+bool menu_driver_init(bool video_is_threaded);
+
+retro_time_t menu_driver_get_current_time(void);
+
+void menu_display_timedate(gfx_display_ctx_datetime_t *datetime);
+
+void menu_display_powerstate(gfx_display_ctx_powerstate_t *powerstate);
+
+void menu_display_handle_wallpaper_upload(retro_task_t *task,
+      void *task_data,
+      void *user_data, const char *err);
 
 uintptr_t menu_contentless_cores_get_entry_icon(const char *core_id);
 void menu_contentless_cores_context_init(void);
@@ -707,7 +689,6 @@ void menu_contentless_cores_set_runtime(const char *core_id,
 void menu_contentless_cores_get_info(const char *core_id,
       const contentless_core_info_entry_t **info);
 void menu_contentless_cores_flush_runtime(void);
-/* Contentless cores END */
 
 /* Returns true if search filter is enabled
  * for the specified menu list */
@@ -723,25 +704,11 @@ void menu_driver_get_last_shader_pass_path(
       const char **directory, const char **file_name);
 #endif
 
-const char *menu_driver_get_last_start_directory(void);
-const char *menu_driver_get_last_start_file_name(void);
-void menu_driver_set_last_start_content(const char *start_content_path);
 void menu_driver_set_pending_selection(const char *pending_selection);
 
 struct menu_state *menu_state_get_ptr(void);
 
-enum action_iterate_type
-{
-   ITERATE_TYPE_DEFAULT = 0,
-   ITERATE_TYPE_HELP,
-   ITERATE_TYPE_INFO,
-   ITERATE_TYPE_BIND
-};
-
 int generic_menu_entry_action(void *userdata, menu_entry_t *entry, size_t i, enum menu_action action);
-
-int menu_entries_elem_get_first_char(
-      file_list_t *list, unsigned offset);
 
 void menu_entries_build_scroll_indices(
       struct menu_state *menu_st,
@@ -750,35 +717,9 @@ void menu_entries_build_scroll_indices(
 void get_current_menu_value(struct menu_state *menu_st,
       char *s, size_t len);
 
-/**
- * config_get_menu_driver_options:
- *
- * Get an enumerated list of all menu driver names,
- * separated by '|'.
- *
- * Returns: string listing of all menu driver names,
- * separated by '|'.
- **/
-const char *config_get_menu_driver_options(void);
-
 /* Teardown function for the menu driver. */
 void menu_driver_destroy(
       struct menu_state *menu_st);
-
-extern menu_ctx_driver_t menu_ctx_ozone;
-extern menu_ctx_driver_t menu_ctx_xui;
-extern menu_ctx_driver_t menu_ctx_rgui;
-extern menu_ctx_driver_t menu_ctx_mui;
-extern menu_ctx_driver_t menu_ctx_xmb;
-extern menu_ctx_driver_t menu_ctx_stripes;
-
-/* This callback gets triggered by the keyboard whenever
- * we press or release a keyboard key. When a keyboard
- * key is being pressed down, 'down' will be true. If it
- * is being released, 'down' will be false.
- */
-void menu_input_key_event(bool down, unsigned keycode,
-      uint32_t character, uint16_t mod);
 
 const menu_ctx_driver_t *menu_driver_find_driver(
       settings_t *settings,
@@ -845,7 +786,18 @@ size_t menu_update_fullscreen_thumbnail_label(
 bool menu_is_running_quick_menu(void);
 bool menu_is_nonrunning_quick_menu(void);
 
+bool menu_input_key_bind_set_mode(
+      enum menu_input_binds_ctl_state state, void *data);
+
 extern const menu_ctx_driver_t *menu_ctx_drivers[];
+
+extern menu_ctx_driver_t menu_ctx_ozone;
+extern menu_ctx_driver_t menu_ctx_xui;
+extern menu_ctx_driver_t menu_ctx_rgui;
+extern menu_ctx_driver_t menu_ctx_mui;
+extern menu_ctx_driver_t menu_ctx_xmb;
+extern menu_ctx_driver_t menu_ctx_stripes;
+
 
 RETRO_END_DECLS
 

@@ -576,15 +576,64 @@ static bool driver_find_next(const char *label, char *s, size_t len)
    return false;
 }
 
+static float audio_driver_monitor_adjust_system_rates(
+      double input_sample_rate,
+      double input_fps,
+      float video_refresh_rate,
+      unsigned video_swap_interval,
+      float audio_max_timing_skew)
+{
+   float inp_sample_rate        = input_sample_rate;
+   float target_video_sync_rate = video_refresh_rate
+         / (float)video_swap_interval;
+   float timing_skew            =
+      fabs(1.0f - input_fps / target_video_sync_rate);
+   if (timing_skew <= audio_max_timing_skew)
+      return (inp_sample_rate * target_video_sync_rate / input_fps);
+   return inp_sample_rate;
+}
+
+static bool video_driver_monitor_adjust_system_rates(
+      unsigned _video_swap_interval,
+      float timing_skew_hz,
+      float video_refresh_rate,
+      bool vrr_runloop_enable,
+      float audio_max_timing_skew,
+      unsigned video_swap_interval,
+      double input_fps)
+{
+   float target_video_sync_rate = timing_skew_hz;
+
+   /* Divide target rate only when using Auto interval */
+   if (_video_swap_interval == 0)
+      target_video_sync_rate /= (float)video_swap_interval;
+
+   if (!vrr_runloop_enable)
+   {
+      float timing_skew                    = fabs(
+            1.0f - input_fps / target_video_sync_rate);
+      /* We don't want to adjust pitch too much. If we have extreme cases,
+       * just don't readjust at all. */
+      if (timing_skew <= audio_max_timing_skew)
+         return true;
+      RARCH_LOG("[Video]: Timings deviate too much. Will not adjust."
+            " (Target = %.2f Hz, Game = %.2f Hz)\n",
+            target_video_sync_rate,
+            (float)input_fps);
+   }
+   return input_fps <= target_video_sync_rate;
+}
+
 static void driver_adjust_system_rates(
+      runloop_state_t *runloop_st,
+      video_driver_state_t *video_st,
+      settings_t *settings,
       bool vrr_runloop_enable,
       float video_refresh_rate,
       float audio_max_timing_skew,
       bool video_adaptive_vsync,
       unsigned video_swap_interval)
 {
-   runloop_state_t     *runloop_st        = runloop_state_get_ptr();
-   video_driver_state_t *video_st         = video_state_get_ptr();
    struct retro_system_av_info *av_info   = &video_st->av_info;
    const struct retro_system_timing *info =
       (const struct retro_system_timing*)&av_info->timing;
@@ -632,12 +681,13 @@ static void driver_adjust_system_rates(
       video_st->core_hz             = input_fps;
 
       if (!video_driver_monitor_adjust_system_rates(
-         timing_skew_hz,
-         video_refresh_rate,
-         vrr_runloop_enable,
-         audio_max_timing_skew,
-         video_swap_interval,
-         input_fps))
+               settings->uints.video_swap_interval,
+               timing_skew_hz,
+               video_refresh_rate,
+               vrr_runloop_enable,
+               audio_max_timing_skew,
+               video_swap_interval,
+               input_fps))
       {
          /* We won't be able to do VSync reliably
             when game FPS > monitor FPS. */
@@ -747,7 +797,7 @@ void drivers_init(
 #endif
 
    if (flags & (DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK))
-      driver_adjust_system_rates(
+      driver_adjust_system_rates(runloop_st, video_st, settings,
                                  settings->bools.vrr_runloop_enable,
                                  settings->floats.video_refresh_rate,
                                  settings->floats.audio_max_timing_skew,
@@ -767,7 +817,7 @@ void drivers_init(
 #ifdef HAVE_VIDEO_FILTER
       video_driver_filter_free();
 #endif
-      video_driver_set_cached_frame_ptr(NULL);
+      video_st->frame_cache_data  = NULL;
       if (!video_driver_init_internal(&video_is_threaded,
                verbosity_enabled))
          retroarch_fail(1, "video_driver_init_internal()");
@@ -803,6 +853,7 @@ void drivers_init(
       bool windowed_fullscreen             = settings->bools.video_fullscreen && settings->bools.video_windowed_fullscreen;
       bool all_fullscreen                  = settings->bools.video_fullscreen || settings->bools.video_windowed_fullscreen;
    
+      /* Making a switch from PC standard 60 Hz to NTSC 59.94 is excluded by the last condition. */
       if (  refresh_rate > 0.0
             && !settings->uints.crt_switch_resolution
             && !settings->bools.vrr_runloop_enable
@@ -892,7 +943,9 @@ void drivers_init(
     * a global notifications on/off toggle switch */
    if (   video_font_enable
        && menu_enable_widgets
-       && video_driver_has_widgets())
+       && video_st->current_video
+       && video_st->current_video->gfx_widgets_enabled
+       && video_st->current_video->gfx_widgets_enabled(video_st->data))
    {
       bool rarch_force_fullscreen = video_st->flags &
          VIDEO_FLAG_FORCE_FULLSCREEN;
@@ -1041,8 +1094,8 @@ void driver_uninit(int flags)
    {
       video_driver_free_internal();
       VIDEO_DRIVER_LOCK_FREE(video_st);
-      video_st->data = NULL;
-      video_driver_set_cached_frame_ptr(NULL);
+      video_st->data              = NULL;
+      video_st->frame_cache_data  = NULL;
    }
 
    if (flags & DRIVER_AUDIO_MASK)
@@ -1104,7 +1157,7 @@ static void retroarch_deinit_drivers(struct retro_callbacks *cbs)
                        );
    video_st->record_gpu_buffer          = NULL;
    video_st->current_video              = NULL;
-   video_driver_set_cached_frame_ptr(NULL);
+   video_st->frame_cache_data           = NULL;
 
    /* Audio */
    audio_state_get_ptr()->flags        &= ~AUDIO_FLAG_ACTIVE;
@@ -1160,17 +1213,19 @@ bool driver_ctl(enum driver_ctl_state state, void *data)
    {
       case RARCH_DRIVER_CTL_SET_REFRESH_RATE:
          {
-            float *hz                    = (float*)data;
+            float *hz                     = (float*)data;
             audio_driver_state_t 
-               *audio_st                 = audio_state_get_ptr();
-            settings_t *settings         = config_get_ptr();
+               *audio_st                  = audio_state_get_ptr();
+            settings_t *settings          = config_get_ptr();
+            runloop_state_t *runloop_st   = runloop_state_get_ptr();
+            video_driver_state_t*video_st = video_state_get_ptr();
             unsigned 
-               audio_output_sample_rate  = settings->uints.audio_output_sample_rate;
-            bool vrr_runloop_enable      = settings->bools.vrr_runloop_enable;
-            float video_refresh_rate     = settings->floats.video_refresh_rate;
-            float audio_max_timing_skew  = settings->floats.audio_max_timing_skew;
-            bool video_adaptive_vsync    = settings->bools.video_adaptive_vsync;
-            unsigned video_swap_interval = settings->uints.video_swap_interval;
+               audio_output_sample_rate   = settings->uints.audio_output_sample_rate;
+            bool vrr_runloop_enable       = settings->bools.vrr_runloop_enable;
+            float video_refresh_rate      = settings->floats.video_refresh_rate;
+            float audio_max_timing_skew   = settings->floats.audio_max_timing_skew;
+            bool video_adaptive_vsync     = settings->bools.video_adaptive_vsync;
+            unsigned video_swap_interval  = settings->uints.video_swap_interval;
 
             video_monitor_set_refresh_rate(*hz);
 
@@ -1179,7 +1234,7 @@ bool driver_ctl(enum driver_ctl_state state, void *data)
             audio_st->source_ratio_current    =
             (double)audio_output_sample_rate / audio_st->input;
 
-            driver_adjust_system_rates(
+            driver_adjust_system_rates(runloop_st, video_st, settings,
                                        vrr_runloop_enable,
                                        video_refresh_rate,
                                        audio_max_timing_skew,
@@ -2624,10 +2679,14 @@ bool command_event(enum event_command cmd, void *data)
       case CMD_EVENT_TAKE_SCREENSHOT:
 #ifdef HAVE_SCREENSHOTS
          {
-            const char *dir_screenshot = settings->paths.directory_screenshot;
+            const char *dir_screenshot      = settings->paths.directory_screenshot;
+            video_driver_state_t *video_st  = video_state_get_ptr();
             if (!take_screenshot(dir_screenshot,
-                     path_get(RARCH_PATH_BASENAME), false,
-                     video_driver_cached_frame_has_valid_framebuffer(), false, true))
+                     path_get(RARCH_PATH_BASENAME),
+                     false,
+                     video_st->frame_cache_data && (video_st->frame_cache_data == RETRO_HW_FRAME_BUFFER_VALID),
+                     false,
+                     true))
                return false;
          }
 #endif
@@ -2637,6 +2696,7 @@ bool command_event(enum event_command cmd, void *data)
             bool load_dummy_core            = data ? *(bool*)data : true;
             content_ctx_info_t content_info = {0};
             global_t   *global              = global_get_ptr();
+            video_driver_state_t *video_st  = video_state_get_ptr();
             rarch_system_info_t *sys_info   = &runloop_st->system;
             uint8_t flags                   = content_get_flags();
 
@@ -2680,7 +2740,9 @@ bool command_event(enum event_command cmd, void *data)
                if (!settings->bools.video_fullscreen)
                {
                   input_driver_state_t *input_st = input_state_get_ptr();
-                  video_driver_show_mouse();
+                  if (     video_st->poke
+                        && video_st->poke->show_mouse)
+                     video_st->poke->show_mouse(video_st->data, true);
                   if (input_driver_ungrab_mouse())
                      input_st->flags &= ~INP_FLAG_GRAB_MOUSE_STATE;
                }
@@ -3354,6 +3416,9 @@ bool command_event(enum event_command cmd, void *data)
             size_t *playlist_index         = (size_t*)data;
             struct playlist_entry entry    = {0};
             unsigned i                     = 0;
+#ifdef HAVE_MENU
+            struct menu_state *menu_st     = menu_state_get_ptr();
+#endif
 
             /* the update function reads our entry as const,
              * so these casts are safe */
@@ -3365,7 +3430,10 @@ bool command_event(enum event_command cmd, void *data)
 
 #ifdef HAVE_MENU
             /* Update playlist metadata */
-            menu_driver_ctl(RARCH_MENU_CTL_REFRESH_THUMBNAIL_IMAGE, &i);
+            if (     menu_st->driver_ctx 
+                  && menu_st->driver_ctx->refresh_thumbnail_image)
+               menu_st->driver_ctx->refresh_thumbnail_image(
+                     menu_st->userdata, i);
 #endif
 
             runloop_msg_queue_push(msg_hash_to_str(MSG_RESET_CORE_ASSOCIATION), 1, 180, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
@@ -3773,14 +3841,18 @@ bool command_event(enum event_command cmd, void *data)
             command_event(CMD_EVENT_REINIT, NULL);
             if (video_fullscreen)
             {
-               video_driver_hide_mouse();
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, false);
                if (!settings->bools.video_windowed_fullscreen)
                   if (input_driver_grab_mouse())
                      input_st->flags |= INP_FLAG_GRAB_MOUSE_STATE;
             }
             else
             {
-               video_driver_show_mouse();
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, true);
                if (!settings->bools.video_windowed_fullscreen)
                   if (input_driver_ungrab_mouse())
                      input_st->flags &= ~INP_FLAG_GRAB_MOUSE_STATE;
@@ -3804,7 +3876,7 @@ bool command_event(enum event_command cmd, void *data)
             if (disk_control_enabled(&sys_info->disk_control))
             {
 #if defined(HAVE_MENU)
-               bool refresh               = false;
+               struct menu_state *menu_st = menu_state_get_ptr();
                /* Get initial disk eject state */
                bool initial_disk_ejected  = disk_control_get_eject_state(&sys_info->disk_control);
 #endif
@@ -3818,10 +3890,8 @@ bool command_event(enum event_command cmd, void *data)
                 * must refresh the disk options menu */
                if (initial_disk_ejected != disk_control_get_eject_state(
                      &sys_info->disk_control))
-               {
-                  menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-                  menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
-               }
+                  menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
+                                                  |  MENU_ST_FLAG_PREVENT_POPULATE;
 #endif
                return success;
             }
@@ -3841,13 +3911,16 @@ bool command_event(enum event_command cmd, void *data)
 
             if (disk_control_enabled(&sys_info->disk_control))
             {
-               bool *show_msg = (bool*)data;
-               bool eject     = !disk_control_get_eject_state(&sys_info->disk_control);
-               bool verbose   = true;
-               bool refresh   = false;
+               bool *show_msg                  = (bool*)data;
+               bool eject                      = !disk_control_get_eject_state(
+                                                  &sys_info->disk_control);
+               bool verbose                    = true;
+#if defined(HAVE_MENU)
+               struct menu_state *menu_st      = menu_state_get_ptr();
+#endif
 
                if (show_msg)
-                  verbose     = *show_msg;
+                  verbose                      = *show_msg;
 
                disk_control_set_eject_state(
                      &sys_info->disk_control, eject, verbose);
@@ -3855,8 +3928,8 @@ bool command_event(enum event_command cmd, void *data)
 #if defined(HAVE_MENU)
                /* It is necessary to refresh the disk options
                 * menu when toggling the tray state */
-               menu_entries_ctl(MENU_ENTRIES_CTL_SET_REFRESH, &refresh);
-               menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
+               menu_st->flags                 |=  MENU_ST_FLAG_ENTRIES_NEED_REFRESH
+                                               |  MENU_ST_FLAG_PREVENT_POPULATE;
 #endif
             }
             else
@@ -3972,9 +4045,17 @@ bool command_event(enum event_command cmd, void *data)
                   grab_mouse_state ? "ON" : "OFF");
 
             if (grab_mouse_state)
-               video_driver_hide_mouse();
+            {
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, false);
+            }
             else
-               video_driver_show_mouse();
+            {
+               if (     video_st->poke
+                     && video_st->poke->show_mouse)
+                  video_st->poke->show_mouse(video_st->data, true);
+            }
          }
          break;
       case CMD_EVENT_UI_COMPANION_TOGGLE:
@@ -4058,7 +4139,9 @@ bool command_event(enum event_command cmd, void *data)
                {
                   if (input_driver_grab_mouse())
                      input_st->flags |= INP_FLAG_GRAB_MOUSE_STATE;
-                  video_driver_hide_mouse();
+                  if (     video_st->poke
+                        && video_st->poke->show_mouse)
+                     video_st->poke->show_mouse(video_st->data, false);
                }
                /* Ungrab only if windowed and auto mouse grab is disabled */
                else if (!video_fullscreen &&
@@ -4066,7 +4149,9 @@ bool command_event(enum event_command cmd, void *data)
                {
                   if (input_driver_ungrab_mouse())
                      input_st->flags &= ~INP_FLAG_GRAB_MOUSE_STATE;
-                  video_driver_show_mouse();
+                  if (     video_st->poke
+                        && video_st->poke->show_mouse)
+                     video_st->poke->show_mouse(video_st->data, true);
                }
 
                if (input_st->game_focus_state.enabled)
@@ -6535,9 +6620,6 @@ bool retroarch_ctl(enum rarch_ctl_state state, void *data)
 
    switch(state)
    {
-      case RARCH_CTL_HAS_SET_SUBSYSTEMS:
-         return ((runloop_st->current_core.flags &
-               RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS) > 0);
 #ifdef HAVE_BSV_MOVIE
       case RARCH_CTL_BSV_MOVIE_IS_INITED:
          return (input_state_get_ptr()->bsv_movie_state_handle != NULL);
@@ -7058,6 +7140,7 @@ bool retroarch_main_quit(void)
    video_driver_state_t*video_st = video_state_get_ptr();
    settings_t *settings          = config_get_ptr();
    bool config_save_on_exit      = settings->bools.config_save_on_exit;
+   struct retro_system_av_info *av_info = &video_st->av_info;
 
    /* Restore video driver before saving */
    video_driver_restore_cached(settings);
@@ -7097,9 +7180,15 @@ bool retroarch_main_quit(void)
 
    /* Restore original refresh rate, if it has been changed
     * automatically in SET_SYSTEM_AV_INFO */
-   if (video_st->video_refresh_rate_original)
-      video_display_server_restore_refresh_rate();
+   if (video_st->video_refresh_rate_original) 
+   {
+      RARCH_DBG("[Video]: Restoring original refresh rate: %f Hz\n", video_st->video_refresh_rate_original);
+      /* Set the av_info fps also to the original refresh rate */
+      /* to avoid re-initialization problems */
+      av_info->timing.fps = video_st->video_refresh_rate_original;
 
+      video_display_server_restore_refresh_rate();
+   }
    if (!(runloop_st->flags & RUNLOOP_FLAG_SHUTDOWN_INITIATED))
    {
       /* Save configs before quitting

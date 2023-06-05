@@ -641,15 +641,17 @@ static INLINE void android_mouse_calculate_deltas(android_input_t *android,
    /* Adjust mouse speed based on ratio
     * between core resolution and system resolution */
    float x = 0, y = 0;
-   float                        x_scale = 1;
-   float                        y_scale = 1;
-   struct retro_system_av_info *av_info = video_viewport_get_system_av_info();
+   float                        x_scale      = 1;
+   float                        y_scale      = 1;
+   settings_t *settings                      = config_get_ptr();
+   video_driver_state_t *video_st            = video_state_get_ptr();
+   struct retro_system_av_info *av_info      = &video_st->av_info;
 
    if (av_info)
    {
-      video_viewport_t          *custom_vp   = video_viewport_get_custom();
+      video_viewport_t *custom_vp            = &settings->video_viewport_custom;
       const struct retro_game_geometry *geom = (const struct retro_game_geometry*)&av_info->geometry;
-      x_scale = 2 * (float)geom->base_width / (float)custom_vp->width;
+      x_scale = 2 * (float)geom->base_width  / (float)custom_vp->width;
       y_scale = 2 * (float)geom->base_height / (float)custom_vp->height;
    }
 
@@ -740,7 +742,12 @@ static INLINE void android_input_poll_event_type_motion(
          /* If touchscreen was pressed for less than 200ms
           * then register time stamp of a quick tap */
          if ((AMotionEvent_getEventTime(event)-AMotionEvent_getDownTime(event))/1000000 < 200)
-            android->quick_tap_time = AMotionEvent_getEventTime(event);
+         {
+            /* Prevent the quick tap if a button on the overlay is down */
+            input_driver_state_t *input_st = input_state_get_ptr();
+            if (!(input_st->flags & INP_FLAG_BLOCK_POINTER_INPUT))
+               android->quick_tap_time = AMotionEvent_getEventTime(event);
+         }
          android->mouse_l = 0;
       }
 
