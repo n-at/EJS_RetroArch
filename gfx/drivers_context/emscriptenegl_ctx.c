@@ -47,7 +47,7 @@ typedef struct
 static void gfx_ctx_emscripten_swap_interval(void *data, int interval)
 {
    if (interval == 0)
-      emscripten_set_main_loop_timing(EM_TIMING_RAF, 1);
+      emscripten_set_main_loop_timing(EM_TIMING_RAF, 1); //This breaks fastforward
    else
       emscripten_set_main_loop_timing(EM_TIMING_RAF, interval);
 }
@@ -58,6 +58,7 @@ static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
    bool  is_fullscreen = false;
    EMSCRIPTEN_RESULT r = emscripten_get_fullscreen_status(&fullscreen_status);
 
+#ifndef NO_CANVAS_FULLSCREEN
    if (r == EMSCRIPTEN_RESULT_SUCCESS)
    {
       if (fullscreen_status.isFullscreen)
@@ -67,6 +68,7 @@ static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
          *height = fullscreen_status.screenHeight;
       }
    }
+#endif
 
    if (!is_fullscreen)
    {
@@ -96,8 +98,14 @@ static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
    *resize                           = false;
 
 
+#ifdef WEB_SCALING
+   double dpr = emscripten_get_device_pixel_ratio();
+   emscripten->fb_width  = (unsigned)(input_width * dpr);
+   emscripten->fb_height = (unsigned)(input_height * dpr);
+#else
    emscripten->fb_width  = (unsigned)input_width;
    emscripten->fb_height = (unsigned)input_height;
+#endif
    *quit                 = false;
 }
 

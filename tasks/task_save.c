@@ -1595,40 +1595,28 @@ static void task_push_load_and_save_state(const char *path, void *data,
 }
 
 void* state_data;
-char myString[200];
+char myString[1000];
 
 void save_state_info(void)
 {
     memset(myString, '\0', sizeof(myString));
     if (state_data) 
         free(state_data);
-    retro_ctx_size_info_t info;
-    rastate_size_info_t size;
     if (!core_info_current_supports_savestate()) {
-        strcpy(myString, "Not Supported");
+        strcpy(myString, "Not Supported||0");
         return;
     }
-    core_serialize_size(&info);
-    if (info.size == 0) {
-        strcpy(myString, "Size is zero");
+    size_t serial_size = core_serialize_size();
+    if (serial_size == 0) {
+        strcpy(myString, "Size is zero||0");
         return;
     }
-    if (!content_get_rastate_size(&size)) {
-        strcpy(myString, "Error");
-        return;
-    }
-    state_data = calloc(size.total_size, 1);
+    state_data = content_get_serialized_data(&serial_size);
     if (!state_data) {
-        strcpy(myString, "Error initializing data");
+        strcpy(myString, "Error writing data||0");
         return;
     }
-    if (!content_write_serialized_state(state_data, &size))
-    {
-        strcpy(myString, "Error writing data");
-        free(state_data);
-        return;
-    }
-    sprintf(myString, "%zu|%zu|1", size.total_size, (unsigned long)state_data);
+    sprintf(myString, "%zu|%zu|1", serial_size, (unsigned long)state_data);
 }
 
 

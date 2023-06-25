@@ -4966,11 +4966,11 @@ void system_restart(void)
 
 void cmd_take_screenshot(void)
 {
-    const char *dir_screenshot = "/";
-    const char *name = "screenshot.png";
-    if (!take_screenshot(dir_screenshot,
-             name, true,
-             video_driver_cached_frame_has_valid_framebuffer(), true, false))
+    const char *path = "screenshot.png";
+    video_driver_state_t *video_st = video_state_get_ptr();
+    if (!take_screenshot(NULL,
+             path, true,
+             video_st->frame_cache_data && (video_st->frame_cache_data == RETRO_HW_FRAME_BUFFER_VALID), true, false))
        printf("Error taking screenshot");
 }
 
