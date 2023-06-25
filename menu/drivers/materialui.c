@@ -495,19 +495,6 @@ typedef struct
    bool dragged;
 } materialui_scrollbar_t;
 
-/* This structure holds all objects + metadata
- * corresponding to a particular font */
-typedef struct
-{
-   font_data_t *font;
-   video_font_raster_block_t raster_block;   /* ptr alignment */
-   unsigned glyph_width;
-   unsigned wideglyph_width;
-   int line_height;
-   int line_ascender;
-   int line_centre_offset;
-} materialui_font_data_t;
-
 /* This structure is used to cache system bar
  * string data (+ metadata) to improve rendering
  * performance */
@@ -597,9 +584,9 @@ typedef struct materialui_handle
    /* Font data */
    struct
    {
-      materialui_font_data_t title; /* ptr alignment */
-      materialui_font_data_t list;  /* ptr alignment */
-      materialui_font_data_t hint;  /* ptr alignment */
+      font_data_impl_t title; /* ptr alignment */
+      font_data_impl_t list;  /* ptr alignment */
+      font_data_impl_t hint;  /* ptr alignment */
    } font_data;
 
    void (*word_wrap)(
@@ -2193,29 +2180,6 @@ static const char *materialui_texture_path(unsigned id)
    return NULL;
 }
 
-static void INLINE materialui_font_bind(materialui_font_data_t *font_data)
-{
-   font_driver_bind_block(font_data->font, &font_data->raster_block);
-   font_data->raster_block.carr.coords.vertices = 0;
-}
-
-static void INLINE materialui_font_unbind(materialui_font_data_t *font_data)
-{
-   font_driver_bind_block(font_data->font, NULL);
-}
-
-/* Flushing is slow - only do it if font
- * has actually been used */
-void materialui_font_flush(
-      unsigned video_width, unsigned video_height,
-      materialui_font_data_t *font_data)
-{
-   if (font_data->raster_block.carr.coords.vertices == 0)
-      return;
-   font_driver_flush(video_width, video_height, font_data->font);
-   font_data->raster_block.carr.coords.vertices = 0;
-}
-
 /* ==============================
  * Playlist icons START
  * ============================== */
@@ -2668,7 +2632,7 @@ static void materialui_render_messagebox(
     * are too large to fit on screen */
 
    /* Find the longest line width */
-   for (i = 0; i < list.size; i++)
+   for (i = 0; i < (int)list.size; i++)
    {
       const char *line = list.elems[i].data;
 
@@ -2700,7 +2664,7 @@ static void materialui_render_messagebox(
          NULL);
 
    /* Print each line of the message */
-   for (i = 0; i < list.size; i++)
+   for (i = 0; i < (int)list.size; i++)
    {
       const char *line = list.elems[i].data;
 
@@ -3428,6 +3392,7 @@ static bool materialui_render_process_entry_playlist_desktop(
 
          if (mui->status_bar.delay_timer > mui->thumbnail_stream_delay)
          {
+            size_t _len;
             settings_t *settings               = config_get_ptr();
             bool content_runtime_log           = settings->bools.content_runtime_log;
             bool content_runtime_log_aggregate = settings->bools.content_runtime_log_aggregate;
@@ -3498,21 +3463,27 @@ static bool materialui_render_process_entry_playlist_desktop(
                last_played_str = mui->status_bar.last_played_fallback_str;
 
             /* Generate metadata string */
-            strlcpy(mui->status_bar.str,
+            _len  = strlcpy(mui->status_bar.str,
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_CORE),
                   sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, " ",
-                  sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, core_name,
-                  sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, MUI_TICKER_SPACER,
-                  sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, runtime_str,
-                  sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, MUI_TICKER_SPACER,
-                  sizeof(mui->status_bar.str));
-            strlcat(mui->status_bar.str, last_played_str,
-                  sizeof(mui->status_bar.str));
+            _len += strlcpy(mui->status_bar.str + _len,
+                    " ",
+                    sizeof(mui->status_bar.str) - _len);
+            _len += strlcpy(mui->status_bar.str + _len,
+                    core_name,
+                    sizeof(mui->status_bar.str) - _len);
+            _len += strlcpy(mui->status_bar.str + _len,
+                    MUI_TICKER_SPACER,
+                    sizeof(mui->status_bar.str) - _len);
+            _len += strlcpy(mui->status_bar.str + _len,
+                    runtime_str,
+                    sizeof(mui->status_bar.str) - _len);
+            _len += strlcpy(mui->status_bar.str + _len,
+                    MUI_TICKER_SPACER,
+                    sizeof(mui->status_bar.str) - _len);
+            _len += strlcpy(mui->status_bar.str + _len,
+                    last_played_str,
+                    sizeof(mui->status_bar.str) - _len);
 
             /* All metadata is cached */
             mui->status_bar.cached = true;
@@ -3559,7 +3530,7 @@ static bool (*materialui_render_process_entry)(
 
 static void materialui_init_font(
    gfx_display_t *p_disp,
-   materialui_font_data_t *font_data,
+   font_data_impl_t *font_data,
    int font_size,
    bool video_is_threaded,
    const char *str_latin);
@@ -3806,10 +3777,10 @@ static void materialui_render(void *data,
          /* Check if pointer is within the 'list' region of
           * the window (i.e. exclude header, navigation bar,
           * landscape borders) */
-         if ((pointer_x >  mui->landscape_optimization.border_width) &&
-             (pointer_x <  width - mui->landscape_optimization.border_width - mui->nav_bar_layout_width) &&
-             (pointer_y >= header_height) &&
-             (pointer_y <= height - mui->nav_bar_layout_height - mui->status_bar.height))
+         if (((unsigned)pointer_x >  mui->landscape_optimization.border_width) &&
+             ((unsigned)pointer_x <  width - mui->landscape_optimization.border_width - mui->nav_bar_layout_width) &&
+             ((unsigned)pointer_y >= header_height) &&
+             ((unsigned)pointer_y <= height - mui->nav_bar_layout_height - mui->status_bar.height))
          {
             /* Check if pointer is within the bounds of the
              * current entry */
@@ -5118,7 +5089,7 @@ static void materialui_render_selected_entry_aux_playlist_desktop(
       /* Status bar overlaps list entries
        * > Must flush list font before attempting
        *   to draw it */
-      materialui_font_flush(video_width, video_height, &mui->font_data.list);
+      font_flush(video_width, video_height, &mui->font_data.list);
 
       /* Background
        * > Surface */
@@ -5583,11 +5554,12 @@ static void materialui_render_entry_touch_feedback(
     * or pointer may no longer be held above the entry
     * currently selected for feedback animations */
    if (pointer_active)
-      pointer_active =    (mui->touch_feedback_selection == menu_input->ptr)
-                       && (mui->pointer.x >  mui->landscape_optimization.border_width)
-                       && (mui->pointer.x <  video_width - mui->landscape_optimization.border_width - mui->nav_bar_layout_width)
-                       && (mui->pointer.y >= header_height)
-                       && (mui->pointer.y <= video_height - mui->nav_bar_layout_height - mui->status_bar.height);
+      pointer_active =
+         (mui->touch_feedback_selection == menu_input->ptr)
+         && ((unsigned)mui->pointer.x >  mui->landscape_optimization.border_width)
+         && ((unsigned)mui->pointer.x <  video_width - mui->landscape_optimization.border_width - mui->nav_bar_layout_width)
+         && ((unsigned)mui->pointer.y >= header_height)
+         && ((unsigned)mui->pointer.y <= video_height - mui->nav_bar_layout_height - mui->status_bar.height);
 
    /* Touch feedback highlight fades in when pointer
     * is held stationary on a menu entry */
@@ -6079,8 +6051,8 @@ static void materialui_render_header(
             /* Even more trickery required for proper centring
              * if both search and switch view icons are shown... */
             if (show_search_icon && show_switch_view_icon)
-               if (str_width < usable_title_bar_width - mui->icon_size)
-                  title_x += (int)(mui->icon_size >> 1);
+               if (str_width < (int)usable_title_bar_width - (int)mui->icon_size)
+                  title_x += (int)(mui->icon_size / 2);
          }
       }
    }
@@ -7068,9 +7040,9 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
             video_st->data, video_width, video_height, true, false);
 
    /* Clear text */
-   materialui_font_bind(&mui->font_data.title);
-   materialui_font_bind(&mui->font_data.list);
-   materialui_font_bind(&mui->font_data.hint);
+   font_bind(&mui->font_data.title);
+   font_bind(&mui->font_data.list);
+   font_bind(&mui->font_data.hint);
 
    /* Update theme colours, if required */
    if (mui->color_theme != materialui_color_theme)
@@ -7161,8 +7133,8 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
 
    /* Flush first layer of text
     * > Menu list only uses list and hint fonts */
-   materialui_font_flush(video_width, video_height, &mui->font_data.list);
-   materialui_font_flush(video_width, video_height, &mui->font_data.hint);
+   font_flush(video_width, video_height, &mui->font_data.list);
+   font_flush(video_width, video_height, &mui->font_data.hint);
 
    /* Draw fullscreen thumbnails, if currently active
     * > Must be done *after* we flush the first layer
@@ -7181,10 +7153,8 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
 
    /* Flush second layer of text
     * > Title + system bar only use title and hint fonts */
-   materialui_font_flush(video_width,
-         video_height, &mui->font_data.title);
-   materialui_font_flush(video_width,
-         video_height, &mui->font_data.hint);
+   font_flush(video_width, video_height, &mui->font_data.title);
+   font_flush(video_width, video_height, &mui->font_data.hint);
 
    /* Handle onscreen keyboard */
    if (menu_input_dialog_get_display_kb())
@@ -7211,9 +7181,11 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
 
       /* Draw message box */
       _len        = strlcpy(msg, label, sizeof(msg));
-      msg[_len  ] = '\n';
-      msg[_len+1] = '\0';
-      strlcat(msg, str, sizeof(msg));
+      msg[  _len] = '\n';
+      msg[++_len] = '\0';
+      strlcpy(msg       + _len,
+		      str,
+            sizeof(msg) - _len);
       materialui_render_messagebox(mui,
             p_disp,
             userdata, video_width, video_height,
@@ -7236,7 +7208,7 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
 
       /* Flush message box & osk text
        * > Message box & osk only use list font */
-      materialui_font_flush(video_width, video_height, &mui->font_data.list);
+      font_flush(video_width, video_height, &mui->font_data.list);
    }
 
    /* Draw message box */
@@ -7265,7 +7237,7 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
 
       /* Flush message box text
        * > Message box only uses list font */
-      materialui_font_flush(video_width, video_height, &mui->font_data.list);
+      font_flush(video_width, video_height, &mui->font_data.list);
    }
 
    /* Draw mouse cursor */
@@ -7302,9 +7274,9 @@ static void materialui_frame(void *data, video_frame_info_t *video_info)
    materialui_colors_reset_transition_alpha(mui);
 
    /* Unbind fonts */
-   materialui_font_unbind(&mui->font_data.title);
-   materialui_font_unbind(&mui->font_data.list);
-   materialui_font_unbind(&mui->font_data.hint);
+   font_unbind(&mui->font_data.title);
+   font_unbind(&mui->font_data.list);
+   font_unbind(&mui->font_data.hint);
 
    if (video_st->current_video && video_st->current_video->set_viewport)
       video_st->current_video->set_viewport(
@@ -7554,21 +7526,21 @@ static void materialui_status_bar_init(
       _len = strlcpy(mui->status_bar.runtime_fallback_str,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_RUNTIME),
 	    sizeof(mui->status_bar.runtime_fallback_str));
-      mui->status_bar.runtime_fallback_str[_len  ] = ' ';
-      mui->status_bar.runtime_fallback_str[_len+1] = '\0';
-      strlcat(mui->status_bar.runtime_fallback_str,
+      mui->status_bar.runtime_fallback_str[  _len] = ' ';
+      mui->status_bar.runtime_fallback_str[++_len] = '\0';
+      strlcpy(mui->status_bar.runtime_fallback_str          + _len,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DISABLED),
-	    sizeof(mui->status_bar.runtime_fallback_str));
+            sizeof(mui->status_bar.runtime_fallback_str)    - _len);
 
       _len = strlcpy(mui->status_bar.last_played_fallback_str,
             msg_hash_to_str(
                MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_LAST_PLAYED),
             sizeof(mui->status_bar.last_played_fallback_str));
-      mui->status_bar.last_played_fallback_str[_len  ] = ' ';
-      mui->status_bar.last_played_fallback_str[_len+1] = '\0';
-      strlcat(mui->status_bar.last_played_fallback_str,
+      mui->status_bar.last_played_fallback_str[  _len] = ' ';
+      mui->status_bar.last_played_fallback_str[++_len] = '\0';
+      strlcpy(mui->status_bar.last_played_fallback_str       + _len,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DISABLED),
-            sizeof(mui->status_bar.last_played_fallback_str)
+            sizeof(mui->status_bar.last_played_fallback_str) - _len
             );
    }
 }
@@ -7884,7 +7856,7 @@ static void materialui_update_list_view(materialui_handle_t *mui, settings_t *se
 
 static void materialui_init_font(
    gfx_display_t *p_disp,
-   materialui_font_data_t *font_data,
+   font_data_impl_t *font_data,
    int font_size,
    bool video_is_threaded,
    const char *str_latin
@@ -8299,7 +8271,7 @@ static void materialui_reset_thumbnails(void)
       return;
 
    /* Free node thumbnails */
-   for (i = 0; i < list->size; i++)
+   for (i = 0; i < (int)list->size; i++)
    {
       materialui_node_t *node = (materialui_node_t*)list->list[i].userdata;
 
@@ -8467,14 +8439,14 @@ static void materialui_populate_nav_bar(
       settings_t *settings)
 {
    size_t menu_tab_index                   = 0;
-   bool menu_content_show_playlists        = 
+   bool menu_content_show_playlists        =
       settings->bools.menu_content_show_playlists;
    /* Cache last active menu tab index */
    mui->nav_bar.last_active_menu_tab_index = mui->nav_bar.active_menu_tab_index;
 
    /* Back tab */
-   mui->nav_bar.back_tab.enabled           = menu_st->entries.list 
-      ? (MENU_LIST_GET_STACK_SIZE(menu_st->entries.list, 0) > 1) 
+   mui->nav_bar.back_tab.enabled           = menu_st->entries.list
+      ? (MENU_LIST_GET_STACK_SIZE(menu_st->entries.list, 0) > 1)
       : false;
 
    /* Resume tab
@@ -9019,7 +8991,7 @@ static int materialui_switch_tabs(
             {
                target_tab_index = (int)mui->nav_bar.active_menu_tab_index + 1;
 
-               if (target_tab_index >= mui->nav_bar.num_menu_tabs)
+               if (target_tab_index >= (int)mui->nav_bar.num_menu_tabs)
                {
                   target_tab_index = 0;
                   mui->nav_bar.menu_navigation_wrapped = true;
@@ -10158,10 +10130,10 @@ static int materialui_pointer_up(void *userdata,
 
                /* Check if pointer location is within the
                 * bounds of the pointer item */
-               if (   (x < entry_x)
-                   || (x > (entry_x + node->entry_width))
-                   || (y < entry_y)
-                   || (y > (entry_y + node->entry_height)))
+               if (   ((int)x < entry_x)
+                   || ((int)x > (entry_x + node->entry_width))
+                   || ((int)y < entry_y)
+                   || ((int)y > (entry_y + node->entry_height)))
                   break;
 
                /* Pointer input is valid - perform action */
@@ -10863,7 +10835,9 @@ static void materialui_list_insert(
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_HDR_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_OUTPUT_SETTINGS))
-                  || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_SETTINGS))
+#ifdef HAVE_MICROPHONE
+                  || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_MICROPHONE_SETTINGS))
+#endif
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_SYNCHRONIZATION_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_MIXER_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_MENU_SOUNDS))
@@ -11001,8 +10975,10 @@ static void materialui_list_insert(
                {
                   char val[255];
                   unsigned user_value = i + 1;
-                  snprintf(val, sizeof(val), "%d", user_value);
-                  strlcat(val, "_input_binds_list", sizeof(val));
+                  size_t _len = snprintf(val, sizeof(val), "%d", user_value);
+                  strlcpy(val       + _len,
+                        "_input_binds_list",
+                        sizeof(val) - _len);
 
                   if (string_is_equal(label, val))
                   {

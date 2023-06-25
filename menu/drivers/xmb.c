@@ -1058,7 +1058,7 @@ static void xmb_render_messagebox_internal(
       if (!string_is_empty(msg))
       {
          int width     = font_driver_get_message_width(
-               xmb->font, msg, strlen(msg), 1);
+               xmb->font, msg, strlen(msg), 1.0f);
          if (width > longest_width)
             longest_width = width;
       }
@@ -1132,15 +1132,15 @@ static char* xmb_path_dynamic_wallpaper(xmb_handle_t *xmb)
       free(tmp);
    }
 
-   path[len  ] = '.';
-   path[len+1] = 'p';
-   path[len+2] = 'n';
-   path[len+3] = 'g';
-   path[len+4] = '\0';
+   path[  len] = '.';
+   path[++len] = 'p';
+   path[++len] = 'n';
+   path[++len] = 'g';
+   path[++len] = '\0';
 
    /* Do not update wallpaper in "Load Content" playlists */
-   if ((xmb->categories_selection_ptr == 0 && depth > 4) ||
-         (xmb->categories_selection_ptr > xmb->system_tab_end && depth > 1))
+   if (    (xmb->categories_selection_ptr == 0 && depth > 4)
+        || (xmb->categories_selection_ptr > xmb->system_tab_end && depth > 1))
       return strdup(xmb->bg_file_path);
    
    if (!path_is_valid(path))
@@ -2449,7 +2449,7 @@ static void xmb_context_reset_horizontal_list(
       if (string_ends_with_size(path, ".lpl",
                strlen(path), STRLEN_CONST(".lpl")))
       {
-         size_t len, _len;
+         size_t len;
          struct texture_image ti;
          char sysname[PATH_MAX_LENGTH];
          char texturepath[PATH_MAX_LENGTH];
@@ -2459,22 +2459,21 @@ static void xmb_context_reset_horizontal_list(
          /* Add current node to playlist database name map */
          RHMAP_SET_STR(xmb->playlist_db_node_map, path, node);
 
-         _len               = fill_pathname_base(
+         len                = fill_pathname_base(
                sysname, path, sizeof(sysname));
          /* Manually strip the extension (and dot) from sysname */
-            sysname[_len-4] = 
-            sysname[_len-3] = 
-            sysname[_len-2] = 
-            sysname[_len-1] = '\0';
-         _len               = _len-4;
+            sysname[len-4]  = 
+            sysname[len-3]  = 
+            sysname[len-2]  = 
+            sysname[len-1]  = '\0';
          len                = fill_pathname_join_special(
 			 texturepath, iconpath, sysname,
 			 sizeof(texturepath));
-         texturepath[len  ] = '.';
-         texturepath[len+1] = 'p';
-         texturepath[len+2] = 'n';
-         texturepath[len+3] = 'g';
-         texturepath[len+4] = '\0';
+         texturepath[  len] = '.';
+         texturepath[++len] = 'p';
+         texturepath[++len] = 'n';
+         texturepath[++len] = 'g';
+         texturepath[++len] = '\0';
 
          /* If the playlist icon doesn't exist return default */
 
@@ -2482,11 +2481,11 @@ static void xmb_context_reset_horizontal_list(
          {
                len = fill_pathname_join_special(texturepath, iconpath, "default",
                sizeof(texturepath));
-               texturepath[len  ] = '.';
-               texturepath[len+1] = 'p';
-               texturepath[len+2] = 'n';
-               texturepath[len+3] = 'g';
-               texturepath[len+4] = '\0';
+               texturepath[  len] = '.';
+               texturepath[++len] = 'p';
+               texturepath[++len] = 'n';
+               texturepath[++len] = 'g';
+               texturepath[++len] = '\0';
          }
 
          ti.width         = 0;
@@ -2506,20 +2505,7 @@ static void xmb_context_reset_horizontal_list(
             image_texture_free(&ti);
          }
 
-         /* Manually append '-content.png' to end of sysname string */
-         sysname[_len   ] = '-';
-         sysname[_len+1 ] = 'c';
-         sysname[_len+2 ] = 'o';
-         sysname[_len+3 ] = 'n';
-         sysname[_len+4 ] = 't';
-         sysname[_len+5 ] = 'e';
-         sysname[_len+6 ] = 'n';
-         sysname[_len+7 ] = 't';
-         sysname[_len+8 ] = '.';
-         sysname[_len+9 ] = 'p';
-         sysname[_len+10] = 'n';
-         sysname[_len+11] = 'g';
-         sysname[_len+12] = '\0';
+         strlcat(sysname, "-content.png", sizeof(sysname));
          /* Assemble new icon path */
          fill_pathname_join_special(content_texturepath, iconpath, sysname,
                sizeof(content_texturepath));
@@ -3542,7 +3528,7 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
                   index < ARRAY_SIZE(input_config_bind_order);
                   index++)
             {
-               if (input_config_bind_order[index] == input_num)
+               if (input_num == (int)input_config_bind_order[index])
                {
                   type = input_id + index;
                   break;
@@ -6097,7 +6083,7 @@ static void xmb_frame(void *data, video_frame_info_t *video_info)
 
          percent_width = (unsigned)
             font_driver_get_message_width(
-                  xmb->font, msg, strlen(msg), 1);
+                  xmb->font, msg, strlen(msg), 1.0f);
 
          xmb_draw_text(xmb_shadows_enable, xmb, settings, msg,
                video_width - xmb->margins_title_left - x_pos,
@@ -6336,8 +6322,10 @@ static void xmb_frame(void *data, video_frame_info_t *video_info)
    if (dispctx && dispctx->blend_end)
       dispctx->blend_end(userdata);
 
-   font_driver_flush(video_width, video_height, xmb->font);
-   font_driver_flush(video_width, video_height, xmb->font2);
+   if (xmb->font && xmb->font->renderer && xmb->font->renderer->flush)
+      xmb->font->renderer->flush(video_width, video_height, xmb->font->renderer_data);
+   if (xmb->font2 && xmb->font2->renderer && xmb->font2->renderer->flush)
+      xmb->font2->renderer->flush(video_width, video_height, xmb->font2->renderer_data);
    font_driver_bind_block(xmb->font, NULL);
    font_driver_bind_block(xmb->font2, NULL);
 
@@ -6358,9 +6346,11 @@ static void xmb_frame(void *data, video_frame_info_t *video_info)
       const char *str             = menu_input_dialog_get_buffer();
       const char *label           = menu_st->input_dialog_kb_label;
       size_t _len                 = strlcpy(msg, label, sizeof(msg));
-      msg[_len  ]                 = '\n';
-      msg[_len+1]                 = '\0';
-      strlcat(msg, str, sizeof(msg));
+      msg[  _len]                 = '\n';
+      msg[++_len]                 = '\0';
+      strlcpy(msg       + _len,
+            str,
+            sizeof(msg) - _len);
       render_background           = true;
    }
 
@@ -7361,9 +7351,9 @@ static void xmb_context_reset_internal(xmb_handle_t *xmb,
    if (wideglyph_str)
    {
       int char_width =
-         font_driver_get_message_width(xmb->font, "a", 1, 1);
+         font_driver_get_message_width(xmb->font, "a", 1, 1.0f);
       int wideglyph_width =
-         font_driver_get_message_width(xmb->font, wideglyph_str, strlen(wideglyph_str), 1);
+         font_driver_get_message_width(xmb->font, wideglyph_str, strlen(wideglyph_str), 1.0f);
 
       if (wideglyph_width > 0 && char_width > 0)
          xmb->wideglyph_width = wideglyph_width * 100 / char_width;
@@ -8232,14 +8222,14 @@ static int xmb_pointer_up(void *userdata,
           * - A touch in the right margin triggers a 'select' action
           *   for the current item
           * - Between the left/right margins input is handled normally */
-         if (x < margin_left)
+         if ((int)x < margin_left)
          {
-            if (y >= margin_top)
+            if ((int)y >= margin_top)
                return xmb_menu_entry_action(xmb,
                      entry, selection, MENU_ACTION_CANCEL);
             return menu_input_dialog_start_search() ? 0 : -1;
          }
-         else if (x > margin_right)
+         else if ((int)x > margin_right)
             return xmb_menu_entry_action(xmb,
                   entry, selection, MENU_ACTION_SELECT);
          else if (ptr <= (end - 1))
@@ -8265,7 +8255,7 @@ static int xmb_pointer_up(void *userdata,
           * Note: At the top level, navigating left
           * means switching to the 'next' horizontal list,
           * which is actually a movement to the *right* */
-         if (y > margin_top)
+         if ((int)y > margin_top)
             xmb_menu_entry_action(xmb,
                   entry, selection,
                   (xmb->depth == 1) ? MENU_ACTION_RIGHT : MENU_ACTION_LEFT);
@@ -8275,17 +8265,17 @@ static int xmb_pointer_up(void *userdata,
           * Note: At the top level, navigating right
           * means switching to the 'previous' horizontal list,
           * which is actually a movement to the *left* */
-         if (y > margin_top)
+         if ((int)y > margin_top)
             xmb_menu_entry_action(xmb,
                   entry, selection,
                   (xmb->depth == 1) ? MENU_ACTION_LEFT : MENU_ACTION_RIGHT);
          break;
       case MENU_INPUT_GESTURE_SWIPE_UP:
          /* Swipe up in left margin: ascend alphabet */
-         if (x < margin_left)
+         if ((int)x < margin_left)
             xmb_menu_entry_action(xmb,
                   entry, selection, MENU_ACTION_SCROLL_DOWN);
-         else if (x < margin_right)
+         else if ((int)x < margin_right)
          {
             /* Swipe up between left and right margins:
              * move selection pointer down by 1 'page' */
@@ -8315,10 +8305,10 @@ static int xmb_pointer_up(void *userdata,
          break;
       case MENU_INPUT_GESTURE_SWIPE_DOWN:
          /* Swipe down in left margin: descend alphabet */
-         if (x < margin_left)
+         if ((int)x < margin_left)
             xmb_menu_entry_action(xmb,
                   entry, selection, MENU_ACTION_SCROLL_UP);
-         else if (x < margin_right)
+         else if ((int)x < margin_right)
          {
             /* Swipe down between left and right margins:
              * move selection pointer up by 1 'page' */

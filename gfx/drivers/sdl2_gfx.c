@@ -301,7 +301,7 @@ static void sdl_refresh_input_size(sdl2_video_t *vid, bool menu, bool rgb32,
          format = rgb32 ? SDL_PIXELFORMAT_ARGB8888 : SDL_PIXELFORMAT_RGB565;
 
       SDL_SetHintWithPriority(SDL_HINT_RENDER_SCALE_QUALITY,
-                              (vid->video.smooth || menu) ? "linear" : "nearest",
+                              (menu ? "nearest" : (vid->video.smooth ? "linear" : "nearest")),
                               SDL_HINT_OVERRIDE);
 
       target->tex = SDL_CreateTexture(vid->renderer, format,
@@ -539,19 +539,7 @@ static bool sdl2_gfx_focus(void *data)
    return (SDL_GetWindowFlags(vid->window) & flags) == flags;
 }
 
-static bool sdl2_gfx_suppress_screensaver(void *data, bool enable)
-{
-   if (video_driver_display_type_get() == RARCH_DISPLAY_X11)
-   {
-#ifdef HAVE_X11
-      x11_suspend_screensaver(video_driver_window_get(), enable);
-#endif
-      return true;
-   }
-
-   return false;
-}
-
+static bool sdl2_gfx_suspend_screensaver(void *data, bool enable) { return false; }
 /* TODO/FIXME - implement */
 static bool sdl2_gfx_has_windowed(void *data) { return true; }
 
@@ -678,9 +666,9 @@ static uint32_t sdl2_get_flags(void *data) { return 0; }
 
 static video_poke_interface_t sdl2_video_poke_interface = {
    sdl2_get_flags,
-   NULL,
-   NULL,
-   NULL,
+   NULL, /* load_texture */
+   NULL, /* unload_texture */
+   NULL, /* set_video_mode */
    NULL, /* get_refresh_rate */
    sdl2_poke_set_filtering,
    NULL, /* get_video_output_size */
@@ -695,9 +683,13 @@ static video_poke_interface_t sdl2_video_poke_interface = {
    sdl2_poke_set_osd_msg,
    sdl2_show_mouse,
    sdl2_grab_mouse_toggle,
-   NULL,                         /* get_current_shader */
-   NULL,                         /* get_current_software_framebuffer */
-   NULL                          /* get_hw_render_interface */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
+   NULL, /* set_hdr_max_nits */
+   NULL, /* set_hdr_paper_white_nits */
+   NULL, /* set_hdr_contrast */
+   NULL, /* set_hdr_expand_gamut */
 };
 
 static void sdl2_gfx_poke_interface(void *data, const video_poke_interface_t **iface)
@@ -722,19 +714,26 @@ video_driver_t video_sdl2 = {
    sdl2_gfx_set_nonblock_state,
    sdl2_gfx_alive,
    sdl2_gfx_focus,
-   sdl2_gfx_suppress_screensaver,
+#ifdef HAVE_X11
+   x11_suspend_screensaver,
+#else
+   sdl2_gfx_suspend_screensaver,
+#endif
    sdl2_gfx_has_windowed,
    sdl2_gfx_set_shader,
    sdl2_gfx_free,
    "sdl2",
-
-   NULL,
+   NULL, /* set_viewport */
    sdl2_gfx_set_rotation,
    sdl2_gfx_viewport_info,
    sdl2_gfx_read_viewport,
    NULL, /* read_frame_raw */
 #ifdef HAVE_OVERLAY
-    NULL,
+   NULL, /* get_overlay_interface */
 #endif
-    sdl2_gfx_poke_interface
+   sdl2_gfx_poke_interface,
+   NULL, /* wrap_type_to_enum */
+#ifdef HAVE_GFX_WIDGETS
+   NULL  /* gfx_widgets_enabled */
+#endif
 };

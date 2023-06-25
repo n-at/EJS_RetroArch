@@ -1078,7 +1078,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
-   "Audioausgabe-Einstellungen ändern."
+   "Audioeinstellungen für Ein- und Ausgabe ändern."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS,
@@ -1528,6 +1528,24 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUDIO_DRIVER_JACK,
    "Jack-Audio-Connection-Kit-Treiber."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DRIVER,
+   "Zu verwendender Mikrofontreiber."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_DRIVER,
+   "Mikrofon Resampler"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_DRIVER,
+   "Zu verwendender Mikrofon-Resampling-Treiber."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Audio-Resampling-Treiber"
@@ -2345,6 +2363,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS,
    "Audioausgabe-Einstellungen ändern."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_SETTINGS,
+   "Audioeingabe-Einstellungen ändern."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_RESAMPLER_SETTINGS,
    "Audio-Resampler-Einstellungen ändern."
@@ -2508,6 +2536,78 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "Gewünschte Audiolatenz in Millisekunden. Wird ignoriert, wenn der Audiotreiber die angegebene Latenz nicht liefern kann."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_ENABLE,
+   "Audioeingabe in unterstützten Cores aktivieren. Hat keinen Einfluss auf die CPU, wenn der Core kein Mikrofon verwendet."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+   "Audiogerät"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DEVICE,
+   "Überschreibt das Standardeingabegerät, welches der Mikrofontreiber verwendet. Dies ist treiberabhängig."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_MICROPHONE_DEVICE,
+   "Überschreibt das Standardeingabegerät, welches der Mikrofontreiber verwendet. Dies ist treiberabhängig."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Audio-Resampler-Qualität"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Diesen Wert verkleinern, für bessere Leistung/kleinere Latenz zu Lasten der Audioqualität; erhöhen, für bessere Audioqualität auf Kosten der Leistung/kleinerer Latenz."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_INPUT_RATE,
+   "Standard-Eingangsfrequenz (Hz)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_INPUT_RATE,
+   "Audioeingangsfrequenz, die verwendet wird, wenn ein Core keine bestimmte Anzahl anfordert."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+   "Audioeingabelatenz (ms)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_LATENCY,
+   "Gewünschte Audioeingangslatenz in Millisekunden. Wird ignoriert, wenn der Mikrofontreiber die angegebene Latenz nicht zur Verfügung stellt."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "Exklusiver WASAPI-Modus"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "RetroArch erlauben, bei Verwendung des WASAPI Mikrofontreibers die ausschließliche Kontrolle über das Mikrofongerät zu übernehmen. Falls deaktiviert, verwendet RetroArch stattdessen den Shared Modus."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "WASAPI-Gleitkomma-Format"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "Gleitkommaformat für den WASAPI-Treiber verwenden, wenn dies vom Audiogerät unterstützt wird."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "Größe des gemeinsamen WASAPI-Puffers"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "Zwischenspeicher-Größe (in Frames), wenn der WASAPI-Treiber im gemeinsamen Modus verwendet wird."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 

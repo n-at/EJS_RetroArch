@@ -141,9 +141,9 @@ const struct win32_lang_pair win32_lang_pairs[] =
 
 unsigned short win32_get_langid_from_retro_lang(enum retro_language lang)
 {
-   int i;
+   size_t i;
 
-   for (i = 0; i < sizeof(win32_lang_pairs) / sizeof(win32_lang_pairs[0]); i++)
+   for (i = 0; i < ARRAY_SIZE(win32_lang_pairs); i++)
    {
       if (win32_lang_pairs[i].lang == lang)
          return win32_lang_pairs[i].lang_ident;
@@ -154,9 +154,9 @@ unsigned short win32_get_langid_from_retro_lang(enum retro_language lang)
 
 enum retro_language win32_get_retro_lang_from_langid(unsigned short langid)
 {
-   int i;
+   size_t i;
 
-   for (i = 0; i < sizeof(win32_lang_pairs) / sizeof(win32_lang_pairs[0]); i++)
+   for (i = 0; i < ARRAY_SIZE(win32_lang_pairs); i++)
    {
       if (win32_lang_pairs[i].lang_ident > 0x3ff)
       {
@@ -366,9 +366,9 @@ static void frontend_win32_get_os(char *s, size_t len, int *major, int *minor)
             case 2:
                if (server)
                {
-                  strlcpy(s, "Windows Server 2003", len);
+                  size_t _len = strlcpy(s, "Windows Server 2003", len);
                   if (GetSystemMetrics(SM_SERVERR2))
-                     strlcat(s, " R2", len);
+                     strlcpy(s + _len, " R2", len - _len);
                }
                else
                {

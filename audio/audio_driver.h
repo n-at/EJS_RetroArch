@@ -56,7 +56,7 @@ typedef struct audio_mixer_stream
    char *name;
    size_t bufsize;
    float volume;
-   enum audio_mixer_stream_type  stream_type;
+   enum audio_mixer_stream_type stream_type;
    enum audio_mixer_type type;
    enum audio_mixer_state state;
 } audio_mixer_stream_t;
@@ -70,8 +70,8 @@ typedef struct audio_mixer_stream_params
    unsigned slot_selection_idx;
    float volume;
    enum audio_mixer_slot_selection_type slot_selection_type;
-   enum audio_mixer_stream_type  stream_type;
-   enum audio_mixer_type  type;
+   enum audio_mixer_stream_type stream_type;
+   enum audio_mixer_type type;
    enum audio_mixer_state state;
 } audio_mixer_stream_params_t;
 #endif
@@ -112,10 +112,19 @@ typedef struct audio_driver
     */
    ssize_t (*write)(void *data, const void *buf, size_t size);
 
-   /* Temporarily pauses the audio driver. */
+   /**
+    * Temporarily pauses the audio driver.
+    *
+    * @param data Opaque handle to the audio driver context
+    * that was returned by \c init.
+    * @return \c true if the audio driver was successfully paused,
+    * \c false if there was an error.
+    **/
    bool (*stop)(void *data);
 
-   /* Resumes audio driver from the paused state. */
+   /**
+    * Resumes audio driver from the paused state.
+    **/
    bool (*start)(void *data, bool is_shutdown);
 
    /* Is the audio driver currently running? */
@@ -130,7 +139,7 @@ typedef struct audio_driver
     * */
    void (*set_nonblock_state)(void *data, bool toggle);
 
-   /* Stops and frees driver data. */
+   /* Stops and frees driver. */
    void (*free)(void *data);
 
    /* Defines if driver will take standard floating point samples,
@@ -166,23 +175,45 @@ typedef struct
    uint64_t free_samples_count;
 
    struct string_list *devices_list;
-   float  *output_samples_buf;
+
+   /**
+    * A scratch buffer for audio output to be processed,
+    * up to (but excluding) the point where it's converted to 16-bit audio
+    * to give to the driver.
+    */
+   float *output_samples_buf;
+   size_t output_samples_buf_length;
 #ifdef HAVE_REWIND
    int16_t *rewind_buf;
 #endif
+
+   /**
+    * A scratch buffer for processed audio output to be converted to 16-bit,
+    * so that it can be sent to the driver.
+    */
    int16_t *output_samples_conv_buf;
+   size_t output_samples_conv_buf_length;
 #ifdef HAVE_DSP_FILTER
    retro_dsp_filter_t *dsp;
 #endif
    const retro_resampler_t *resampler;
 
    void *resampler_data;
+
+   /**
+    * The current audio driver.
+    */
    const audio_driver_t *current_audio;
+
    void *context_audio_data;
+
+   /**
+    * Scratch buffer for preparing data for the resampler
+    */
    float *input_data;
+   size_t input_data_length;
 #ifdef HAVE_AUDIOMIXER
-   struct audio_mixer_stream
-      mixer_streams[AUDIO_MIXER_MAX_SYSTEM_STREAMS];
+   struct audio_mixer_stream mixer_streams[AUDIO_MIXER_MAX_SYSTEM_STREAMS];
 #endif
    struct retro_audio_callback callback;                 /* ptr alignment */
                                                          /* ptr alignment */
@@ -197,8 +228,7 @@ typedef struct
    size_t buffer_size;
    size_t data_ptr;
 
-   unsigned free_samples_buf[
-      AUDIO_BUFFER_FREE_SAMPLES_COUNT];
+   unsigned free_samples_buf[AUDIO_BUFFER_FREE_SAMPLES_COUNT];
 
 #ifdef HAVE_AUDIOMIXER
    float mixer_volume_gain;
@@ -219,8 +249,7 @@ typedef struct
    bool mixer_mute_enable;
 #endif
 
-   /* Sample the flush delta-time when fast forwarding to find the correct
-   ressample ratio. */
+   /* Sample the flush delta-time when fast forwarding to find the correct ratio. */
    retro_time_t last_flush_time;
    /* Exponential moving average */
    retro_time_t avg_flush_delta;
@@ -290,6 +319,17 @@ void audio_driver_load_system_sounds(void);
 bool audio_driver_start(bool is_shutdown);
 
 bool audio_driver_stop(void);
+
+/**
+ * If you need to query the size of audio samples,
+ * use this function instead of checking the flags directly.
+ *
+ * @return The size of a single audio sample in bytes,
+ * as determined by the presence of the \c AUDIO_FLAG_USE_FLOAT flag.
+ * Will currently return either 2 (for \c uint16_t) or 4 (for \c float),
+ * although this may change if we add support for more sample types.
+ */
+unsigned audio_driver_get_sample_size(void);
 
 #ifdef HAVE_TRANSLATE
 /* TODO/FIXME - Doesn't currently work.  Fix this. */

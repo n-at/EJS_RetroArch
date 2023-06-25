@@ -856,15 +856,16 @@ static void rcheevos_client_copy_achievements(
        * we don't need to keep the definition around
        * as it won't be reactivated. Otherwise, 
        * we do have to keep a copy of it. */
-      if ((achievement->active & (RCHEEVOS_ACTIVE_HARDCORE 
+      if ((achievement->active & (
+                    RCHEEVOS_ACTIVE_HARDCORE 
                   | RCHEEVOS_ACTIVE_SOFTCORE)) != 0)
          achievement->memaddr = strdup(definition->definition);
 
       ++achievement;
    }
 
-   rcheevos_locals->game.achievement_count = achievement 
-      - rcheevos_locals->game.achievements;
+   rcheevos_locals->game.achievement_count = (unsigned)(achievement 
+      - rcheevos_locals->game.achievements);
 }
 
 static void rcheevos_client_copy_leaderboards(
@@ -1753,7 +1754,7 @@ static void rcheevos_async_award_achievement_callback(
    if (rcheevos_async_succeeded(result, &api_response.response,
             buffer, buffer_size))
    {
-      if (api_response.awarded_achievement_id != request->id)
+      if ((int)api_response.awarded_achievement_id != request->id)
          snprintf(buffer, buffer_size, "Achievement %u awarded instead",
                api_response.awarded_achievement_id);
       else if (api_response.response.error_message)

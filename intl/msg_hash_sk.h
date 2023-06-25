@@ -571,6 +571,10 @@ MSG_HASH(
    "Dátum zostavenia"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_RETROARCH_VERSION,
+   "Verzia RetroArch"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_GIT_VERSION,
    "Verzia Git"
    )
@@ -1077,10 +1081,6 @@ MSG_HASH(
    "Zvuk"
    )
 MSG_HASH(
-   MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
-   "Zmena nastavení audio výstupu."
-   )
-MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS,
    "Vstup"
    )
@@ -1368,6 +1368,16 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUDIO_DRIVER_SL,
    "OpenSL ovládač."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER,
+   "Mikrofón"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_DRIVER,
+   "Resamplovač mikrofónu"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Vzorkovač zvuku"
@@ -1905,6 +1915,12 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS,
    "Zmena nastavení audio výstupu."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+   "Mikrofón"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
    "Prevzorkovač"
@@ -2032,6 +2048,42 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "Požadované oneskorenie zvuku v milisekundách. Nemusí byť dodržaná, ak zvukový ovládač nedokáže danú latenciu dosiahnuť."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+   "Mikrofón"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+   "Zariadenie"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Kvalita prevzorkovania"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Znížením tejto hodnoty uprednostníte výkon/nižšiu latenciu pred kvalitou zvuku, zvýšením získate lepšiu kvalitu zvuku na úkor výkonu/nižšej latencie."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "WASAPI exkluzívny mód"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "Formát WASAPI s pohyblivou desatinnou čiarkou"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "Dĺžka zdieľanej vyrovnávacej pamäte WASAPI"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "Veľkosť medzipamäte (v rámcoch) pri použití ovládača WASAPI v zdieľanom režime."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 
@@ -2353,6 +2405,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_HAPTIC_FEEDBACK_SETTINGS,
    "Haptická spätná väzba/vibrácia"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_MENU_SETTINGS,
+   "Ovládacie prvky ponuky"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_HOTKEY_BINDS,
@@ -3873,6 +3929,10 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_PORTABLE_PATHS,
    "Prenosné hracie zoznamy"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MANAGE,
+   "Spravovať"
+   )
 
 /* Settings > Playlists > Playlist Management */
 
@@ -4790,6 +4850,10 @@ MSG_HASH(
    "Podľa jadra"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_RUNTIME_AGGREGATE,
+   "Zoskupiť"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SYSTEM_INFO_POWER_SOURCE_CHARGED,
    "Nabité"
    )
@@ -4858,6 +4922,10 @@ MSG_HASH(
    "Zvyšuje"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_RUMBLE_TYPE_DECREASE,
+   "Zníženia"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_RUMBLE_PORT_16,
    "Všetko"
    )
@@ -4908,6 +4976,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_SORT_MODE_OFF,
    "Žiadne"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_LABEL_DISPLAY_MODE_KEEP_REGION,
+   "Zachovať región"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_THUMBNAIL_MODE_DEFAULT,
@@ -5180,6 +5252,10 @@ MSG_HASH(
    "Elektrická modrá"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_LAGOON,
+   "Lagúna"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_DRACULA,
    "Drakula"
    )
@@ -5221,6 +5297,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_FONT,
    "Písmo ponuky"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_LAYOUT,
+   "Rozloženie ponuky"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_SWITCH_ICONS,
@@ -5284,6 +5364,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_PLAIN,
    "Obyčajný"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_UNDERSEA,
+   "Pod morom"
    )
 
 /* Ozone: Settings > User Interface > Appearance */

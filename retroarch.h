@@ -73,6 +73,7 @@
 
 #define DRIVERS_CMD_ALL \
       ( DRIVER_AUDIO_MASK \
+      | DRIVER_MICROPHONE_MASK \
       | DRIVER_VIDEO_MASK \
       | DRIVER_INPUT_MASK \
       | DRIVER_CAMERA_MASK \
@@ -109,7 +110,7 @@ enum rarch_state_flags
 bool retroarch_ctl(enum rarch_ctl_state state, void *data);
 
 int retroarch_get_capabilities(enum rarch_capabilities type,
-      char *s, size_t len, size_t _len);
+      char *s, size_t len);
 
 void retroarch_override_setting_set(enum rarch_override_setting enum_idx, void *data);
 
@@ -160,6 +161,17 @@ void retroarch_favorites_deinit(void);
  * Returns: string listing of all audio driver names, separated by '|'.
  **/
 const char* config_get_audio_driver_options(void);
+
+#ifdef HAVE_MICROPHONE
+/**
+ * config_get_microphone_driver_options:
+ *
+ * Get an enumerated list of all microphone driver names, separated by '|'.
+ *
+ * Returns: string listing of all microphone driver names, separated by '|'.
+ **/
+const char* config_get_microphone_driver_options(void);
+#endif
 
 /* Camera */
 

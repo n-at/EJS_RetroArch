@@ -839,14 +839,11 @@ static const char *ctr_texture_path(unsigned id)
                      sizeof(state_path)))
                return NULL;
 
-            _len                 = strlcpy(texture_path,
+            _len = strlcpy(texture_path,
                   state_path, sizeof(texture_path));
-            texture_path[_len  ] = '.';
-            texture_path[_len+1] = 'p';
-            texture_path[_len+2] = 'n';
-            texture_path[_len+3] = 'g';
-            texture_path[_len+4] = '\0';
-
+            strlcpy(texture_path       + _len,
+                  ".png",
+                  sizeof(texture_path) - _len);
             return path_basename_nocompression(texture_path);
          }
       default:
@@ -1283,6 +1280,7 @@ static void ctr_render_bottom_screen(void *data)
    {
       case CTR_BOTTOM_MENU_NOT_AVAILABLE:
          {
+            size_t _len;
             char str_path[PATH_MAX_LENGTH];
             const char *dir_assets = settings->paths.directory_bottom_assets;
 
@@ -1295,8 +1293,10 @@ static void ctr_render_bottom_screen(void *data)
                   msg_hash_to_str(MSG_3DS_BOTTOM_MENU_ASSET_NOT_FOUND),
                   &params);
 
-	    strlcpy(str_path, dir_assets, sizeof(str_path));
-            strlcat(str_path, "\n/bottom_menu.png", sizeof(str_path));
+            _len = strlcpy(str_path, dir_assets, sizeof(str_path));
+            strlcpy(str_path       + _len,
+                  "\n/bottom_menu.png",
+                  sizeof(str_path) - _len);
 
             params.scale = 1.10f;
             params.y    -= 0.10f;
@@ -2941,24 +2941,24 @@ static const video_poke_interface_t ctr_poke_interface = {
    ctr_get_flags,
    ctr_load_texture,
    ctr_unload_texture,
-   NULL,
-   NULL,
+   NULL, /* set_video_mode */
+   NULL, /* get_refresh_rate */
    ctr_set_filtering,
-   NULL,                                  /* get_video_output_size */
-   NULL,                                  /* get_video_output_prev */
-   NULL,                                  /* get_video_output_next */
-   NULL,                                  /* get_current_framebuffer */
-   NULL,
+   NULL, /* get_video_output_size */
+   NULL, /* get_video_output_prev */
+   NULL, /* get_video_output_next */
+   NULL, /* get_current_framebuffer */
+   NULL, /* get_proc_address */
    ctr_set_aspect_ratio,
    ctr_apply_state_changes,
    ctr_set_texture_frame,
    ctr_set_texture_enable,
-   font_driver_render_msg, /* ctr_set_osd_msg*/
-   NULL,                   /* show_mouse */
-   NULL,                   /* grab_mouse_toggle */
-   NULL,                   /* get_current_shader */
-   NULL,                   /* get_current_software_framebuffer */
-   NULL,                    /* get_hw_render_interface */
+   font_driver_render_msg,
+   NULL, /* show_mouse */
+   NULL, /* grab_mouse_toggle */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
    NULL, /* set_hdr_max_nits */
    NULL, /* set_hdr_paper_white_nits */
    NULL, /* set_hdr_contrast */
@@ -2998,7 +2998,7 @@ video_driver_t video_ctr =
    ctr_overlay_interface,
 #endif
    ctr_get_poke_interface,
-   NULL,
+   NULL, /* wrap_type_to_enum */
 #ifdef HAVE_GFX_WIDGETS
    ctr_widgets_enabled
 #endif

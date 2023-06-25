@@ -156,9 +156,6 @@ static bool font_init_first(
       case FONT_DRIVER_RENDER_D3D8_API:
       {
          static const font_renderer_t *d3d8_font_backends[] = {
-#if defined(_XBOX1)
-            &d3d_xdk1_font,
-#endif
             NULL
          };
          unsigned i;
@@ -677,6 +674,7 @@ static char* font_driver_reshape_msg(const char* msg, unsigned char *buffer, siz
                                    : buffer;
    unsigned char *dst              = (unsigned char*)dst_buffer;
 
+
    while (*src || reverse)
    {
       if (reverse)
@@ -699,7 +697,7 @@ static char* font_driver_reshape_msg(const char* msg, unsigned char *buffer, siz
                   else if (replacement < 0x800)
                   {
                      *dst++ = 0xC0 | (replacement >> 6);
-                     *dst++ = 0x80 | (replacement & 0x3F);
+                     *dst++ = 0x80 | (replacement       & 0x3F);
                   }
                   else if (replacement < 0x10000)
                   {
@@ -708,14 +706,14 @@ static char* font_driver_reshape_msg(const char* msg, unsigned char *buffer, siz
                         src -= 2;
 
                      *dst++ = 0xE0 | ( replacement >> 12);
-                     *dst++ = 0x80 | ((replacement >> 6) & 0x3F);
-                     *dst++ = 0x80 | ( replacement       & 0x3F);
+                     *dst++ = 0x80 | ((replacement >>  6) & 0x3F);
+                     *dst++ = 0x80 | ( replacement        & 0x3F);
                   }
                   else
                   {
                      *dst++ = 0xF0 |  (replacement >> 18);
                      *dst++ = 0x80 | ((replacement >> 12) & 0x3F);
-                     *dst++ = 0x80 | ((replacement >> 6)  & 0x3F);
+                     *dst++ = 0x80 | ((replacement >>  6) & 0x3F);
                      *dst++ = 0x80 | ( replacement        & 0x3F);
                   }
 
@@ -795,11 +793,17 @@ void font_driver_bind_block(void *font_data, void *block)
       font->renderer->bind_block(font->renderer_data, block);
 }
 
-void font_driver_flush(unsigned width, unsigned height, void *font_data)
+/* Flushing is slow - only do it if font has actually been used */
+void font_flush(
+      unsigned video_width,
+      unsigned video_height,
+      font_data_impl_t *font_data)
 {
-   font_data_t *font = (font_data_t*)(font_data ? font_data : video_font_driver);
-   if (font && font->renderer && font->renderer->flush)
-      font->renderer->flush(width, height, font->renderer_data);
+   if (font_data->raster_block.carr.coords.vertices == 0)
+      return;
+   if (font_data->font && font_data->font->renderer && font_data->font->renderer->flush)
+      font_data->font->renderer->flush(video_width, video_height, font_data->font->renderer_data);
+   font_data->raster_block.carr.coords.vertices = 0;
 }
 
 int font_driver_get_message_width(void *font_data,
@@ -925,12 +929,11 @@ font_data_t *font_driver_init_first(
 
 void font_driver_init_osd(
       void *video_data,
-      const void *video_info_data,
+      const video_info_t *video_info,
       bool threading_hint,
       bool is_threaded,
       enum font_driver_render_api api)
 {
-   const video_info_t *video_info = (const video_info_t*)video_info_data;
    if (!video_font_driver && video_info)
       video_font_driver = font_driver_init_first(video_data,
             *video_info->path_font ? video_info->path_font : NULL,

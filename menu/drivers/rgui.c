@@ -1384,7 +1384,8 @@ static bool rgui_set_pixel_format_function(void)
             string_is_equal(driver_ident, "d3d12"))
       argb32_to_pixel_platform_format = argb32_to_bgra4444;
    else if (string_is_equal(driver_ident, "sdl_dingux") ||    /* DINGUX SDL */
-            string_is_equal(driver_ident, "sdl_rs90"))
+            string_is_equal(driver_ident, "sdl_rs90") ||
+            string_is_equal(driver_ident, "xvideo"))
    {
       argb32_to_pixel_platform_format = argb32_to_rgb565;
       return false; /* Transparency not supported */
@@ -1852,12 +1853,12 @@ static bool INLINE rgui_draw_particle(
    /* This great convoluted mess just saves us
     * having to perform comparisons on every
     * iteration of the for loops... */
-   int x_start_i = (x > 0) ? x : 0;
-   int y_start_i = (y > 0) ? y : 0;
-   int x_end     = x + width;
-   int y_end     = y + height;
-   int x_start   = (x_start_i <= (int)fb_width)  ? x_start_i : fb_width;
-   int y_start   = (y_start_i <= (int)fb_height) ? y_start_i : fb_height;
+   unsigned x_start_i = (x > 0) ? x : 0;
+   unsigned y_start_i = (y > 0) ? y : 0;
+   int x_end          = x + width;
+   int y_end          = y + height;
+   int x_start        = (x_start_i <= fb_width)  ? x_start_i : fb_width;
+   int y_start        = (y_start_i <= fb_height) ? y_start_i : fb_height;
    
    if (x_end <= 0)
       x_end      = 0;
@@ -3037,13 +3038,12 @@ static void rgui_update_dynamic_theme_path(
    {
       size_t len = fill_pathname_join_special(rgui->theme_dynamic_path, theme_dir,
             rgui->menu_title, sizeof(rgui->theme_dynamic_path));
-      rgui->theme_dynamic_path[len  ] = '.';
-      rgui->theme_dynamic_path[len+1] = 'c';
-      rgui->theme_dynamic_path[len+2] = 'f';
-      rgui->theme_dynamic_path[len+3] = 'g';
-      rgui->theme_dynamic_path[len+4] = '\0';
-
-      use_playlist_theme = path_is_valid(rgui->theme_dynamic_path);
+      rgui->theme_dynamic_path[  len] = '.';
+      rgui->theme_dynamic_path[++len] = 'c';
+      rgui->theme_dynamic_path[++len] = 'f';
+      rgui->theme_dynamic_path[++len] = 'g';
+      rgui->theme_dynamic_path[++len] = '\0';
+      use_playlist_theme              = path_is_valid(rgui->theme_dynamic_path);
    }
 
    if (!use_playlist_theme)
@@ -4587,8 +4587,8 @@ static int rgui_osk_ptr_at_pos(
          unsigned osk_ptr_x       = osk_x + keyboard_offset_x + ptr_offset_x + (key_column * key_width);
          unsigned osk_ptr_y       = osk_y + keyboard_offset_y + ptr_offset_y + (key_row    * key_height);
 
-         if (  x > osk_ptr_x && x < osk_ptr_x + ptr_width &&
-               y > osk_ptr_y && y < osk_ptr_y + ptr_height)
+         if ((unsigned)x > osk_ptr_x && (unsigned)x < osk_ptr_x + ptr_width &&
+             (unsigned)y > osk_ptr_y && (unsigned)y < osk_ptr_y + ptr_height)
             return (int)key_index;
       }
    }
@@ -4605,7 +4605,7 @@ static void rgui_render_osk(
       unsigned fb_width,
       unsigned fb_height)
 {
-   size_t key_index;
+   int key_index;
    
    unsigned input_label_max_length;
    unsigned input_str_max_length;
@@ -4662,9 +4662,11 @@ static void rgui_render_osk(
        * fallback to old style 'message box' implementation */
       char msg[255];
       size_t _len = strlcpy(msg, input_label, sizeof(msg));
-      msg[_len  ] = '\n';
-      msg[_len+1] = '\0';
-      strlcat(msg, input_str, sizeof(msg));
+      msg[  _len] = '\n';
+      msg[++_len] = '\0';
+      strlcpy(msg       + _len,
+            input_str,
+            sizeof(msg) - _len);
       rgui_render_messagebox(rgui, msg, fb_width, fb_height);
       return;
    }
@@ -5098,12 +5100,12 @@ static void rgui_render(
        rgui->pointer.active && !show_fs_thumbnail)
    {
       /* Update currently 'highlighted' item */
-      if (rgui->pointer.y > rgui->term_layout.start_y)
+      if (rgui->pointer.y > (int)rgui->term_layout.start_y)
       {
          old_start       = menu_st->entries.begin;
          /* NOTE: It's okay for this to go out of range
           * (limits are checked in rgui_pointer_up()) */
-         menu_input->ptr = (unsigned)((rgui->pointer.y - rgui->term_layout.start_y) / rgui->font_height_stride) + old_start;
+         menu_input->ptr = (unsigned)(((rgui->pointer.y - rgui->term_layout.start_y) / rgui->font_height_stride) + old_start);
       }
 
       /* Allow drag-scrolling if items are currently off-screen */
@@ -5245,7 +5247,9 @@ static void rgui_render(
             title_width     = (unsigned)(utf8len(thumbnail_title_buf) * rgui->font_width_stride);
          }
 
-         title_x = rgui->term_layout.start_x + ((rgui->term_layout.width * rgui->font_width_stride) - title_width) / 2;
+         title_x            = (unsigned)(rgui->term_layout.start_x 
+                            +          ((rgui->term_layout.width * rgui->font_width_stride) 
+                            -            title_width) / 2);
 
          /* Draw thumbnail title background */
          rgui_fill_rect(rgui->frame_buf.data, fb_width, fb_height,
@@ -5386,7 +5390,7 @@ static void rgui_render(
       if (use_smooth_ticker)
       {
          ticker_smooth.selected    = true;
-         ticker_smooth.field_width = title_max_len * rgui->font_width_stride;
+         ticker_smooth.field_width = (unsigned)(title_max_len * rgui->font_width_stride);
          ticker_smooth.src_str     = rgui->menu_title;
          ticker_smooth.dst_str     = title_buf;
          ticker_smooth.dst_str_len = sizeof(title_buf);
@@ -5394,9 +5398,9 @@ static void rgui_render(
 
          /* If title is scrolling, then title_len == title_max_len */
          if (gfx_animation_ticker_smooth(&ticker_smooth))
-            title_len = title_max_len;
+            title_len              = title_max_len;
          else
-            title_len = utf8len(title_buf);
+            title_len              = utf8len(title_buf);
       }
       else
       {
@@ -5412,8 +5416,10 @@ static void rgui_render(
 
       string_to_upper(title_buf);
 
-      title_x = ticker_x_offset + rgui->term_layout.start_x +
-                (rgui->term_layout.width - title_len) * rgui->font_width_stride / 2;
+      title_x = (unsigned)(ticker_x_offset 
+               +  rgui->term_layout.start_x
+               + (rgui->term_layout.width - title_len) 
+               *  rgui->font_width_stride / 2);
 
       /* Title is always centred, unless it is long enough
        * to infringe upon the battery indicator, in which case
@@ -5469,7 +5475,7 @@ static void rgui_render(
          {
             unsigned term_offset     = rgui_swap_thumbnails
                   ? (unsigned)(rgui->term_layout.height - (i - new_start) - 1)
-                  : (i - new_start);
+                  : (unsigned)(i - new_start);
             unsigned thumbnail_width = 0;
 
             /* Note:
@@ -5550,7 +5556,7 @@ static void rgui_render(
          if (use_smooth_ticker)
          {
             ticker_smooth.selected    = entry_selected;
-            ticker_smooth.field_width = entry_title_max_len * rgui->font_width_stride;
+            ticker_smooth.field_width = (unsigned)(entry_title_max_len * rgui->font_width_stride);
             if (!string_is_empty(entry.rich_label))
                ticker_smooth.src_str  = entry.rich_label;
             else
@@ -6874,11 +6880,9 @@ static void rgui_update_savestate_thumbnail_path(void *data, unsigned i)
             strlcat(path, FILE_PATH_PNG_EXTENSION, sizeof(path));
 
             if (path_is_valid(path))
-            {
-               strlcpy(
-                     rgui->savestate_thumbnail_file_path, path,
+               strlcpy(rgui->savestate_thumbnail_file_path,
+                     path,
                      sizeof(rgui->savestate_thumbnail_file_path));
-            }
          }
       }
    }
@@ -7860,11 +7864,11 @@ static void rgui_thumbnail_cycle_dupe(rgui_t *rgui)
 
    if (settings->uints.gfx_thumbnails == settings->uints.menu_left_thumbnails)
    {
+      unsigned tmp = (rgui->gfx_thumbnails_prev > 0)
+                  ? (unsigned)rgui->gfx_thumbnails_prev
+                  : settings->uints.gfx_thumbnails + 1;
       configuration_set_uint(settings,
-            settings->uints.gfx_thumbnails,
-            (rgui->gfx_thumbnails_prev > 0)
-                  ? rgui->gfx_thumbnails_prev
-                  : settings->uints.gfx_thumbnails + 1);
+            settings->uints.gfx_thumbnails, tmp);
 
       if (settings->uints.gfx_thumbnails > 3)
          configuration_set_uint(settings,

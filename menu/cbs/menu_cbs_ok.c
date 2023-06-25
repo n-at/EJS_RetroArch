@@ -168,7 +168,6 @@ static int (funcname)(const char *path, const char *label, unsigned type, size_t
    return generic_action_ok(path, label, type, idx, entry_idx, _id, _flush); \
 }
 
-
 #define DEFAULT_ACTION_DIALOG_START(funcname, _label, _idx, _cb) \
 static int (funcname)(const char *path, const char *label_setting, unsigned type, size_t idx, size_t entry_idx) \
 { \
@@ -209,10 +208,16 @@ static int (funcname)(const char *path, const char *label, unsigned type, size_t
    return action_ok_download_generic(path, label, NULL, type, idx, entry_idx,_id); \
 }
 
-#define DEFAULT_ACTION_OK_CMD_FUNC(func_name, cmd) \
-int (func_name)(const char *path, const char *label, unsigned type, size_t idx, size_t entry_idx) \
+#define STATIC_DEFAULT_ACTION_OK_CMD_FUNC(func_name, cmd) \
+static int (func_name)(const char *path, const char *label, unsigned type, size_t idx, size_t entry_idx) \
 { \
    return generic_action_ok_command(cmd); \
+}
+
+#define STATIC_DEFAULT_ACTION_OK_FUNC(func_name, lbl) \
+static int (func_name)(const char *path, const char *label, unsigned type, size_t idx, size_t entry_idx) \
+{ \
+   return generic_action_ok_displaylist_push(path, NULL, label, type, idx, entry_idx, lbl); \
 }
 
 #define DEFAULT_ACTION_OK_FUNC(func_name, lbl) \
@@ -276,6 +281,10 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
          return MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_RESOLUTION;
       case ACTION_OK_DL_DROPDOWN_BOX_LIST_AUDIO_DEVICE:
          return MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_AUDIO_DEVICE;
+#ifdef HAVE_MICROPHONE
+      case ACTION_OK_DL_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE:
+         return MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE;
+#endif
       case ACTION_OK_DL_DROPDOWN_BOX_LIST_PLAYLIST_DEFAULT_CORE:
          return MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_PLAYLIST_DEFAULT_CORE;
       case ACTION_OK_DL_DROPDOWN_BOX_LIST_PLAYLIST_LABEL_DISPLAY_MODE:
@@ -450,8 +459,10 @@ static enum msg_hash_enums action_ok_dl_to_enum(unsigned lbl)
          return MENU_ENUM_LABEL_DEFERRED_AUDIO_SETTINGS_LIST;
       case ACTION_OK_DL_AUDIO_OUTPUT_SETTINGS_LIST:
          return MENU_ENUM_LABEL_DEFERRED_AUDIO_OUTPUT_SETTINGS_LIST;
-      case ACTION_OK_DL_AUDIO_RESAMPLER_SETTINGS_LIST:
-         return MENU_ENUM_LABEL_DEFERRED_AUDIO_RESAMPLER_SETTINGS_LIST;
+#ifdef HAVE_MICROPHONE
+      case ACTION_OK_DL_MICROPHONE_SETTINGS_LIST:
+         return MENU_ENUM_LABEL_DEFERRED_MICROPHONE_SETTINGS_LIST;
+#endif
       case ACTION_OK_DL_AUDIO_SYNCHRONIZATION_SETTINGS_LIST:
          return MENU_ENUM_LABEL_DEFERRED_AUDIO_SYNCHRONIZATION_SETTINGS_LIST;
       case ACTION_OK_DL_AUDIO_MIXER_SETTINGS_LIST:
@@ -870,6 +881,17 @@ int generic_action_ok_displaylist_push(const char *path,
          info.enum_idx      = MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_AUDIO_DEVICE;
          dl_type            = DISPLAYLIST_GENERIC;
          break;
+#ifdef HAVE_MICROPHONE
+      case ACTION_OK_DL_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE:
+         info.type          = type;
+         info.directory_ptr = idx;
+         info_path          = path;
+         info_label         = msg_hash_to_str(
+               MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE);
+         info.enum_idx      = MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE;
+         dl_type            = DISPLAYLIST_GENERIC;
+         break;
+#endif
 #ifdef HAVE_NETWORKING
       case ACTION_OK_DL_DROPDOWN_BOX_LIST_NETPLAY_MITM_SERVER:
          info.type          = type;
@@ -1268,7 +1290,7 @@ int generic_action_ok_displaylist_push(const char *path,
                strlcpy(tmp, path_get(RARCH_PATH_CONTENT), sizeof(tmp));
             path_basedir(tmp);
 
-            if (content_get_subsystem() != type - MENU_SETTINGS_SUBSYSTEM_ADD)
+            if (content_get_subsystem() != (int)type - MENU_SETTINGS_SUBSYSTEM_ADD)
                content_clear_subsystem();
             content_set_subsystem(type - MENU_SETTINGS_SUBSYSTEM_ADD);
             filebrowser_set_type(FILEBROWSER_SELECT_FILE_SUBSYSTEM);
@@ -1678,7 +1700,9 @@ int generic_action_ok_displaylist_push(const char *path,
       case ACTION_OK_DL_AUDIO_SETTINGS_LIST:
       case ACTION_OK_DL_AUDIO_SYNCHRONIZATION_SETTINGS_LIST:
       case ACTION_OK_DL_AUDIO_OUTPUT_SETTINGS_LIST:
-      case ACTION_OK_DL_AUDIO_RESAMPLER_SETTINGS_LIST:
+#ifdef HAVE_MICROPHONE
+      case ACTION_OK_DL_MICROPHONE_SETTINGS_LIST:
+#endif
       case ACTION_OK_DL_AUDIO_MIXER_SETTINGS_LIST:
       case ACTION_OK_DL_INPUT_HOTKEY_BINDS_LIST:
       case ACTION_OK_DL_RECORDING_SETTINGS_LIST:
@@ -2019,8 +2043,10 @@ static int set_path_generic(const char *label, const char *action_path)
 
    if (setting)
    {
-      setting_set_with_string_representation(
-            setting, action_path);
+      if (setting->value.target.string)
+         strlcpy(setting->value.target.string, action_path, setting->size);
+      if (setting->change_handler)
+         setting->change_handler(setting);
       return menu_setting_generic(setting, 0, false);
    }
 
@@ -2624,17 +2650,19 @@ static int action_ok_playlist_entry_collection(const char *path,
          return ret;
       }
 
-      /* Cache core path */
-      strlcpy(core_path, core_info->path, sizeof(core_path));
-
       /* Update playlist entry */
-      update_entry.core_path = core_info->path;
+      strlcpy(core_path, core_info->path, sizeof(core_path));
+      playlist_resolve_path(PLAYLIST_SAVE, true, core_path, sizeof(core_path));
+      update_entry.core_path = core_path;
       update_entry.core_name = core_info->display_name;
 
       command_playlist_update_write(
             playlist,
             selection_ptr,
             &update_entry);
+
+      /* Cache core path */
+      strlcpy(core_path, core_info->path, sizeof(core_path));
    }
    else
    {
@@ -3214,7 +3242,10 @@ static void menu_input_st_string_cb_save_preset(void *userdata,
 
       if (setting)
       {
-         setting_set_with_string_representation(setting, str);
+         if (setting->value.target.string)
+            strlcpy(setting->value.target.string, str, setting->size);
+         if (setting->change_handler)
+            setting->change_handler(setting);
          menu_setting_generic(setting, 0, false);
       }
       else if (!string_is_empty(label))
@@ -3472,7 +3503,10 @@ static void menu_input_st_string_cb_cheat_file_save_as(
 
       if (setting)
       {
-         setting_set_with_string_representation(setting, str);
+         if (setting->value.target.string)
+            strlcpy(setting->value.target.string, str, setting->size);
+         if (setting->change_handler)
+            setting->change_handler(setting);
          menu_setting_generic(setting, 0, false);
       }
       else if (!string_is_empty(label))
@@ -3822,7 +3856,8 @@ static int action_ok_path_manual_scan_directory(const char *path,
 static int action_ok_core_deferred_set(const char *new_core_path,
       const char *content_label, unsigned type, size_t idx, size_t entry_idx)
 {
-   char msg[PATH_MAX_LENGTH];
+   size_t _len;
+   char msg[128];
    char resolved_core_path[PATH_MAX_LENGTH];
    struct menu_state *menu_st    = menu_state_get_ptr();
    struct playlist_entry entry   = {0};
@@ -3857,8 +3892,8 @@ static int action_ok_core_deferred_set(const char *new_core_path,
          &entry);
 
    /* Provide visual feedback */
-   strlcpy(msg, msg_hash_to_str(MSG_SET_CORE_ASSOCIATION), sizeof(msg));
-   strlcat(msg, core_display_name, sizeof(msg));
+   _len = strlcpy(msg, msg_hash_to_str(MSG_SET_CORE_ASSOCIATION), sizeof(msg));
+   strlcpy(msg + _len, core_display_name, sizeof(msg) - _len);
    runloop_msg_queue_push(msg, 1, 100, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
    menu_entries_pop_stack(&selection, 0, 1);
@@ -3913,18 +3948,18 @@ static int action_ok_set_switch_cpu_profile(const char *path,
 #endif
 
 #ifdef HAVE_LAKKA_SWITCH
-
 static int action_ok_set_switch_gpu_profile(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
 {
+   size_t _len;
    char command[PATH_MAX_LENGTH];
    char *profile_name  = SWITCH_GPU_PROFILES[entry_idx];
    size_t _len         = strlcpy(command, "gpu-profile set ", sizeof(command));
    snprintf(command + _len, sizeof(command) - _len, "'%s'", profile_name);
    system(command);
    /* TODO/FIXME - localize */
-   strlcpy(command, "Current profile set to ", sizeof(command));
-   strlcat(command, profile_name, sizeof(command));
+   _len = strlcpy(command, "Current profile set to ", sizeof(command));
+   strlcpy(command + _len, profile_name, sizeof(command) - _len);
    runloop_msg_queue_push(command, 1, 90, true, NULL,
          MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
    return -1;
@@ -5400,16 +5435,16 @@ int action_ok_close_content(const char *path, const char *label, unsigned type, 
    return ret;
 }
 
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_cheat_apply_changes,      CMD_EVENT_CHEATS_APPLY)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_quit,                     CMD_EVENT_QUIT)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_save_new_config,          CMD_EVENT_MENU_SAVE_CONFIG)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_resume_content,           CMD_EVENT_RESUME)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_restart_content,          CMD_EVENT_RESET)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_screenshot,               CMD_EVENT_TAKE_SCREENSHOT)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_cheat_apply_changes,      CMD_EVENT_CHEATS_APPLY)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_quit,                     CMD_EVENT_QUIT)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_save_new_config,          CMD_EVENT_MENU_SAVE_CONFIG)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_resume_content,           CMD_EVENT_RESUME)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_restart_content,          CMD_EVENT_RESET)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_screenshot,               CMD_EVENT_TAKE_SCREENSHOT)
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_shader_apply_changes,     CMD_EVENT_SHADERS_APPLY_CHANGES)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_shader_apply_changes,     CMD_EVENT_SHADERS_APPLY_CHANGES)
 #endif
-DEFAULT_ACTION_OK_CMD_FUNC(action_ok_show_wimp,                CMD_EVENT_UI_COMPANION_TOGGLE)
+STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_show_wimp,                CMD_EVENT_UI_COMPANION_TOGGLE)
 
 static int action_ok_set_core_association(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
@@ -5816,167 +5851,171 @@ end:
    return ret;
 }
 
-DEFAULT_ACTION_OK_FUNC(action_ok_browse_url_start, ACTION_OK_DL_BROWSE_URL_START)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_favorites, ACTION_OK_DL_FAVORITES_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_images, ACTION_OK_DL_IMAGES_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cdrom_info_list, ACTION_OK_DL_CDROM_INFO_DETAIL_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_video, ACTION_OK_DL_VIDEO_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_music, ACTION_OK_DL_MUSIC_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_explore, ACTION_OK_DL_EXPLORE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_goto_contentless_cores, ACTION_OK_DL_CONTENTLESS_CORES_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_browse_url_start, ACTION_OK_DL_BROWSE_URL_START)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_favorites, ACTION_OK_DL_FAVORITES_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_images, ACTION_OK_DL_IMAGES_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cdrom_info_list, ACTION_OK_DL_CDROM_INFO_DETAIL_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_video, ACTION_OK_DL_VIDEO_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_music, ACTION_OK_DL_MUSIC_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_explore, ACTION_OK_DL_EXPLORE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_goto_contentless_cores, ACTION_OK_DL_CONTENTLESS_CORES_LIST)
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_save, ACTION_OK_DL_SHADER_PRESET_SAVE)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_remove, ACTION_OK_DL_SHADER_PRESET_REMOVE)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_parameters, ACTION_OK_DL_SHADER_PARAMETERS)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_save, ACTION_OK_DL_SHADER_PRESET_SAVE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_remove, ACTION_OK_DL_SHADER_PRESET_REMOVE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_parameters, ACTION_OK_DL_SHADER_PARAMETERS)
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_parent_directory_push, ACTION_OK_DL_PARENT_DIRECTORY_PUSH)
-DEFAULT_ACTION_OK_FUNC(action_ok_directory_push, ACTION_OK_DL_DIRECTORY_PUSH)
-DEFAULT_ACTION_OK_FUNC(action_ok_configurations_list, ACTION_OK_DL_CONFIGURATIONS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_saving_list, ACTION_OK_DL_SAVING_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_network_list, ACTION_OK_DL_NETWORK_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_network_hosting_list, ACTION_OK_DL_NETWORK_HOSTING_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_netplay_kick_list, ACTION_OK_DL_NETPLAY_KICK_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_netplay_ban_list, ACTION_OK_DL_NETPLAY_BAN_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_netplay_lobby_filters_list, ACTION_OK_DL_NETPLAY_LOBBY_FILTERS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_list, ACTION_OK_DL_SUBSYSTEM_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_database_manager_list, ACTION_OK_DL_DATABASE_MANAGER_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_parent_directory_push, ACTION_OK_DL_PARENT_DIRECTORY_PUSH)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_directory_push, ACTION_OK_DL_DIRECTORY_PUSH)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_configurations_list, ACTION_OK_DL_CONFIGURATIONS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_saving_list, ACTION_OK_DL_SAVING_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_network_list, ACTION_OK_DL_NETWORK_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_network_hosting_list, ACTION_OK_DL_NETWORK_HOSTING_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_netplay_kick_list, ACTION_OK_DL_NETPLAY_KICK_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_netplay_ban_list, ACTION_OK_DL_NETPLAY_BAN_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_netplay_lobby_filters_list, ACTION_OK_DL_NETPLAY_LOBBY_FILTERS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_list, ACTION_OK_DL_SUBSYSTEM_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_database_manager_list, ACTION_OK_DL_DATABASE_MANAGER_LIST)
 #ifdef HAVE_BLUETOOTH
-DEFAULT_ACTION_OK_FUNC(action_ok_bluetooth_list, ACTION_OK_DL_BLUETOOTH_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_bluetooth_list, ACTION_OK_DL_BLUETOOTH_SETTINGS_LIST)
 #endif
 #ifdef HAVE_NETWORKING
 #ifdef HAVE_WIFI
-DEFAULT_ACTION_OK_FUNC(action_ok_wifi_list, ACTION_OK_DL_WIFI_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_wifi_networks_list, ACTION_OK_DL_WIFI_NETWORKS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_wifi_list, ACTION_OK_DL_WIFI_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_wifi_networks_list, ACTION_OK_DL_WIFI_NETWORKS_LIST)
 #endif
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_compressed_archive_push, ACTION_OK_DL_COMPRESSED_ARCHIVE_PUSH)
-DEFAULT_ACTION_OK_FUNC(action_ok_compressed_archive_push_detect_core, ACTION_OK_DL_COMPRESSED_ARCHIVE_PUSH_DETECT_CORE)
-DEFAULT_ACTION_OK_FUNC(action_ok_logging_list, ACTION_OK_DL_LOGGING_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_frame_throttle_list, ACTION_OK_DL_FRAME_THROTTLE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_frame_time_counter_list, ACTION_OK_DL_FRAME_TIME_COUNTER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_rewind_list, ACTION_OK_DL_REWIND_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheat, ACTION_OK_DL_CHEAT_DETAILS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheat_start_or_cont, ACTION_OK_DL_CHEAT_SEARCH_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_display_list, ACTION_OK_DL_ONSCREEN_DISPLAY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_notifications_list, ACTION_OK_DL_ONSCREEN_NOTIFICATIONS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_notifications_views_list, ACTION_OK_DL_ONSCREEN_NOTIFICATIONS_VIEWS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_overlay_list, ACTION_OK_DL_ONSCREEN_OVERLAY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_menu_list, ACTION_OK_DL_MENU_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_compressed_archive_push, ACTION_OK_DL_COMPRESSED_ARCHIVE_PUSH)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_compressed_archive_push_detect_core, ACTION_OK_DL_COMPRESSED_ARCHIVE_PUSH_DETECT_CORE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_logging_list, ACTION_OK_DL_LOGGING_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_frame_throttle_list, ACTION_OK_DL_FRAME_THROTTLE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_frame_time_counter_list, ACTION_OK_DL_FRAME_TIME_COUNTER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_rewind_list, ACTION_OK_DL_REWIND_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheat, ACTION_OK_DL_CHEAT_DETAILS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheat_start_or_cont, ACTION_OK_DL_CHEAT_SEARCH_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_display_list, ACTION_OK_DL_ONSCREEN_DISPLAY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_notifications_list, ACTION_OK_DL_ONSCREEN_NOTIFICATIONS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_notifications_views_list, ACTION_OK_DL_ONSCREEN_NOTIFICATIONS_VIEWS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_onscreen_overlay_list, ACTION_OK_DL_ONSCREEN_OVERLAY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_menu_list, ACTION_OK_DL_MENU_SETTINGS_LIST)
 #ifdef _3DS
-DEFAULT_ACTION_OK_FUNC(action_ok_menu_bottom_list, ACTION_OK_DL_MENU_BOTTOM_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_menu_bottom_list, ACTION_OK_DL_MENU_BOTTOM_SETTINGS_LIST)
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_quick_menu_override_options, ACTION_OK_DL_QUICK_MENU_OVERRIDE_OPTIONS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_menu_views_list, ACTION_OK_DL_MENU_VIEWS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_settings_views_list, ACTION_OK_DL_SETTINGS_VIEWS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_quick_menu_views_list, ACTION_OK_DL_QUICK_MENU_VIEWS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_power_management_list, ACTION_OK_DL_POWER_MANAGEMENT_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cpu_perfpower_list, ACTION_OK_DL_CPU_PERFPOWER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cpu_policy_entry, ACTION_OK_DL_CPU_POLICY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_menu_sounds_list, ACTION_OK_DL_MENU_SOUNDS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_user_interface_list, ACTION_OK_DL_USER_INTERFACE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_menu_file_browser_list, ACTION_OK_DL_MENU_FILE_BROWSER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_retro_achievements_list, ACTION_OK_DL_RETRO_ACHIEVEMENTS_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheevos_appearance_list, ACTION_OK_DL_CHEEVOS_APPEARANCE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheevos_visibility_list, ACTION_OK_DL_CHEEVOS_VISIBILITY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_updater_list, ACTION_OK_DL_UPDATER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_lakka_services, ACTION_OK_DL_LAKKA_SERVICES_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_user_list, ACTION_OK_DL_USER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_netplay_sublist, ACTION_OK_DL_NETPLAY)
-DEFAULT_ACTION_OK_FUNC(action_ok_directory_list, ACTION_OK_DL_DIRECTORY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_privacy_list, ACTION_OK_DL_PRIVACY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_midi_list, ACTION_OK_DL_MIDI_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_rdb_entry, ACTION_OK_DL_RDB_ENTRY)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_quick_menu_override_options, ACTION_OK_DL_QUICK_MENU_OVERRIDE_OPTIONS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_menu_views_list, ACTION_OK_DL_MENU_VIEWS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_settings_views_list, ACTION_OK_DL_SETTINGS_VIEWS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_quick_menu_views_list, ACTION_OK_DL_QUICK_MENU_VIEWS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_power_management_list, ACTION_OK_DL_POWER_MANAGEMENT_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cpu_perfpower_list, ACTION_OK_DL_CPU_PERFPOWER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cpu_policy_entry, ACTION_OK_DL_CPU_POLICY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_menu_sounds_list, ACTION_OK_DL_MENU_SOUNDS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_user_interface_list, ACTION_OK_DL_USER_INTERFACE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_menu_file_browser_list, ACTION_OK_DL_MENU_FILE_BROWSER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_retro_achievements_list, ACTION_OK_DL_RETRO_ACHIEVEMENTS_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheevos_appearance_list, ACTION_OK_DL_CHEEVOS_APPEARANCE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheevos_visibility_list, ACTION_OK_DL_CHEEVOS_VISIBILITY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_updater_list, ACTION_OK_DL_UPDATER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_lakka_services, ACTION_OK_DL_LAKKA_SERVICES_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_user_list, ACTION_OK_DL_USER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_netplay_sublist, ACTION_OK_DL_NETPLAY)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_directory_list, ACTION_OK_DL_DIRECTORY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_privacy_list, ACTION_OK_DL_PRIVACY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_midi_list, ACTION_OK_DL_MIDI_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_rdb_entry, ACTION_OK_DL_RDB_ENTRY)
 #ifdef HAVE_AUDIOMIXER
-DEFAULT_ACTION_OK_FUNC(action_ok_mixer_stream_actions, ACTION_OK_DL_MIXER_STREAM_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_mixer_stream_actions, ACTION_OK_DL_MIXER_STREAM_SETTINGS_LIST)
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_browse_url_list, ACTION_OK_DL_BROWSE_URL_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_core_list, ACTION_OK_DL_CORE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_sideload_core_list, ACTION_OK_DL_SIDELOAD_CORE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheat_file, ACTION_OK_DL_CHEAT_FILE)
-DEFAULT_ACTION_OK_FUNC(action_ok_cheat_file_append, ACTION_OK_DL_CHEAT_FILE_APPEND)
-DEFAULT_ACTION_OK_FUNC(action_ok_playlist_collection, ACTION_OK_DL_PLAYLIST_COLLECTION)
-DEFAULT_ACTION_OK_FUNC(action_ok_disk_image_append_list, ACTION_OK_DL_DISK_IMAGE_APPEND_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_add_list, ACTION_OK_DL_SUBSYSTEM_ADD_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_add_load, ACTION_OK_DL_SUBSYSTEM_LOAD)
-DEFAULT_ACTION_OK_FUNC(action_ok_record_configfile, ACTION_OK_DL_RECORD_CONFIGFILE)
-DEFAULT_ACTION_OK_FUNC(action_ok_stream_configfile, ACTION_OK_DL_STREAM_CONFIGFILE)
-DEFAULT_ACTION_OK_FUNC(action_ok_remap_file, ACTION_OK_DL_REMAP_FILE)
-DEFAULT_ACTION_OK_FUNC(action_ok_override_file, ACTION_OK_DL_OVERRIDE_FILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_browse_url_list, ACTION_OK_DL_BROWSE_URL_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_core_list, ACTION_OK_DL_CORE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_sideload_core_list, ACTION_OK_DL_SIDELOAD_CORE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheat_file, ACTION_OK_DL_CHEAT_FILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_cheat_file_append, ACTION_OK_DL_CHEAT_FILE_APPEND)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_playlist_collection, ACTION_OK_DL_PLAYLIST_COLLECTION)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_disk_image_append_list, ACTION_OK_DL_DISK_IMAGE_APPEND_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_add_list, ACTION_OK_DL_SUBSYSTEM_ADD_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_subsystem_add_load, ACTION_OK_DL_SUBSYSTEM_LOAD)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_record_configfile, ACTION_OK_DL_RECORD_CONFIGFILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_stream_configfile, ACTION_OK_DL_STREAM_CONFIGFILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_remap_file, ACTION_OK_DL_REMAP_FILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_override_file, ACTION_OK_DL_OVERRIDE_FILE)
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset, ACTION_OK_DL_SHADER_PRESET)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_prepend, ACTION_OK_DL_SHADER_PRESET_PREPEND)
-DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_append, ACTION_OK_DL_SHADER_PRESET_APPEND)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset, ACTION_OK_DL_SHADER_PRESET)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_prepend, ACTION_OK_DL_SHADER_PRESET_PREPEND)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_shader_preset_append, ACTION_OK_DL_SHADER_PRESET_APPEND)
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_push_generic_list, ACTION_OK_DL_GENERIC)
-DEFAULT_ACTION_OK_FUNC(action_ok_audio_dsp_plugin, ACTION_OK_DL_AUDIO_DSP_PLUGIN)
-DEFAULT_ACTION_OK_FUNC(action_ok_video_filter, ACTION_OK_DL_VIDEO_FILTER)
-DEFAULT_ACTION_OK_FUNC(action_ok_overlay_preset, ACTION_OK_DL_OVERLAY_PRESET)
-DEFAULT_ACTION_OK_FUNC(action_ok_video_font, ACTION_OK_DL_VIDEO_FONT)
-DEFAULT_ACTION_OK_FUNC(action_ok_rpl_entry, ACTION_OK_DL_RPL_ENTRY)
-DEFAULT_ACTION_OK_FUNC(action_ok_open_archive_detect_core, ACTION_OK_DL_OPEN_ARCHIVE_DETECT_CORE)
-DEFAULT_ACTION_OK_FUNC(action_ok_file_load_music, ACTION_OK_DL_MUSIC)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_list, ACTION_OK_DL_ACCOUNTS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_generic_list, ACTION_OK_DL_GENERIC)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_audio_dsp_plugin, ACTION_OK_DL_AUDIO_DSP_PLUGIN)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_video_filter, ACTION_OK_DL_VIDEO_FILTER)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_overlay_preset, ACTION_OK_DL_OVERLAY_PRESET)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_video_font, ACTION_OK_DL_VIDEO_FONT)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_rpl_entry, ACTION_OK_DL_RPL_ENTRY)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_open_archive_detect_core, ACTION_OK_DL_OPEN_ARCHIVE_DETECT_CORE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_file_load_music, ACTION_OK_DL_MUSIC)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_list, ACTION_OK_DL_ACCOUNTS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_driver_settings_list, ACTION_OK_DL_DRIVER_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_crt_switchres_settings_list, ACTION_OK_DL_CRT_SWITCHRES_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_settings_list, ACTION_OK_DL_VIDEO_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_fullscreen_mode_settings_list, ACTION_OK_DL_VIDEO_FULLSCREEN_MODE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_synchronization_settings_list, ACTION_OK_DL_VIDEO_SYNCHRONIZATION_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_windowed_mode_settings_list, ACTION_OK_DL_VIDEO_WINDOWED_MODE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_scaling_settings_list, ACTION_OK_DL_VIDEO_SCALING_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_hdr_settings_list, ACTION_OK_DL_VIDEO_HDR_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_video_output_settings_list, ACTION_OK_DL_VIDEO_OUTPUT_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_configuration_settings_list, ACTION_OK_DL_CONFIGURATION_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_settings_list, ACTION_OK_DL_CORE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_restore_backup_list, ACTION_OK_DL_CORE_RESTORE_BACKUP_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_delete_backup_list, ACTION_OK_DL_CORE_DELETE_BACKUP_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_settings_list, ACTION_OK_DL_AUDIO_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_output_settings_list, ACTION_OK_DL_AUDIO_OUTPUT_SETTINGS_LIST)
+#ifdef HAVE_MICROPHONE
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_microphone_settings_list, ACTION_OK_DL_MICROPHONE_SETTINGS_LIST)
+#endif
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_synchronization_settings_list, ACTION_OK_DL_AUDIO_SYNCHRONIZATION_SETTINGS_LIST)
+#ifdef HAVE_AUDIOMIXER
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_mixer_settings_list, ACTION_OK_DL_AUDIO_MIXER_SETTINGS_LIST)
+#endif
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_ai_service_settings_list, ACTION_OK_DL_AI_SERVICE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accessibility_settings_list, ACTION_OK_DL_ACCESSIBILITY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_input_settings_list, ACTION_OK_DL_INPUT_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_input_menu_settings_list, ACTION_OK_DL_INPUT_MENU_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_input_turbo_fire_settings_list, ACTION_OK_DL_INPUT_TURBO_FIRE_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_input_haptic_feedback_settings_list, ACTION_OK_DL_INPUT_HAPTIC_FEEDBACK_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_latency_settings_list, ACTION_OK_DL_LATENCY_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_recording_settings_list, ACTION_OK_DL_RECORDING_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_settings_list, ACTION_OK_DL_PLAYLIST_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_manager_list, ACTION_OK_DL_PLAYLIST_MANAGER_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_input_hotkey_binds_list, ACTION_OK_DL_INPUT_HOTKEY_BINDS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_user_binds_list, ACTION_OK_DL_USER_BINDS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_cheevos_list, ACTION_OK_DL_ACCOUNTS_CHEEVOS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_youtube_list, ACTION_OK_DL_ACCOUNTS_YOUTUBE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_twitch_list, ACTION_OK_DL_ACCOUNTS_TWITCH_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_facebook_list, ACTION_OK_DL_ACCOUNTS_FACEBOOK_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_dump_disc_list, ACTION_OK_DL_DUMP_DISC_LIST)
+#ifdef HAVE_LAKKA
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_eject_disc, ACTION_OK_DL_EJECT_DISC)
+#endif
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_load_disc_list, ACTION_OK_DL_LOAD_DISC_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_open_archive, ACTION_OK_DL_OPEN_ARCHIVE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_rgui_menu_theme_preset, ACTION_OK_DL_RGUI_MENU_THEME_PRESET)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_pl_thumbnails_updater_list, ACTION_OK_DL_PL_THUMBNAILS_UPDATER_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_manual_content_scan_list, ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_manual_content_scan_dat_file, ACTION_OK_DL_MANUAL_CONTENT_SCAN_DAT_FILE)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_list, ACTION_OK_DL_CORE_MANAGER_LIST)
+#ifdef HAVE_MIST
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_steam_settings_list, ACTION_OK_DL_STEAM_SETTINGS_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_steam_list, ACTION_OK_DL_CORE_MANAGER_STEAM_LIST)
+#endif
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_option_override_list, ACTION_OK_DL_CORE_OPTION_OVERRIDE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_remap_file_manager_list, ACTION_OK_DL_REMAP_FILE_MANAGER_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_savestate_list, ACTION_OK_DL_SAVESTATE_LIST)
+STATIC_DEFAULT_ACTION_OK_FUNC(action_ok_push_core_options_list, ACTION_OK_DL_CORE_OPTIONS_LIST)
+DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_manager_settings, ACTION_OK_DL_PLAYLIST_MANAGER_SETTINGS)
+#ifdef HAVE_CHEEVOS
 DEFAULT_ACTION_OK_FUNC(action_ok_push_achievements_hardcore_pause_list, ACTION_OK_DL_ACHIEVEMENTS_HARDCORE_PAUSE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_driver_settings_list, ACTION_OK_DL_DRIVER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_crt_switchres_settings_list, ACTION_OK_DL_CRT_SWITCHRES_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_settings_list, ACTION_OK_DL_VIDEO_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_fullscreen_mode_settings_list, ACTION_OK_DL_VIDEO_FULLSCREEN_MODE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_synchronization_settings_list, ACTION_OK_DL_VIDEO_SYNCHRONIZATION_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_windowed_mode_settings_list, ACTION_OK_DL_VIDEO_WINDOWED_MODE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_scaling_settings_list, ACTION_OK_DL_VIDEO_SCALING_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_hdr_settings_list, ACTION_OK_DL_VIDEO_HDR_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_video_output_settings_list, ACTION_OK_DL_VIDEO_OUTPUT_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_configuration_settings_list, ACTION_OK_DL_CONFIGURATION_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_settings_list, ACTION_OK_DL_CORE_SETTINGS_LIST)
+#endif
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_information_list, ACTION_OK_DL_CORE_INFORMATION_LIST)
 #ifdef HAVE_MIST
 DEFAULT_ACTION_OK_FUNC(action_ok_push_core_information_steam_list, ACTION_OK_DL_CORE_INFORMATION_STEAM_LIST)
 #endif
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_restore_backup_list, ACTION_OK_DL_CORE_RESTORE_BACKUP_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_delete_backup_list, ACTION_OK_DL_CORE_DELETE_BACKUP_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_settings_list, ACTION_OK_DL_AUDIO_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_output_settings_list, ACTION_OK_DL_AUDIO_OUTPUT_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_resampler_settings_list, ACTION_OK_DL_AUDIO_RESAMPLER_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_synchronization_settings_list, ACTION_OK_DL_AUDIO_SYNCHRONIZATION_SETTINGS_LIST)
-#ifdef HAVE_AUDIOMIXER
-DEFAULT_ACTION_OK_FUNC(action_ok_push_audio_mixer_settings_list, ACTION_OK_DL_AUDIO_MIXER_SETTINGS_LIST)
-#endif
-DEFAULT_ACTION_OK_FUNC(action_ok_push_ai_service_settings_list, ACTION_OK_DL_AI_SERVICE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accessibility_settings_list, ACTION_OK_DL_ACCESSIBILITY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_input_settings_list, ACTION_OK_DL_INPUT_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_input_menu_settings_list, ACTION_OK_DL_INPUT_MENU_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_input_turbo_fire_settings_list, ACTION_OK_DL_INPUT_TURBO_FIRE_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_input_haptic_feedback_settings_list, ACTION_OK_DL_INPUT_HAPTIC_FEEDBACK_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_latency_settings_list, ACTION_OK_DL_LATENCY_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_recording_settings_list, ACTION_OK_DL_RECORDING_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_settings_list, ACTION_OK_DL_PLAYLIST_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_manager_list, ACTION_OK_DL_PLAYLIST_MANAGER_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_playlist_manager_settings, ACTION_OK_DL_PLAYLIST_MANAGER_SETTINGS)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_input_hotkey_binds_list, ACTION_OK_DL_INPUT_HOTKEY_BINDS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_user_binds_list, ACTION_OK_DL_USER_BINDS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_cheevos_list, ACTION_OK_DL_ACCOUNTS_CHEEVOS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_youtube_list, ACTION_OK_DL_ACCOUNTS_YOUTUBE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_twitch_list, ACTION_OK_DL_ACCOUNTS_TWITCH_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_accounts_facebook_list, ACTION_OK_DL_ACCOUNTS_FACEBOOK_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_dump_disc_list, ACTION_OK_DL_DUMP_DISC_LIST)
-#ifdef HAVE_LAKKA
-DEFAULT_ACTION_OK_FUNC(action_ok_push_eject_disc, ACTION_OK_DL_EJECT_DISC)
-#endif
-DEFAULT_ACTION_OK_FUNC(action_ok_push_load_disc_list, ACTION_OK_DL_LOAD_DISC_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_open_archive, ACTION_OK_DL_OPEN_ARCHIVE)
-DEFAULT_ACTION_OK_FUNC(action_ok_rgui_menu_theme_preset, ACTION_OK_DL_RGUI_MENU_THEME_PRESET)
-DEFAULT_ACTION_OK_FUNC(action_ok_pl_thumbnails_updater_list, ACTION_OK_DL_PL_THUMBNAILS_UPDATER_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_manual_content_scan_list, ACTION_OK_DL_MANUAL_CONTENT_SCAN_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_manual_content_scan_dat_file, ACTION_OK_DL_MANUAL_CONTENT_SCAN_DAT_FILE)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_list, ACTION_OK_DL_CORE_MANAGER_LIST)
-#ifdef HAVE_MIST
-DEFAULT_ACTION_OK_FUNC(action_ok_steam_settings_list, ACTION_OK_DL_STEAM_SETTINGS_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_manager_steam_list, ACTION_OK_DL_CORE_MANAGER_STEAM_LIST)
-#endif
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_option_override_list, ACTION_OK_DL_CORE_OPTION_OVERRIDE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_remap_file_manager_list, ACTION_OK_DL_REMAP_FILE_MANAGER_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_savestate_list, ACTION_OK_DL_SAVESTATE_LIST)
-DEFAULT_ACTION_OK_FUNC(action_ok_push_core_options_list, ACTION_OK_DL_CORE_OPTIONS_LIST)
 
 static int action_ok_open_uwp_permission_settings(const char *path,
    const char *label, unsigned type, size_t idx, size_t entry_idx)
@@ -6248,7 +6287,6 @@ static int action_ok_push_netplay_ban(const char *path, const char *label,
 DEFAULT_ACTION_OK_DL_PUSH(action_ok_content_collection_list, FILEBROWSER_SELECT_COLLECTION, ACTION_OK_DL_CONTENT_COLLECTION_LIST, NULL)
 DEFAULT_ACTION_OK_DL_PUSH(action_ok_push_content_list, FILEBROWSER_SELECT_FILE, ACTION_OK_DL_CONTENT_LIST, settings->paths.directory_menu_content)
 DEFAULT_ACTION_OK_DL_PUSH(action_ok_push_scan_file, FILEBROWSER_SCAN_FILE, ACTION_OK_DL_CONTENT_LIST, settings->paths.directory_menu_content)
-
 
 static int action_ok_scan_directory_list(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
@@ -6797,6 +6835,28 @@ static int action_ok_push_dropdown_item_audio_device(const char *path,
    return action_cancel_pop_default(NULL, NULL, 0, 0);
 }
 
+#ifdef HAVE_MICROPHONE
+static int action_ok_push_dropdown_item_microphone_device(const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   const char *menu_path        = NULL;
+   enum msg_hash_enums enum_idx;
+   rarch_setting_t     *setting;
+   menu_entries_get_last_stack(&menu_path, NULL, NULL, NULL, NULL);
+   enum_idx = (enum msg_hash_enums)atoi(menu_path);
+   setting  = menu_setting_find_enum(enum_idx);
+
+   if (!setting)
+      return -1;
+
+   strlcpy(setting->value.target.string, label, setting->size);
+
+   command_event(CMD_EVENT_MICROPHONE_REINIT, NULL);
+
+   return action_cancel_pop_default(NULL, NULL, 0, 0);
+}
+#endif
+
 static int action_ok_push_dropdown_item_input_device_type(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
 {
@@ -7176,8 +7236,7 @@ static int action_ok_video_resolution(const char *path,
 
    if (video_driver_get_video_output_size(&width, &height, desc, sizeof(desc)))
    {
-      char msg[PATH_MAX_LENGTH];
-
+      char msg[128];
       msg[0] = '\0';
 
 #if defined(_WIN32) || defined(__PS3__)
@@ -7605,11 +7664,10 @@ int action_ok_core_lock(const char *path,
 
    if (!core_info_set_core_lock(core_path, lock))
    {
+      size_t _len;
       const char *core_name = NULL;
       core_info_t *core_info = NULL;
-      char msg[PATH_MAX_LENGTH];
-
-      msg[0] = '\0';
+      char msg[128];
 
       /* Need to fetch core name for error message */
 
@@ -7622,20 +7680,18 @@ int action_ok_core_lock(const char *path,
          core_name = path_basename_nocompression(core_path);
 
       /* Build error message */
-      strlcpy(
-            msg,
+      _len = strlcpy(msg,
             msg_hash_to_str(lock ?
                   MSG_CORE_LOCK_FAILED : MSG_CORE_UNLOCK_FAILED),
             sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcat(msg, core_name, sizeof(msg));
+         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       /* Generate log + notification */
       RARCH_ERR("%s\n", msg);
 
-      runloop_msg_queue_push(
-         msg,
+      runloop_msg_queue_push(msg,
          1, 100, true,
          NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
 
@@ -7669,11 +7725,10 @@ int action_ok_core_set_standalone_exempt(const char *path,
 
    if (!core_info_set_core_standalone_exempt(core_path, exempt))
    {
-      const char *core_name = NULL;
+      size_t _len;
+      const char *core_name  = NULL;
       core_info_t *core_info = NULL;
-      char msg[PATH_MAX_LENGTH];
-
-      msg[0] = '\0';
+      char msg[128];
 
       /* Need to fetch core name for error message */
 
@@ -7686,15 +7741,14 @@ int action_ok_core_set_standalone_exempt(const char *path,
          core_name = path_basename_nocompression(core_path);
 
       /* Build error message */
-      strlcpy(
-            msg,
+      _len = strlcpy(msg,
             msg_hash_to_str(exempt ?
                   MSG_CORE_SET_STANDALONE_EXEMPT_FAILED :
                   MSG_CORE_UNSET_STANDALONE_EXEMPT_FAILED),
             sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcat(msg, core_name, sizeof(msg));
+         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       /* Generate log + notification */
       RARCH_ERR("%s\n", msg);
@@ -7721,11 +7775,10 @@ static int action_ok_core_delete(const char *path,
    /* Check whether core is locked */
    if (core_info_get_core_lock(core_path, true))
    {
+      size_t _len;
       const char *core_name  = NULL;
       core_info_t *core_info = NULL;
-      char msg[PATH_MAX_LENGTH];
-
-      msg[0] = '\0';
+      char msg[128];
 
       /* Need to fetch core name for notification */
 
@@ -7738,10 +7791,10 @@ static int action_ok_core_delete(const char *path,
          core_name = path_basename_nocompression(core_path);
 
       /* Build notification message */
-      strlcpy(msg, msg_hash_to_str(MSG_CORE_DELETE_DISABLED), sizeof(msg));
+      _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_DELETE_DISABLED), sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcat(msg, core_name, sizeof(msg));
+         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       runloop_msg_queue_push(
          msg,
@@ -7768,10 +7821,9 @@ static int action_ok_core_delete(const char *path,
     * interface */
    if (play_feature_delivery_enabled())
    {
+      size_t _len;
       const char *core_filename = path_basename_nocompression(core_path);
       char backup_core_path[PATH_MAX_LENGTH];
-
-      backup_core_path[0] = '\0';
 
       if (play_feature_delivery_core_installed(core_filename))
          play_feature_delivery_delete(core_filename);
@@ -7787,13 +7839,13 @@ static int action_ok_core_delete(const char *path,
        * accumulation of mess, additionally check
        * for and remove any such backups when deleting
        * a core */
-      strlcpy(backup_core_path, core_path,
+      _len = strlcpy(backup_core_path, core_path,
             sizeof(backup_core_path));
-      strlcat(backup_core_path, FILE_PATH_BACKUP_EXTENSION,
-            sizeof(backup_core_path));
+      strlcpy(backup_core_path + _len, FILE_PATH_BACKUP_EXTENSION,
+            sizeof(backup_core_path) - _len);
 
-      if (!string_is_empty(backup_core_path) &&
-          path_is_valid(backup_core_path))
+      if (  !string_is_empty(backup_core_path)
+          && path_is_valid(backup_core_path))
          filestream_delete(backup_core_path);
    }
    else
@@ -8005,7 +8057,7 @@ static int action_ok_playlist_refresh(const char *path,
     * scan record */
    if (!scan_record_valid)
    {
-      char msg[PATH_MAX_LENGTH];
+      char msg[128];
       if (string_is_empty(msg_subject))
          msg_subject = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE);
       fill_pathname_join_special(msg, msg_prefix, msg_subject, sizeof(msg));
@@ -8341,7 +8393,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_ACHIEVEMENT_RESUME_CANCEL,           action_ok_close_submenu },
          {MENU_ENUM_LABEL_MANUAL_CONTENT_SCAN_LIST,            action_ok_push_manual_content_scan_list},
          {MENU_ENUM_LABEL_AUDIO_OUTPUT_SETTINGS,               action_ok_push_audio_output_settings_list},
-         {MENU_ENUM_LABEL_AUDIO_RESAMPLER_SETTINGS,            action_ok_push_audio_resampler_settings_list},
+#ifdef HAVE_MICROPHONE
+         {MENU_ENUM_LABEL_MICROPHONE_SETTINGS,                 action_ok_push_microphone_settings_list},
+#endif
          {MENU_ENUM_LABEL_LATENCY_SETTINGS,                    action_ok_push_latency_settings_list},
          {MENU_ENUM_LABEL_CORE_SETTINGS,                       action_ok_push_core_settings_list},
          {MENU_ENUM_LABEL_CORE_INFORMATION,                    action_ok_push_core_information_list},
@@ -8735,6 +8789,11 @@ static int menu_cbs_init_bind_ok_compare_type(menu_file_list_cbs_t *cbs,
          case MENU_SETTING_DROPDOWN_ITEM_AUDIO_DEVICE:
             BIND_ACTION_OK(cbs, action_ok_push_dropdown_item_audio_device);
             break;
+#ifdef HAVE_MICROPHONE
+         case MENU_SETTING_DROPDOWN_ITEM_MICROPHONE_DEVICE:
+            BIND_ACTION_OK(cbs, action_ok_push_dropdown_item_microphone_device);
+            break;
+#endif
 #ifdef HAVE_NETWORKING
          case MENU_SETTING_DROPDOWN_ITEM_NETPLAY_MITM_SERVER:
             BIND_ACTION_OK(cbs, action_ok_push_dropdown_item_netplay_mitm_server);

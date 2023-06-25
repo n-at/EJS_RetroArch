@@ -204,33 +204,6 @@ int system_property_get(const char *command,
 /* forward declaration */
 bool android_run_events(void *data);
 
-void android_dpi_get_density(char *s, size_t len)
-{
-   static bool inited_once             = false;
-   static bool inited2_once            = false;
-   static char string[PROP_VALUE_MAX]  = {0};
-   static char string2[PROP_VALUE_MAX] = {0};
-   if (!inited_once)
-   {
-      system_property_get("getprop", "ro.sf.lcd_density", string);
-      inited_once = true;
-   }
-
-   if (!string_is_empty(string))
-   {
-      strlcpy(s, string, len);
-      return;
-   }
-
-   if (!inited2_once)
-   {
-      system_property_get("wm", "density", string2);
-      inited2_once = true;
-   }
-
-   strlcpy(s, string2, len);
-}
-
 void android_app_write_cmd(struct android_app *android_app, int8_t cmd)
 {
    if (android_app)
@@ -1741,13 +1714,13 @@ static void frontend_unix_get_env(int *argc,
 
    if (xdg)
    {
-      strlcpy(base_path, xdg, sizeof(base_path));
-      strlcat(base_path, "/retroarch", sizeof(base_path));
+      size_t _len = strlcpy(base_path, xdg, sizeof(base_path));
+      strlcpy(base_path + _len, "/retroarch", sizeof(base_path) - _len);
    }
    else if (home)
    {
-      strlcpy(base_path, home, sizeof(base_path));
-      strlcat(base_path, "/.config/retroarch", sizeof(base_path));
+      size_t _len = strlcpy(base_path, home, sizeof(base_path));
+      strlcpy(base_path + _len, "/.config/retroarch", sizeof(base_path) - _len);
    }
    else
       strlcpy(base_path, "retroarch", sizeof(base_path));
@@ -2255,21 +2228,23 @@ static int frontend_unix_parse_drive_list(void *data, bool load_content)
 
    if (xdg)
    {
-      strlcpy(base_path, xdg, sizeof(base_path));
-      strlcat(base_path, "/retroarch", sizeof(base_path));
+      size_t _len = strlcpy(base_path, xdg, sizeof(base_path));
+      strlcpy(base_path + _len, "/retroarch", sizeof(base_path) - _len);
    }
    else if (home)
    {
-      strlcpy(base_path, home, sizeof(base_path));
-      strlcat(base_path, "/.config/retroarch", sizeof(base_path));
+      size_t _len = strlcpy(base_path, home, sizeof(base_path));
+      strlcpy(base_path + _len, "/.config/retroarch", sizeof(base_path) - _len);
    }
 #endif
 
-   strlcpy(udisks_media_path, "/run/media", sizeof(udisks_media_path));
-   if (user)
    {
-      strlcat(udisks_media_path, "/", sizeof(udisks_media_path));
-      strlcat(udisks_media_path, user, sizeof(udisks_media_path));
+      size_t _len = strlcpy(udisks_media_path, "/run/media", sizeof(udisks_media_path));
+      if (user)
+      {
+         strlcpy(udisks_media_path + _len, "/", sizeof(udisks_media_path) - _len);
+         strlcat(udisks_media_path, user, sizeof(udisks_media_path));
+      }
    }
 
    if (!string_is_empty(base_path))
@@ -2685,7 +2660,7 @@ static bool frontend_unix_check_for_path_changes(path_change_data_t *change_data
    {
       i = 0;
 
-      while (i < length && i < sizeof(buffer))
+      while (i < length && i < (int)sizeof(buffer))
       {
          struct inotify_event *event = (struct inotify_event *)&buffer[i];
 
@@ -2702,7 +2677,7 @@ static bool frontend_unix_check_for_path_changes(path_change_data_t *change_data
              * to disk, to make sure that the new data is
              * immediately available when the file is re-read.
              */
-            for (j = 0; j < inotify_data->wd_list->count; j++)
+            for (j = 0; j < (int)inotify_data->wd_list->count; j++)
             {
                if (inotify_data->wd_list->data[j] == event->wd)
                {

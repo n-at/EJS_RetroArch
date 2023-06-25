@@ -1114,7 +1114,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
-   "Modifica le impostazioni per l'uscita audio."
+   "Cambia le impostazioni di ingresso/uscita audio."
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_SETTINGS,
@@ -1556,6 +1556,28 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUDIO_DRIVER_JACK,
    "Driver Jack Audio Connection Kit."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER,
+   "Microfono"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DRIVER,
+   "Driver microfono da usare."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_DRIVER,
+   "Riamplificatore Microfono"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_DRIVER,
+   "Driver riamplificatore microfono da usare."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_BLOCK_FRAMES,
+   "Blocco Frame Microfono"
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Driver per il Riamplificatore Audio"
@@ -2377,6 +2399,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS,
    "Modifica le impostazioni per l'uscita audio."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+   "Microfono"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_SETTINGS,
+   "Cambia le impostazioni di ingresso audio."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
    "Riamplificatore"
@@ -2556,6 +2588,74 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "Latenza audio desiderata in millisecondi. Il valore potrebbe non essere rispettato se il driver audio non è in grado di osservare la latenza scelta."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+   "Microfono"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_ENABLE,
+   "Abilita l'ingresso audio nei core supportati. Non ha alcun sovraccarico se il core non utilizza un microfono."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+   "Dispositivo audio"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DEVICE,
+   "Sovrascrivi il dispositivo di input predefinito utilizzato dal driver del microfono. Questo dipende dal driver."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_MICROPHONE_DEVICE,
+   "Sovrascrivi il dispositivo di input predefinito utilizzato dal driver del microfono. Questo dipende dal driver."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Qualità del Resampler Audio"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Abbassare questo valore per favorire prestazioni / latenza inferiore rispetto alla qualità audio, aumentare per una migliore qualità audio a scapito delle prestazioni / latenza inferiore."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_INPUT_RATE,
+   "Frequenza di campionamento in ingresso audio, usata se un core non richiede un numero specifico."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+   "Latenza In Ingresso Audio (Ms)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_LATENCY,
+   "Latenza di ingresso audio desiderata in millisecondi. Non potrebbe essere onorato se il driver del microfono non può fornire una latenza."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "Modalità Esclusiva WASAPI"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "Consenti a RetroArch di prendere il controllo esclusivo del dispositivo microfono quando si utilizza il driver del microfono WASAPI. Se disabilitato, RetroArch utilizzerà invece la modalità condivisa."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "Formato Float WASAPI"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "Usa l'input in virgola mobile per il driver WASAPI, se supportato dal tuo dispositivo audio."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "WASAPI ha condiviso la lunghezza del Buffer"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "La lunghezza del buffer intermedio (in fotogrammi) quando si utilizza il driver WASAPI in modalità condivisa."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 

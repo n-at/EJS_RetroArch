@@ -77,15 +77,29 @@ static void crt_store_temp_changes(videocrt_switch_t *p_switch)
    p_switch->tmp_rotated       = p_switch->rotated;
 }
 
+static bool is_aspect_ratio_core_provided(void)
+{
+   settings_t *settings  = config_get_ptr();
+   return settings->uints.video_aspect_ratio_idx == ASPECT_RATIO_CORE;
+}
+
 static void crt_aspect_ratio_switch(
       videocrt_switch_t *p_switch,
       unsigned width, unsigned height,
       float srm_width, float srm_height)
 {
-   /* Send aspect float to video_driver */
-   video_driver_state_t *video_st = video_state_get_ptr();
    float fly_aspect               = (float)width / (float)height;
    p_switch->fly_aspect           = fly_aspect;
+   video_driver_state_t *video_st = video_state_get_ptr();
+
+   /* We only force aspect ratio for the core provided setting */
+   if (!is_aspect_ratio_core_provided())
+   {
+      RARCH_LOG("[CRT]: Aspect ratio forced by user: %f\n", video_st->aspect_ratio);
+      return;
+   }
+
+   /* Send aspect float to video_driver */
    video_st->aspect_ratio         = fly_aspect;
    RARCH_LOG("[CRT]: Setting Aspect Ratio: %f \n", fly_aspect);
    RARCH_LOG("[CRT]: Setting Video Screen Size to: %dx%d \n",
@@ -125,7 +139,10 @@ static void crt_switch_set_aspect(
       patched_height           = height;
    }
 
-   if (srm_width >= 1920 && !srm_isstretched)
+   sr_state state;
+   sr_get_state(&state);
+
+   if ((int)srm_width >= state.super_width && !srm_isstretched)
       RARCH_LOG("[CRT]: Super resolution detected. Fractal scaling @ X:%f Y:%f \n", srm_xscale, srm_yscale);
    else if (srm_isstretched && srm_width > 0 )
       RARCH_LOG("[CRT]: Resolution is stretched. Fractal scaling @ X:%f Y:%f \n", srm_xscale, srm_yscale);
@@ -144,6 +161,14 @@ static bool is_kms_driver_context(void)
    return (gfxctx.ident && strncmp(gfxctx.ident, "kms",3) == 0);
 }
 
+static bool is_khr_driver_context()
+{
+   gfx_ctx_ident_t gfxctx;
+   video_context_driver_get_ident(&gfxctx);
+   RARCH_LOG("[CRT] Video context is: %s\n", gfxctx.ident);
+   return (gfxctx.ident && strncmp(gfxctx.ident, "khr_display",11) == 0);
+}
+
 #if !defined(HAVE_VIDEOCORE)
 static bool crt_sr2_init(videocrt_switch_t *p_switch,
       int monitor_index, unsigned int crt_mode, unsigned int super_width)
@@ -160,6 +185,7 @@ static bool crt_sr2_init(videocrt_switch_t *p_switch,
       strlcpy(index, "0", sizeof(index));
 
    p_switch->kms_ctx = is_kms_driver_context();
+   p_switch->khr_ctx = is_khr_driver_context();
 
    if (!p_switch->sr2_active)
    {
@@ -191,8 +217,13 @@ static bool crt_sr2_init(videocrt_switch_t *p_switch,
             break;
       }
 
-      if (super_width >2)
+      if (super_width > 2)
+      {
          sr_set_user_mode(super_width, 0, 0);
+         char sw[16];
+         sprintf(sw, "%d", super_width);
+         sr_set_option(SR_OPT_SUPER_WIDTH, sw);
+      }
 
       if (p_switch->kms_ctx)
             p_switch->rtn = sr_init_disp("dummy", NULL);
@@ -234,6 +265,12 @@ static bool crt_sr2_init(videocrt_switch_t *p_switch,
    {
       p_switch->sr2_active = true;
       RARCH_LOG("[CRT]: KMS context detected, keeping SR alive\n");
+      return true;
+   }
+   else if (p_switch->rtn >= 0 && p_switch->khr_ctx)
+   {
+      p_switch->sr2_active = true;
+      RARCH_LOG("[CRT]: Vulkan context detected, keeping SR alive\n");
       return true;
    }
 
@@ -282,7 +319,6 @@ static void switch_res_crt(
    /* Check if SR2 is loaded, if not, load it */
    if (crt_sr2_init(p_switch, monitor_index, crt_mode, super_width))
    {
-      bool swap_w_h;
       const char *_core_name = (const char*)runloop_state_get_ptr()->system.info.library_name;
       /* Check for core and content changes in case we need
          to make any adjustments */
@@ -310,32 +346,33 @@ static void switch_res_crt(
       if (p_switch->rotated)
          flags |= SR_MODE_ROTATED;
 
-      swap_w_h = p_switch->rotated ^ retroarch_get_rotation();
-      ret      = sr_add_mode(swap_w_h ? h : w, swap_w_h ? w : h, rr, flags, &srm);
+      RARCH_DBG("%dx%d rotation: %d rotated: %d core rotation:%d\n", w, h, p_switch->rotated, flags & SR_MODE_ROTATED, retroarch_get_rotation());
+      ret = sr_add_mode(w, h, rr, flags, &srm);
       if (!ret)
-         RARCH_LOG("[CRT]: SR failed to add mode\n");
+         RARCH_ERR("[CRT]: SR failed to add mode\n");
       if (p_switch->kms_ctx)
       {
-         RARCH_LOG("[CRT]: KMS -> use sr_add_mode\n");
 #if 0
          settings_t *settings = config_get_ptr();
 #endif
          get_modeline_for_kms(p_switch, &srm);
-#if 0
-         /* Need trigger the context set video mode */
-         video_driver_reinit(DRIVER_VIDEO_MASK);
-#endif
          video_driver_set_video_mode(srm.width, srm.height, true);
+      }
+      else if (p_switch->khr_ctx)
+      {
+         RARCH_WARN("[CRT]: Vulkan -> Can't modeswitch for now\n");
+         /*crt_switch_driver_refresh();
+         video_driver_set_video_mode(srm.width, srm.height, true);*/
       }
       else
          ret = sr_set_mode(srm.id);
       if (!p_switch->kms_ctx && !ret)
-         RARCH_LOG("[CRT]: SR failed to switch mode\n");
+         RARCH_ERR("[CRT]: SR failed to switch mode\n");
       p_switch->sr_core_hz = (float)srm.vfreq;
 
       crt_switch_set_aspect(p_switch,
-            retroarch_get_rotation() ? h : w,
-            retroarch_get_rotation() ? w : h,
+            p_switch->rotated? h : w,
+            p_switch->rotated? w : h,
             srm.width, srm.height,
             (float)srm.x_scale, (float)srm.y_scale, srm.is_stretched);
    }
@@ -426,7 +463,8 @@ void crt_switch_res_core(
          crt_store_temp_changes(p_switch);
       }
 
-      if (video_driver_get_aspect_ratio() != p_switch->fly_aspect)
+      if (is_aspect_ratio_core_provided() &&
+         video_driver_get_aspect_ratio() != p_switch->fly_aspect)
       {
          video_driver_state_t *video_st = video_state_get_ptr();
          float fly_aspect               = (float)p_switch->fly_aspect;

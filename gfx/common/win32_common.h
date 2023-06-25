@@ -111,7 +111,7 @@ bool win32_window_create(void *data, unsigned style,
       RECT *mon_rect, unsigned width,
       unsigned height, bool fullscreen);
 
-bool win32_suppress_screensaver(void *data, bool enable);
+bool win32_suspend_screensaver(void *data, bool enable);
 
 bool win32_get_metrics(void *data,
       enum display_metric_types type, float *value);
@@ -137,7 +137,7 @@ void win32_check_window(void *data,
 void win32_set_window(unsigned *width, unsigned *height,
       bool fullscreen, bool windowed_full, void *rect_data);
 
-void win32_get_video_output_size(
+void win32_get_video_output_size(void *data,
       unsigned *width, unsigned *height, char *desc, size_t desc_len);
 
 void win32_get_video_output_prev(

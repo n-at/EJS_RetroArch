@@ -630,7 +630,7 @@ static void gl1_raster_font_render_message(gl1_t *gl,
    for (;;)
    {
       const char *delim = strchr(msg, '\n');
-      size_t msg_len    = delim ? (delim - msg) : strlen(msg);
+      size_t msg_len    = delim ? (size_t)(delim - msg) : strlen(msg);
 
       /* Draw the line */
       gl1_raster_font_render_line(gl, font, glyph_q,
@@ -1117,18 +1117,18 @@ static void *gl1_init(const video_info_t *video,
 
    {
       char device_str[128];
-
+      size_t len    = 0;
       device_str[0] = '\0';
 
       if (!string_is_empty(vendor))
       {
-         size_t len        = strlcpy(device_str, vendor, sizeof(device_str));
-         device_str[len  ] = ' ';
-         device_str[len+1] = '\0';
+         len               = strlcpy(device_str, vendor, sizeof(device_str));
+         device_str[  len] = ' ';
+         device_str[++len] = '\0';
       }
 
       if (!string_is_empty(renderer))
-         strlcat(device_str, renderer, sizeof(device_str));
+         strlcpy(device_str + len, renderer, sizeof(device_str) - len);
 
       video_driver_set_gpu_device_string(device_str);
 
@@ -1285,11 +1285,6 @@ static void gl1_set_viewport(gl1_t *gl1,
          {
             delta  = (device_aspect / desired_aspect - 1.0f) / 2.0f + 0.5f;
             y      = (int)roundf(viewport_height * (0.5f - delta));
-#if defined(RARCH_MOBILE)
-            /* In portrait mode, we want viewport to gravitate to top of screen. */
-            if (device_aspect < 1.0f)
-                y *= 2;
-#endif
             viewport_height = (unsigned)roundf(2.0f * viewport_height * delta);
          }
       }
@@ -1305,6 +1300,12 @@ static void gl1_set_viewport(gl1_t *gl1,
       gl1->vp.width  = viewport_width;
       gl1->vp.height = viewport_height;
    }
+
+#if defined(RARCH_MOBILE)
+   /* In portrait mode, we want viewport to gravitate to top of screen. */
+   if (device_aspect < 1.0f)
+      gl1->vp.y *= 2;
+#endif
 
    glViewport(gl1->vp.x, gl1->vp.y, gl1->vp.width, gl1->vp.height);
    gl1_set_projection(gl1, &gl1_default_ortho, allow_rotate);
@@ -2217,26 +2218,26 @@ static const video_poke_interface_t gl1_poke_interface = {
    gl1_unload_texture,
    gl1_set_video_mode,
    gl1_get_refresh_rate,
-   NULL,
+   NULL, /* set_filtering */
    gl1_get_video_output_size,
    gl1_get_video_output_prev,
    gl1_get_video_output_next,
-   NULL,
-   NULL,
+   NULL, /* get_current_framebuffer */
+   NULL, /* get_proc_address */
    gl1_set_aspect_ratio,
-   NULL,
+   NULL, /* apply_state_changes */
    gl1_set_texture_frame,
    gl1_set_texture_enable,
    font_driver_render_msg,
-   NULL,
-   NULL,                         /* grab_mouse_toggle */
-   NULL,                         /* get_current_shader */
-   NULL,                         /* get_current_software_framebuffer */
-   NULL,                         /* get_hw_render_interface */
-   NULL,                         /* set_hdr_max_nits */
-   NULL,                         /* set_hdr_paper_white_nits */
-   NULL,                         /* set_hdr_contrast */
-   NULL                          /* set_hdr_expand_gamut */
+   NULL, /* show_mouse */
+   NULL, /* grab_mouse_toggle */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
+   NULL, /* set_hdr_max_nits */
+   NULL, /* set_hdr_paper_white_nits */
+   NULL, /* set_hdr_contrast */
+   NULL  /* set_hdr_expand_gamut */
 };
 
 static void gl1_get_poke_interface(void *data,
@@ -2406,13 +2407,12 @@ video_driver_t video_gl1 = {
    gl1_viewport_info,
    gl1_read_viewport,
    NULL, /* read_frame_raw */
-
 #ifdef HAVE_OVERLAY
    gl1_get_overlay_interface,
 #endif
-  gl1_get_poke_interface,
-  gl1_wrap_type_to_enum,
+   gl1_get_poke_interface,
+   gl1_wrap_type_to_enum,
 #ifdef HAVE_GFX_WIDGETS
-  gl1_widgets_enabled
+   gl1_widgets_enabled
 #endif
 };

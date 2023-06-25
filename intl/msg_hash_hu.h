@@ -1122,7 +1122,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
-   "A hang beállításai."
+   "A hangkimenet és bemenet beállításai."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS,
@@ -1588,6 +1588,24 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUDIO_DRIVER_JACK,
    "Jack Audio Connection Kit illesztő."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DRIVER,
+   "A mikrofonhoz használt illesztő."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_DRIVER,
+   "Mikrofon újramintavételező"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_DRIVER,
+   "A mikrofonhoz használt újramintavételező illesztő."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Hang-újramintavételező"
@@ -2413,6 +2431,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS,
    "A hangkimenet beállításai."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_SETTINGS,
+   "A hangbemenet beállításai."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
    "Újramintavételezés"
@@ -2588,6 +2616,78 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "A kívánt hangkésleltetés ezredmásodpercben. Előfordulhat, hogy a hang illesztőprogramja nem képes a kívánt késleltetést biztosítani."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+   "Mikrofon"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_ENABLE,
+   "Hangbemenet engedélyezése az ezt támogató magokhoz. Nincs hatással a teljesítményre, ha a mag nem használja a mikrofont."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+   "Eszköz"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DEVICE,
+   "Az illesztő által használt alapértelmezett bemeneti hangeszköz felülbírálata. Illesztőprogramtól függ."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_MICROPHONE_DEVICE,
+   "Az illesztő által használt alapértelmezett bemeneti hangeszköz felülbírálata. Illesztőprogramtól függ."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Újramintavételezés minősége"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Kisebb értékek esetén a késleltetés/teljesítmény jobb a minőség rovására, nagyobb értékeknél a hangminőség jobb a teljesítmény/késleltetés rovására."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_INPUT_RATE,
+   "Alapértelmezett bemeneti gyakoriság (Hz)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_INPUT_RATE,
+   "A hangbemenet mintavételi frekvenciája, akkor használatos, ha a mag nem igényel egy meghatározott értéket."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+   "Hangbemenet késletetése (ms)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_LATENCY,
+   "A hangbemenet kívánt késleltetése ezredmásodpercben. Előfordulhat, hogy a hang illesztőprogramja nem képes a kívánt késleltetést biztosítani."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "WASAPI kizárólagos mód"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "A WASAPI illesztő kizárólagos módban használhatja a mikrofon hangeszközt. Kikapcsolt állapotban megosztott módot használ."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "WASAPI lebegőpontos formátum"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "Lebegőpontos bemeneti formátum használata a WASAPI illesztőhöz, ha a hangeszköz támogatja."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "WASAPI megosztott puffer méret"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "A köztes puffer mérete (képkockákban), a WASAPI illesztő megosztott módú használata esetén."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 
@@ -14189,6 +14289,46 @@ MSG_HASH(
    "Az érintőképernyő koordinátáinak x/y szorzója, az OS szintű kijelző méretezéshez alkalmazkodás miatt."
    )
 #ifdef UDEV_TOUCH_SUPPORT
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TOUCH_VMOUSE_POINTER,
+   "Érintős virtuális egér mutató eszközként"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_POINTER,
+   "A bemeneti érintőképernyős események továbbítása."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TOUCH_VMOUSE_MOUSE,
+   "Érintős virtuális egér egér eszközként"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_MOUSE,
+   "Virtuális egér emulálása a bemeneti érintőképernyős eszköz eseményei alapján."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TOUCH_VMOUSE_TOUCHPAD,
+   "Érintős virtuális egér tapipad módban"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_TOUCHPAD,
+   "Az egér engedélyezésével együtt az érintőképernyő tapipadként működik."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TOUCH_VMOUSE_TRACKBALL,
+   "Érintős virtuális egér hanyattegér módban"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_TRACKBALL,
+   "Az egér engedélyezésével együtt az érintőképernyő hanyattegér módban működik, a mutató lendületével együtt."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_TOUCH_VMOUSE_GESTURE,
+   "Érintős virtuális egér gesztusvezérléssel"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_GESTURE,
+   "A gesztusvezérlés engedélyezése: koppintás, húzás, legyezés."
+   )
 #endif
 #ifdef HAVE_ODROIDGO2
 MSG_HASH(

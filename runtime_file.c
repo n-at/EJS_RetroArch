@@ -318,8 +318,8 @@ runtime_log_t *runtime_log_init(
        * the name of the core itself */
       if (supports_no_game)
       {
-         strlcpy(content_name, core_name, sizeof(content_name));
-         strlcat(content_name, ".lrtl", sizeof(content_name));
+         size_t _len = strlcpy(content_name, core_name, sizeof(content_name));
+         strlcpy(content_name + _len, ".lrtl", sizeof(content_name) - _len);
       }
    }
    /* NOTE: TyrQuake requires a specific hack, since all
@@ -332,17 +332,19 @@ runtime_log_t *runtime_log_init(
          size_t path_length = last_slash + 1 - content_path;
          if (path_length < PATH_MAX_LENGTH)
          {
+            size_t _len;
             memset(tmp_buf, 0, sizeof(tmp_buf));
             strlcpy(tmp_buf,
                   content_path, path_length * sizeof(char));
-            strlcpy(content_name,
+            _len = strlcpy(content_name,
                   path_basename(tmp_buf), sizeof(content_name));
-            strlcat(content_name, ".lrtl", sizeof(content_name));
+            strlcpy(content_name + _len, ".lrtl", sizeof(content_name) - _len);
          }
       }
    }
    else
    {
+      size_t _len;
       /* path_remove_extension() requires a char * (not const)
        * so have to use a temporary buffer... */
       char *tmp_buf_no_ext = NULL;
@@ -353,8 +355,8 @@ runtime_log_t *runtime_log_init(
       if (string_is_empty(tmp_buf_no_ext))
          return NULL;
 
-      strlcpy(content_name, tmp_buf_no_ext, sizeof(content_name));
-      strlcat(content_name, ".lrtl", sizeof(content_name));
+      _len = strlcpy(content_name, tmp_buf_no_ext, sizeof(content_name));
+      strlcpy(content_name + _len, ".lrtl", sizeof(content_name) - _len);
    }
 
    if (string_is_empty(content_name))
@@ -404,66 +406,7 @@ static retro_time_t runtime_log_convert_hms2usec(unsigned hours,
            ((retro_time_t)seconds           * 1000000);
 }
 
-
 /* Setters */
-
-/* Set runtime to specified hours, minutes, seconds value */
-void runtime_log_set_runtime_hms(runtime_log_t *runtime_log,
-      unsigned hours, unsigned minutes, unsigned seconds)
-{
-   retro_time_t usec;
-
-   if (!runtime_log)
-      return;
-
-   /* Converting to usec and back again may be considered a
-    * waste of CPU cycles, but this allows us to handle any
-    * kind of broken input without issue - i.e. user can enter
-    * minutes and seconds values > 59, and everything still
-    * works correctly */
-   usec = runtime_log_convert_hms2usec(hours, minutes, seconds);
-
-   runtime_log_convert_usec2hms(usec,
-         &runtime_log->runtime.hours,
-         &runtime_log->runtime.minutes,
-         &runtime_log->runtime.seconds);
-}
-
-/* Set runtime to specified microseconds value */
-void runtime_log_set_runtime_usec(
-      runtime_log_t *runtime_log, retro_time_t usec)
-{
-   if (runtime_log)
-      runtime_log_convert_usec2hms(usec,
-            &runtime_log->runtime.hours,
-            &runtime_log->runtime.minutes,
-            &runtime_log->runtime.seconds);
-}
-
-/* Adds specified hours, minutes, seconds value to current runtime */
-void runtime_log_add_runtime_hms(
-      runtime_log_t *runtime_log,
-      unsigned hours,
-      unsigned minutes,
-      unsigned seconds)
-{
-   retro_time_t usec_old;
-   retro_time_t usec_new;
-
-   if (!runtime_log)
-      return;
-
-   usec_old = runtime_log_convert_hms2usec(
-         runtime_log->runtime.hours,
-         runtime_log->runtime.minutes,
-         runtime_log->runtime.seconds);
-   usec_new = runtime_log_convert_hms2usec(hours, minutes, seconds);
-
-   runtime_log_convert_usec2hms(usec_old + usec_new,
-         &runtime_log->runtime.hours,
-         &runtime_log->runtime.minutes,
-         &runtime_log->runtime.seconds);
-}
 
 /* Adds specified microseconds value to current runtime */
 void runtime_log_add_runtime_usec(
@@ -547,7 +490,7 @@ void runtime_log_reset(runtime_log_t *runtime_log)
 /* Getters */
 
 /* Gets runtime in hours, minutes, seconds */
-void runtime_log_get_runtime_hms(runtime_log_t *runtime_log,
+static void runtime_log_get_runtime_hms(runtime_log_t *runtime_log,
       unsigned *hours, unsigned *minutes, unsigned *seconds)
 {
    if (!runtime_log)
@@ -556,15 +499,6 @@ void runtime_log_get_runtime_hms(runtime_log_t *runtime_log,
    *hours   = runtime_log->runtime.hours;
    *minutes = runtime_log->runtime.minutes;
    *seconds = runtime_log->runtime.seconds;
-}
-
-/* Gets runtime in microseconds */
-void runtime_log_get_runtime_usec(
-      runtime_log_t *runtime_log, retro_time_t *usec)
-{
-   if (runtime_log)
-      *usec = runtime_log_convert_hms2usec( runtime_log->runtime.hours,
-            runtime_log->runtime.minutes, runtime_log->runtime.seconds);
 }
 
 /* Gets runtime as a pre-formatted string */
@@ -578,12 +512,13 @@ void runtime_log_get_runtime_str(runtime_log_t *runtime_log,
    s[_len+1]   = '\0';
    if (runtime_log)
    {
+      size_t _len2;
       char t[64];
-      t[0] = '\0';
-      snprintf(t, sizeof(t), "%02u:%02u:%02u",
+      t[0]  = '\0';
+      _len2 = snprintf(t, sizeof(t), "%02u:%02u:%02u",
             runtime_log->runtime.hours, runtime_log->runtime.minutes,
             runtime_log->runtime.seconds);
-      strlcat(s, t, len);
+      strlcpy(s + _len2, t, len - _len2);
    }
    else
    {
@@ -617,12 +552,9 @@ void runtime_log_get_last_played(runtime_log_t *runtime_log,
 
 /* Gets last played entry values as a struct tm 'object'
  * (e.g. for printing with strftime()) */
-void runtime_log_get_last_played_time(runtime_log_t *runtime_log,
+static void runtime_log_get_last_played_time(runtime_log_t *runtime_log,
       struct tm *time_info)
 {
-   if (!runtime_log || !time_info)
-      return;
-
    /* Set tm values */
    time_info->tm_year  = (int)runtime_log->last_played.year  - 1900;
    time_info->tm_mon   = (int)runtime_log->last_played.month - 1;
@@ -640,6 +572,7 @@ void runtime_log_get_last_played_time(runtime_log_t *runtime_log,
 static bool runtime_last_played_human(runtime_log_t *runtime_log,
       char *str, size_t len)
 {
+   size_t _len, _len2;
    struct tm time_info;
    time_t last_played;
    time_t current;
@@ -678,16 +611,17 @@ static bool runtime_last_played_human(runtime_log_t *runtime_log,
       delta /= periods[i];
 
    /* Generate string */
-   snprintf(tmp, sizeof(tmp), "%u ", (int)delta);
-   if (delta == 1)
-      strlcat(tmp, msg_hash_to_str((enum msg_hash_enums)units[i][0]),
-            sizeof(tmp));
-   else
-      strlcat(tmp, msg_hash_to_str((enum msg_hash_enums)units[i][1]),
-            sizeof(tmp));
-   strlcat(str, tmp, len);
-   strlcat(str, " ", len);
-   strlcat(str, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_TIME_UNIT_AGO), len);
+   _len         = snprintf(tmp, sizeof(tmp), "%u ", (int)delta);
+   _len        += strlcpy (tmp       + _len,
+         msg_hash_to_str((enum msg_hash_enums)units[i][(delta == 1) ? 0 : 1]),
+                         sizeof(tmp) - _len);
+
+   _len2        = strlcat(str, tmp, len);
+   str[  _len2] = ' ';
+   str[++_len2] = '\0';
+   _len2       += strlcpy(str + _len2,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_TIME_UNIT_AGO),
+         len - _len2);
 
    return true;
 }
@@ -845,8 +779,8 @@ void runtime_log_get_last_played_str(runtime_log_t *runtime_log,
          struct tm time_info;
          runtime_log_get_last_played_time(runtime_log, &time_info);
          strftime_am_pm(tmp, sizeof(tmp), format_str, &time_info);
-         str[_len  ] = ' ';
-         str[_len+1] = '\0';
+         str[  _len] = ' ';
+         str[++_len] = '\0';
          strlcat(str, tmp, len);
          return;
       }
@@ -1104,8 +1038,8 @@ void runtime_log_get_last_played_str(runtime_log_t *runtime_log,
                      msg_hash_to_str(
                         MENU_ENUM_LABEL_VALUE_PLAYLIST_INLINE_CORE_DISPLAY_NEVER),
                      sizeof(tmp));
-            str[_len  ] = ' ';
-            str[_len+1] = '\0';
+            str[  _len] = ' ';
+            str[++_len] = '\0';
             strlcat(str, tmp, len);
             return;
          case PLAYLIST_LAST_PLAYED_STYLE_YMD_HMS:
@@ -1144,23 +1078,9 @@ bool runtime_log_has_runtime(runtime_log_t *runtime_log)
 {
    if (runtime_log)
       return !(
-            (runtime_log->runtime.hours   == 0) &&
-            (runtime_log->runtime.minutes == 0) &&
-            (runtime_log->runtime.seconds == 0));
-   return false;
-}
-
-/* Returns true if log has a non-zero last played entry */
-bool runtime_log_has_last_played(runtime_log_t *runtime_log)
-{
-   if (runtime_log)
-      return !(
-            (runtime_log->last_played.year   == 0) &&
-            (runtime_log->last_played.month  == 0) &&
-            (runtime_log->last_played.day    == 0) &&
-            (runtime_log->last_played.hour   == 0) &&
-            (runtime_log->last_played.minute == 0) &&
-            (runtime_log->last_played.second == 0));
+               (runtime_log->runtime.hours   == 0)
+            && (runtime_log->runtime.minutes == 0)
+            && (runtime_log->runtime.seconds == 0));
    return false;
 }
 
@@ -1397,9 +1317,9 @@ void runtime_update_contentless_core(
 #endif
 
    /* Sanity check */
-   if (string_is_empty(core_path) ||
-       !core_info_find(core_path, &core_info) ||
-       !core_info->supports_no_game)
+   if (    string_is_empty(core_path)
+       || !core_info_find(core_path, &core_info)
+       || !core_info->supports_no_game)
       return;
 
    /* Set fallback runtime status
@@ -1447,8 +1367,8 @@ void runtime_update_contentless_core(
     * to be populated even when no runtime is recorded */
    if (runtime_info.status != CONTENTLESS_CORE_RUNTIME_VALID)
    {
-      if (string_is_equal(menu_ident, "ozone") ||
-          string_is_equal(menu_ident, "glui"))
+      if (   string_is_equal(menu_ident, "ozone")
+          || string_is_equal(menu_ident, "glui"))
       {
          runtime_log_get_runtime_str(NULL,
                runtime_str, sizeof(runtime_str));

@@ -614,8 +614,7 @@ static int action_start_video_resolution(
 
    if (video_driver_get_video_output_size(&width, &height, desc, sizeof(desc)))
    {
-      char msg[PATH_MAX_LENGTH];
-
+      char msg[128];
       msg[0] = '\0';
 
 #if defined(_WIN32) || !defined(__PSL1GHT__) && !defined(__PS3__)
@@ -706,9 +705,10 @@ static int action_start_core_lock(
    /* ...Otherwise, attempt to unlock it */
    if (!core_info_set_core_lock(core_path, false))
    {
+      size_t _len;
       const char *core_name  = NULL;
       core_info_t *core_info = NULL;
-      char msg[PATH_MAX_LENGTH];
+      char msg[128];
 
       /* Need to fetch core name for error message */
 
@@ -721,10 +721,10 @@ static int action_start_core_lock(
          core_name = path_basename_nocompression(core_path);
 
       /* Build error message */
-      strlcpy(msg, msg_hash_to_str(MSG_CORE_UNLOCK_FAILED), sizeof(msg));
+      _len = strlcpy(msg, msg_hash_to_str(MSG_CORE_UNLOCK_FAILED), sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcat(msg, core_name, sizeof(msg));
+         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       /* Generate log + notification */
       RARCH_ERR("%s\n", msg);
@@ -765,9 +765,10 @@ static int action_start_core_set_standalone_exempt(
    /* ...Otherwise, attempt to unset the exempt flag */
    if (!core_info_set_core_standalone_exempt(core_path, false))
    {
+      size_t _len;
       const char *core_name  = NULL;
       core_info_t *core_info = NULL;
-      char msg[PATH_MAX_LENGTH];
+      char msg[128];
 
       /* Need to fetch core name for error message */
 
@@ -780,12 +781,12 @@ static int action_start_core_set_standalone_exempt(
          core_name = path_basename_nocompression(core_path);
 
       /* Build error message */
-      strlcpy(msg,
+      _len = strlcpy(msg,
             msg_hash_to_str(MSG_CORE_UNSET_STANDALONE_EXEMPT_FAILED),
             sizeof(msg));
 
       if (!string_is_empty(core_name))
-         strlcat(msg, core_name, sizeof(msg));
+         strlcpy(msg + _len, core_name, sizeof(msg) - _len);
 
       /* Generate log + notification */
       RARCH_ERR("%s\n", msg);

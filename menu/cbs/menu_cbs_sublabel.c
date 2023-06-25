@@ -83,20 +83,20 @@ static int menu_action_sublabel_file_browser_core(file_list_t *list, unsigned ty
             core_info->licenses_list, ", ");
       _len      = strlcpy(s,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
-      s[_len  ] = ':';
-      s[_len+1] = ' ';
-      s[_len+2] = '\0';
-      strlcat(s, tmp, len);
+      s[  _len] = ':';
+      s[++_len] = ' ';
+      s[++_len] = '\0';
+      strlcpy(s + _len, tmp, len - _len);
    }
    else
    {
       /* No license found - set to N/A */
       _len      = strlcpy(s,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
-      s[_len  ] = ':';
-      s[_len+1] = ' ';
-      s[_len+2] = '\0';
-      strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
+      s[  _len] = ':';
+      s[++_len] = ' ';
+      s[++_len] = '\0';
+      strlcpy(s + _len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len - _len);
    }
 
    return 1;
@@ -131,8 +131,8 @@ static int menu_action_sublabel_contentless_core(file_list_t *list,
       return 0;
 
    /* Search for specified core */
-   if (!core_info_find(core_path, &core_info) ||
-       !core_info->supports_no_game)
+   if (   !core_info_find(core_path, &core_info)
+       || !core_info->supports_no_game)
       return 1;
 
    /* Get corresponding contentless core info entry */
@@ -146,18 +146,23 @@ static int menu_action_sublabel_contentless_core(file_list_t *list,
 
    /* > Runtime info is always omitted when using Ozone
     * > Check if required runtime log is enabled */
-   if (((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_PER_CORE) &&
-         !content_runtime_log) ||
-       ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_AGGREGATE) &&
-         !content_runtime_log_aggregate) ||
-       string_is_equal(menu_ident, "ozone"))
+   if (   ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_PER_CORE)
+       && !content_runtime_log)
+       || ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_AGGREGATE)
+       && !content_runtime_log_aggregate)
+#ifdef HAVE_OZONE
+       || string_is_equal(menu_ident, "ozone")
+#endif
+      )
       display_runtime = false;
 
+#ifdef HAVE_MATERIALUI
    /* > License info is always displayed unless
     *   we are using GLUI with runtime info enabled */
    if (display_runtime && string_is_equal(menu_ident, "glui"))
       tmp[0  ] = '\0';
    else
+#endif
    {
       /* Display licenses */
       strlcpy(s, entry->licenses_str, len);
@@ -343,8 +348,10 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_window_opacity,          MENU_
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_window_show_decorations, MENU_ENUM_SUBLABEL_VIDEO_WINDOW_SHOW_DECORATIONS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_video_window_show_menubar,     MENU_ENUM_SUBLABEL_UI_MENUBAR_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_settings_list,           MENU_ENUM_SUBLABEL_AUDIO_SETTINGS)
-DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_resampler_settings_list,           MENU_ENUM_SUBLABEL_AUDIO_RESAMPLER_SETTINGS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_output_settings_list,           MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS)
+#ifdef HAVE_MICROPHONE
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_settings_list,           MENU_ENUM_SUBLABEL_MICROPHONE_SETTINGS)
+#endif
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_synchronization_settings_list,           MENU_ENUM_SUBLABEL_AUDIO_SYNCHRONIZATION_SETTINGS)
 #ifdef HAVE_AUDIOMIXER
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_mixer_settings_list,           MENU_ENUM_SUBLABEL_AUDIO_MIXER_SETTINGS)
@@ -788,6 +795,19 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_dsp_plugin_remove,       MENU_
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_wasapi_exclusive_mode,   MENU_ENUM_SUBLABEL_AUDIO_WASAPI_EXCLUSIVE_MODE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_wasapi_float_format,     MENU_ENUM_SUBLABEL_AUDIO_WASAPI_FLOAT_FORMAT)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_audio_wasapi_sh_buffer_length, MENU_ENUM_SUBLABEL_AUDIO_WASAPI_SH_BUFFER_LENGTH)
+
+#ifdef HAVE_MICROPHONE
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_driver,                  MENU_ENUM_SUBLABEL_MICROPHONE_DRIVER)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_resampler_driver,        MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_DRIVER)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_resampler_quality,       MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_enable,                  MENU_ENUM_SUBLABEL_MICROPHONE_ENABLE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_device,                  MENU_ENUM_SUBLABEL_MICROPHONE_DEVICE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_rate,                    MENU_ENUM_SUBLABEL_MICROPHONE_INPUT_RATE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_latency,                 MENU_ENUM_SUBLABEL_MICROPHONE_LATENCY)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_wasapi_exclusive_mode,   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_wasapi_float_format,     MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_FLOAT_FORMAT)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_microphone_wasapi_sh_buffer_length, MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH)
+#endif
 
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_overlay_opacity,                 MENU_ENUM_SUBLABEL_OVERLAY_OPACITY)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_overlay_scale_landscape,         MENU_ENUM_SUBLABEL_OVERLAY_SCALE_LANDSCAPE)
@@ -1388,7 +1408,7 @@ static int action_bind_sublabel_subsystem_add(
       if (content_get_subsystem_rom_id() < subsystem->num_roms)
          snprintf(s, len,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SUBSYSTEM_CONTENT_INFO),
-               (content_get_subsystem() == type - MENU_SETTINGS_SUBSYSTEM_ADD)
+               (content_get_subsystem() == (int)type - MENU_SETTINGS_SUBSYSTEM_ADD)
              ? subsystem->roms[content_get_subsystem_rom_id()].desc
              : subsystem->roms[0].desc);
    }
@@ -1613,41 +1633,43 @@ static int action_bind_sublabel_netplay_room(file_list_t *list,
    if (room_index >= (unsigned)net_st->room_count)
       return -1;
 
-   room = &net_st->room_list[room_index];
-   _len = strlcpy(s, msg_hash_to_str(MSG_PROGRAM), len);
+   room  = &net_st->room_list[room_index];
+   _len  = strlcpy(s, msg_hash_to_str(MSG_PROGRAM), len);
 
-   snprintf(s + _len, len - _len,
+   _len += snprintf(s + _len, len - _len,
       ": %s (%s)\n"
       "%s: %s (%s)\n"
       "%s: %s ",
-      !string_is_empty(room->retroarch_version) ? room->retroarch_version :
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
+      !string_is_empty(room->retroarch_version) 
+      ? room->retroarch_version
+      : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
       (!string_is_empty(room->frontend) &&
-         !string_is_equal_case_insensitive(room->frontend, "N/A")) ?
-            room->frontend :
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
+         !string_is_equal_case_insensitive(room->frontend, "N/A"))
+            ? room->frontend
+            : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
       msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT_INFO_CORE_NAME),
       room->corename, room->coreversion,
       msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CONTENT),
       (!string_is_empty(room->gamename) &&
-         !string_is_equal_case_insensitive(room->gamename, "N/A")) ?
-            room->gamename :
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE));
+         !string_is_equal_case_insensitive(room->gamename, "N/A"))
+            ? room->gamename
+            : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE));
 
    if (     string_is_empty(room->subsystem_name)
          || string_is_equal_case_insensitive(room->subsystem_name, "N/A"))
       snprintf(buf, sizeof(buf), "(%08lX)",
-         (unsigned long)(unsigned)room->gamecrc);
+            (unsigned long)(unsigned)room->gamecrc);
    else
    {
-      buf[0 ]     = '(';
-      buf[1 ]     = '\0';
-      _len        = strlcat(buf, room->subsystem_name, sizeof(buf));
-      buf[_len  ] = ')';
-      buf[_len+1] = '\0';
+      size_t _len2  = 0;
+      buf[  _len2]  = '(';
+      buf[++_len2]  = '\0';
+      _len2        += strlcpy(buf + _len2, room->subsystem_name, sizeof(buf) - _len2);
+      buf[  _len2]  = ')';
+      buf[++_len2]  = '\0';
    }
 
-   strlcat(s, buf, len);
+   strlcpy(s + _len, buf, len - _len);
 
    return 0;
 }
@@ -1687,12 +1709,12 @@ static int action_bind_sublabel_netplay_kick_client(file_list_t *list,
    {
       size_t _len = strlcpy(buf, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_STATUS),
             sizeof(buf));
-      buf[_len  ] = ':';
-      buf[_len+1] = ' ';
-      buf[_len+2] = '\0';
-      _len        = strlcat(buf, status, sizeof(buf));
-      buf[_len  ] = '\n';
-      buf[_len+1] = '\0';
+      buf[  _len] = ':';
+      buf[++_len] = ' ';
+      buf[++_len] = '\0';
+      _len       += strlcpy(buf + _len, status, sizeof(buf) - _len);
+      buf[  _len] = '\n';
+      buf[++_len] = '\0';
       strlcat(s, buf, len);
    }
 
@@ -1702,7 +1724,7 @@ static int action_bind_sublabel_netplay_kick_client(file_list_t *list,
          msg_hash_to_str(MSG_NETPLAY_CLIENT_DEVICES));
 
       /* Ensure that at least one device can be written. */
-      if (written > 0 && written < (sizeof(buf) - STRLEN_CONST(" 16\n")))
+      if (written > 0 && written < (int)sizeof(buf) - (int)STRLEN_CONST(" 16\n"))
       {
          uint32_t device;
          char *buf_written = buf + written;
@@ -1722,7 +1744,7 @@ static int action_bind_sublabel_netplay_kick_client(file_list_t *list,
                }
 
                written += tmp_written;
-               if (written >= (sizeof(buf) - 1))
+               if (written >= (int)sizeof(buf) - 1)
                   break;
 
                buf_written += tmp_written;
@@ -1825,35 +1847,35 @@ static int action_bind_sublabel_playlist_entry(
 
    /* Only add sublabel if a core is currently assigned
     * > Both core name and core path must be valid */
-   if (  string_is_empty(entry->core_name) ||
-         string_is_equal(entry->core_name, "DETECT") ||
-         string_is_empty(entry->core_path) ||
-         string_is_equal(entry->core_path, "DETECT"))
+   if (     string_is_empty(entry->core_name)
+         || string_is_equal(entry->core_name, "DETECT")
+         || string_is_empty(entry->core_path)
+         || string_is_equal(entry->core_path, "DETECT"))
       return 0;
 
    /* Add core name */
    _len      = strlcpy(s,
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_SUBLABEL_CORE), len);
-   s[_len  ] =  ' ';
-   s[_len+1] =  '\0';
-   strlcat(s, entry->core_name, len);
+   s[  _len] =  ' ';
+   s[++_len] =  '\0';
+   _len     += strlcpy(s + _len, entry->core_name, len - _len);
 
    /* Get runtime info *if* required runtime log is enabled
     * *and* this is a valid playlist type */
-   if (((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_PER_CORE) &&
-         !content_runtime_log) ||
-       ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_AGGREGATE) &&
-         !content_runtime_log_aggregate))
+   if (   ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_PER_CORE)
+         && !content_runtime_log)
+       || ((playlist_sublabel_runtime_type == PLAYLIST_RUNTIME_AGGREGATE)
+         && !content_runtime_log_aggregate))
       return 0;
 
    /* Note: This looks heavy, but each string_is_equal() call will
     * return almost immediately */
-   if (!string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY)) &&
-       !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_HISTORY_TAB)) &&
-       !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_FAVORITES_LIST)) &&
-       !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_FAVORITES_TAB)) &&
-       !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_PLAYLIST_LIST)) &&
-       !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_HORIZONTAL_MENU)))
+   if (   !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY))
+       && !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_HISTORY_TAB))
+       && !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_FAVORITES_LIST))
+       && !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_FAVORITES_TAB)) 
+       && !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_PLAYLIST_LIST)) 
+       && !string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_HORIZONTAL_MENU)))
       return 0;
 
    /* Check whether runtime info should be loaded from log file */
@@ -1874,19 +1896,19 @@ static int action_bind_sublabel_playlist_entry(
 
       /* Runtime/last played strings are now cached in the
        * playlist, so we can add both in one go */
-      tmp[0  ] = '\n';
-      tmp[1  ] = '\0';
-      n        = strlcat(tmp, entry->runtime_str, sizeof(tmp));
+      tmp[  n] = '\n';
+      tmp[++n] = '\0';
+      n       += strlcpy(tmp + n, entry->runtime_str, sizeof(tmp) - n);
 
       if (n < 64 - 1)
       {
-         tmp[n  ] = '\n';
-         tmp[n+1] = '\0';
-         strlcat(tmp, entry->last_played_str, sizeof(tmp));
+         tmp[  n] = '\n';
+         tmp[++n] = '\0';
+         strlcpy(tmp + n, entry->last_played_str, sizeof(tmp) - n);
       }
 
       if (!string_is_empty(tmp))
-         strlcat(s, tmp, len);
+         strlcpy(s + _len, tmp, len - _len);
    }
 
    return 0;
@@ -1967,20 +1989,20 @@ static int action_bind_sublabel_core_updater_entry(
             entry->licenses_list, ", ");
       _len      = strlcpy(s,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
-      s[_len  ] = ':';
-      s[_len+1] = ' ';
-      s[_len+2] = '\0';
-      strlcat(s, tmp, len);
+      s[  _len] = ':';
+      s[++_len] = ' ';
+      s[++_len] = '\0';
+      strlcpy(s + _len, tmp, len - _len);
    }
    else
    {
       /* No license found - set to N/A */
       _len      = strlcpy(s,
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_INFO_LICENSES), len);
-      s[_len  ] = ':';
-      s[_len+1] = ' ';
-      s[_len+2] = '\0';
-      strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
+      s[  _len] = ':';
+      s[++_len] = ' ';
+      s[++_len] = '\0';
+      strlcpy(s + _len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len - _len);
    }
    return 1;
 }
@@ -2002,18 +2024,18 @@ static int action_bind_sublabel_core_backup_entry(
    /* Add crc string */
    if (string_is_empty(crc))
    {
-      s[_len  ] = '0';
-      s[_len+1] = '0';
-      s[_len+2] = '0';
-      s[_len+3] = '0';
-      s[_len+4] = '0';
-      s[_len+5] = '0';
-      s[_len+6] = '0';
-      s[_len+7] = '0';
-      s[_len+8] = '\0';
+      s[  _len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '0';
+      s[++_len] = '\0';
    }
    else
-      strlcat(s, crc, len);
+      strlcpy(s + _len, crc, len - _len);
 
    return 1;
 }
@@ -2397,6 +2419,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_AUDIO_RESAMPLER_QUALITY:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_resampler_quality);
             break;
+#ifdef HAVE_MICROPHONE
+         case MENU_ENUM_LABEL_MICROPHONE_RESAMPLER_QUALITY:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_resampler_quality);
+            break;
+#endif
          case MENU_ENUM_LABEL_MATERIALUI_ICONS_ENABLE:
 #ifdef HAVE_MATERIALUI
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_materialui_icons_enable);
@@ -3601,6 +3628,35 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_AUDIO_WASAPI_SH_BUFFER_LENGTH:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_wasapi_sh_buffer_length);
             break;
+#ifdef HAVE_MICROPHONE
+         case MENU_ENUM_LABEL_MICROPHONE_ENABLE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_enable);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_INPUT_RATE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_rate);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_DEVICE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_device);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_LATENCY:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_latency);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_wasapi_exclusive_mode);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_WASAPI_FLOAT_FORMAT:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_wasapi_float_format);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_wasapi_sh_buffer_length);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_RESAMPLER_DRIVER:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_resampler_driver);
+            break;
+         case MENU_ENUM_LABEL_MICROPHONE_DRIVER:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_driver);
+            break;
+#endif
          case MENU_ENUM_LABEL_MENU_WALLPAPER:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_wallpaper);
             break;
@@ -4684,15 +4740,17 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          case MENU_ENUM_LABEL_AUDIO_SETTINGS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_settings_list);
             break;
-         case MENU_ENUM_LABEL_AUDIO_RESAMPLER_SETTINGS:
-            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_resampler_settings_list);
-            break;
          case MENU_ENUM_LABEL_AUDIO_SYNCHRONIZATION_SETTINGS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_synchronization_settings_list);
             break;
          case MENU_ENUM_LABEL_AUDIO_OUTPUT_SETTINGS:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_audio_output_settings_list);
             break;
+#ifdef HAVE_MICROPHONE
+         case MENU_ENUM_LABEL_MICROPHONE_SETTINGS:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_microphone_settings_list);
+            break;
+#endif
          case MENU_ENUM_LABEL_AUDIO_MIXER_SETTINGS:
 #ifdef HAVE_AUDIOMIXER
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_mixer_settings_list);
@@ -5270,9 +5328,9 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
    {
       /* Per-port 'Analog to Digital Type' entries
        * require special handling */
-      if (string_starts_with_size(label, "input_player",
-            STRLEN_CONST("input_player")) &&
-         string_ends_with_size(label, "_analog_dpad_mode",
+      if (  string_starts_with_size(label, "input_player",
+            STRLEN_CONST("input_player"))
+         && string_ends_with_size(label, "_analog_dpad_mode",
                strlen(label), STRLEN_CONST("_analog_dpad_mode")))
       {
          unsigned i;
@@ -5280,9 +5338,11 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
          size_t _len = strlcpy(key_input_adc_type, "input_player", sizeof(key_input_adc_type));
          for (i = 0; i < MAX_USERS; i++)
          {
-            snprintf(key_input_adc_type + _len,
+            size_t _len2 = snprintf(key_input_adc_type      + _len,
                   sizeof(key_input_adc_type) - _len, "%u", i + 1);
-            strlcat(key_input_adc_type, "_analog_dpad_mode", sizeof(key_input_adc_type));
+            strlcpy(key_input_adc_type       + _len2,
+                  "_analog_dpad_mode",
+                  sizeof(key_input_adc_type) - _len2);
             if (!string_is_equal(label, key_input_adc_type))
                continue;
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_input_adc_type);

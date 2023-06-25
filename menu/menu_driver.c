@@ -1446,7 +1446,7 @@ static int menu_input_key_bind_set_mode_common(
 
             menu_displaylist_info_init(&info);
 
-            bind_type                = setting_get_bind_type(setting);
+            bind_type                = setting->bind_type;
 
             binds->begin             = bind_type;
             binds->last              = bind_type;
@@ -2883,6 +2883,7 @@ static bool menu_shader_manager_save_preset_internal(
       const char **target_dirs,
       size_t num_target_dirs)
 {
+   size_t _len;
    char fullname[PATH_MAX_LENGTH];
    char buffer[PATH_MAX_LENGTH];
    const char *preset_ext         = NULL;
@@ -2898,10 +2899,10 @@ static bool menu_shader_manager_save_preset_internal(
    preset_ext = video_shader_get_preset_extension(type);
 
    if (!string_is_empty(basename))
-      strlcpy(fullname, basename, sizeof(fullname));
+      _len = strlcpy(fullname, basename, sizeof(fullname));
    else
-      strlcpy(fullname, "retroarch", sizeof(fullname));
-   strlcat(fullname, preset_ext, sizeof(fullname));
+      _len = strlcpy(fullname, "retroarch", sizeof(fullname));
+   strlcpy(fullname + _len, preset_ext, sizeof(fullname) - _len);
 
    if (path_is_absolute(fullname))
    {
@@ -4538,7 +4539,7 @@ void menu_entries_get_core_title(char *s, size_t len)
       : "";
    size_t _len = strlcpy(s, PACKAGE_VERSION, len);
 #if defined(_MSC_VER)
-   _len        = strlcat(s, msvc_vercode_to_str(_MSC_VER), len);
+   _len += strlcpy(s + _len, msvc_vercode_to_str(_MSC_VER), len - _len);
 #endif
 
    if (!string_is_empty(core_version))
@@ -5076,17 +5077,15 @@ unsigned menu_event(
    menu_input_t *menu_input                        = &menu_st->input_state;
    input_driver_state_t *input_st                  = input_state_get_ptr();
    input_driver_t *current_input                   = input_st->current_driver;
-   const input_device_driver_t
-      *joypad                                      = input_st->primary_joypad;
+   const input_device_driver_t *joypad             = input_st->primary_joypad;
 #ifdef HAVE_MFI
-   const input_device_driver_t *sec_joypad         =
-      input_st->secondary_joypad;
+   const input_device_driver_t *sec_joypad         = input_st->secondary_joypad;
 #else
    const input_device_driver_t *sec_joypad         = NULL;
 #endif
    gfx_display_t *p_disp                           = disp_get_ptr();
    menu_input_pointer_hw_state_t *pointer_hw_state = &menu_st->input_pointer_hw_state;
-   menu_handle_t             *menu                 = menu_st->driver_data;
+   menu_handle_t *menu                             = menu_st->driver_data;
    bool keyboard_mapping_blocked                   = input_st->flags & INP_FLAG_KB_MAPPING_BLOCKED;
    bool menu_mouse_enable                          = settings->bools.menu_mouse_enable;
    bool menu_pointer_enable                        = settings->bools.menu_pointer_enable;
@@ -5095,13 +5094,12 @@ unsigned menu_event(
    bool menu_scroll_fast                           = settings->bools.menu_scroll_fast;
    bool pointer_enabled                            = settings->bools.menu_pointer_enable;
    unsigned input_touch_scale                      = settings->uints.input_touch_scale;
-   unsigned menu_scroll_delay                      =
-      settings->uints.menu_scroll_delay;
+   unsigned menu_scroll_delay                      = settings->uints.menu_scroll_delay;
 #ifdef HAVE_OVERLAY
    bool input_overlay_enable                       = settings->bools.input_overlay_enable;
    bool overlay_active                             = input_overlay_enable 
-      && (input_st->overlay_ptr)
-      && (input_st->overlay_ptr->flags & INPUT_OVERLAY_ALIVE);
+         && (input_st->overlay_ptr)
+         && (input_st->overlay_ptr->flags & INPUT_OVERLAY_ALIVE);
 #else
    bool input_overlay_enable                       = false;
    bool overlay_active                             = false;
@@ -5143,11 +5141,11 @@ unsigned menu_event(
 
       /* Read mouse */
 #ifdef HAVE_IOS_TOUCHMOUSE
-       if (menu_mouse_enable)
-       {
-         settings->bools.menu_pointer_enable=true;
-         menu_pointer_enable=true;
-       }
+      if (menu_mouse_enable)
+      {
+         settings->bools.menu_pointer_enable = true;
+         menu_pointer_enable = true;
+      }
 #else
       if (menu_mouse_enable)
          menu_input_get_mouse_hw_state(
@@ -5269,11 +5267,11 @@ unsigned menu_event(
           * for old_input_state. */
 
          first_held                 = true;
+         delay_count                = 0;
          if (initial_held)
             delay_timer             = menu_scroll_delay;
          else
-            delay_timer             = menu_scroll_fast ? 100 : 20;
-         delay_count                = 0;
+            delay_timer             = menu_scroll_delay / 8;
       }
 
       if (delay_count >= delay_timer)
@@ -5288,12 +5286,13 @@ unsigned menu_event(
          new_scroll_accel           = menu_st->scroll.acceleration;
 
          if (menu_scroll_fast)
-            new_scroll_accel        = MIN(new_scroll_accel + 1, 64);
+            new_scroll_accel        = MIN(new_scroll_accel + 1, 25);
          else
             new_scroll_accel        = MIN(new_scroll_accel + 1, 5);
       }
 
       initial_held                  = false;
+      delay_count                  += anim_get_ptr()->delta_time;
    }
    else
    {
@@ -5305,8 +5304,6 @@ unsigned menu_event(
 
    if (set_scroll)
       menu_st->scroll.acceleration  = (unsigned)(new_scroll_accel);
-
-   delay_count                     += anim_get_ptr()->delta_time;
 
    if (display_kb)
    {
@@ -6190,8 +6187,15 @@ void menu_driver_toggle(
       /* Stop all rumbling before entering the menu. */
       command_event(CMD_EVENT_RUMBLE_STOP, NULL);
 
-      if (pause_libretro && !audio_enable_menu)
-         command_event(CMD_EVENT_AUDIO_STOP, NULL);
+      if (pause_libretro)
+      { /* If the menu pauses the game... */
+#ifdef HAVE_MICROPHONE
+         command_event(CMD_EVENT_MICROPHONE_STOP, NULL);
+#endif
+
+         if (!audio_enable_menu) /* If the menu shouldn't have audio... */
+            command_event(CMD_EVENT_AUDIO_STOP, NULL);
+      }
 
       /* Override keyboard callback to redirect to menu instead.
        * We'll use this later for something ... */
@@ -6216,8 +6220,18 @@ void menu_driver_toggle(
       if (!runloop_shutdown_initiated)
          driver_set_nonblock_state();
 
-      if (pause_libretro && !audio_enable_menu)
-         command_event(CMD_EVENT_AUDIO_START, NULL);
+      if (pause_libretro)
+      { /* If the menu pauses the game... */
+
+         if (!audio_enable_menu) /* ...and the menu doesn't have audio... */
+            command_event(CMD_EVENT_AUDIO_START, NULL);
+            /* ...then re-enable the audio driver (which we shut off earlier) */
+
+#ifdef HAVE_MICROPHONE
+         command_event(CMD_EVENT_MICROPHONE_START, NULL);
+         /* Start the microphone, if it was paused beforehand */
+#endif
+      }
 
       /* Restore libretro keyboard callback. */
       if (key_event && frontend_key_event)
@@ -7547,16 +7561,18 @@ int generic_menu_entry_action(
       {
 	      size_t _len             = strlcpy(speak_string,
                title_name, sizeof(speak_string));
-         speak_string[_len  ]    = ' ';
-         speak_string[_len+1]    = '\0';
-         _len                    = strlcat(speak_string,
-               current_label, sizeof(speak_string));
+         speak_string[  _len]    = ' ';
+         speak_string[++_len]    = '\0';
+         _len += strlcpy(speak_string + _len,
+               current_label,
+               sizeof(speak_string)   - _len);
          if (!string_is_equal(current_value, "..."))
          {
-            speak_string[_len  ] = ' ';
-            speak_string[_len+1] = '\0';
-            strlcat(speak_string, current_value,
-                  sizeof(speak_string));
+            speak_string[  _len] = ' ';
+            speak_string[++_len] = '\0';
+            strlcpy(speak_string       + _len,
+                  current_value,
+                  sizeof(speak_string) - _len);
          }
       }
       else
@@ -7565,10 +7581,11 @@ int generic_menu_entry_action(
                current_label, sizeof(speak_string));
          if (!string_is_equal(current_value, "..."))
          {
-            speak_string[_len  ] = ' ';
-            speak_string[_len+1] = '\0';
-            strlcat(speak_string, current_value,
-                  sizeof(speak_string));
+            speak_string[  _len] = ' ';
+            speak_string[++_len] = '\0';
+            strlcpy(speak_string       + _len,
+                  current_value,
+                  sizeof(speak_string) - _len);
          }
       }
 

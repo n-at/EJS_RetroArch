@@ -930,7 +930,7 @@ static void gl2_raster_font_render_message(gl2_t *gl,
    for (;;)
    {
       const char *delim = strchr(msg, '\n');
-      size_t msg_len    = delim ? (delim - msg) : strlen(msg);
+      size_t msg_len    = delim ? (size_t)(delim - msg) : strlen(msg);
 
       /* Draw the line */
       gl2_raster_font_render_line(gl, font,
@@ -1331,11 +1331,6 @@ static void gl2_set_viewport(gl2_t *gl,
          {
             delta  = (device_aspect / desired_aspect - 1.0f) / 2.0f + 0.5f;
             y      = (int)roundf(viewport_height * (0.5f - delta));
-#if defined(RARCH_MOBILE)
-            /* In portrait mode, we want viewport to gravitate to top of screen. */
-            if (device_aspect < 1.0f)
-                y *= 2;
-#endif
             viewport_height = (unsigned)roundf(2.0f * viewport_height * delta);
          }
       }
@@ -1351,6 +1346,12 @@ static void gl2_set_viewport(gl2_t *gl,
       gl->vp.width  = viewport_width;
       gl->vp.height = viewport_height;
    }
+
+#if defined(RARCH_MOBILE)
+   /* In portrait mode, we want viewport to gravitate to top of screen. */
+   if (device_aspect < 1.0f)
+      gl->vp.y *= 2;
+#endif
 
    glViewport(gl->vp.x, gl->vp.y, gl->vp.width, gl->vp.height);
    gl2_set_projection(gl, &default_ortho, allow_rotate);
@@ -4323,18 +4324,18 @@ static void *gl2_init(const video_info_t *video,
 
    {
       char device_str[128];
-
+      size_t len    = 0;
       device_str[0] = '\0';
 
       if (!string_is_empty(vendor))
       {
-        size_t len        = strlcpy(device_str, vendor, sizeof(device_str));
-        device_str[len  ] = ' ';
-        device_str[len+1] = '\0';
+        len               = strlcpy(device_str, vendor, sizeof(device_str));
+        device_str[  len] = ' ';
+        device_str[++len] = '\0';
       }
 
       if (!string_is_empty(renderer))
-        strlcat(device_str, renderer, sizeof(device_str));
+        strlcpy(device_str + len, renderer, sizeof(device_str) - len);
 
       video_driver_set_gpu_device_string(device_str);
 
@@ -5228,7 +5229,7 @@ static const video_poke_interface_t gl2_poke_interface = {
    gl2_unload_texture,
    gl2_set_video_mode,
    gl2_get_refresh_rate,
-   NULL,
+   NULL, /* set_filtering */
    gl2_get_video_output_size,
    gl2_get_video_output_prev,
    gl2_get_video_output_next,
@@ -5240,14 +5241,14 @@ static const video_poke_interface_t gl2_poke_interface = {
    gl2_set_texture_enable,
    font_driver_render_msg,
    gl2_show_mouse,
-   NULL,
+   NULL, /* grab_mouse_toggle */
    gl2_get_current_shader,
-   NULL,                      /* get_current_software_framebuffer */
-   NULL,                      /* get_hw_render_interface */
-   NULL,                      /* set_hdr_max_nits */
-   NULL,                      /* set_hdr_paper_white_nits */
-   NULL,                      /* set_hdr_contrast */
-   NULL                       /* set_hdr_expand_gamut */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
+   NULL, /* set_hdr_max_nits */
+   NULL, /* set_hdr_paper_white_nits */
+   NULL, /* set_hdr_contrast */
+   NULL  /* set_hdr_expand_gamut */
 };
 
 static void gl2_get_poke_interface(void *data,
@@ -5280,24 +5281,18 @@ video_driver_t video_gl2 = {
    gl2_focus,
    gl2_suppress_screensaver,
    gl2_has_windowed,
-
    gl2_set_shader,
-
    gl2_free,
    "gl",
-
    gl2_set_viewport_wrapper,
    gl2_set_rotation,
-
    gl2_viewport_info,
-
    gl2_read_viewport,
 #if defined(READ_RAW_GL_FRAME_TEST)
    gl2_read_frame_raw,
 #else
    NULL,
 #endif
-
 #ifdef HAVE_OVERLAY
    gl2_get_overlay_interface,
 #endif

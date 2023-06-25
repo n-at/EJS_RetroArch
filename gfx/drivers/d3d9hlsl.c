@@ -1451,10 +1451,12 @@ static bool d3d9_hlsl_init_internal(d3d9_video_t *d3d,
 
    windowed_full         = settings->bools.video_windowed_fullscreen;
 
-   full_x                = (windowed_full || info->width  == 0) ?
-      (mon_rect.right  - mon_rect.left) : info->width;
-   full_y                = (windowed_full || info->height == 0) ?
-      (mon_rect.bottom - mon_rect.top)  : info->height;
+   full_x                = (windowed_full || info->width  == 0)
+      ? (unsigned)(mon_rect.right  - mon_rect.left) 
+      : info->width;
+   full_y                = (windowed_full || info->height == 0)
+      ? (unsigned)(mon_rect.bottom - mon_rect.top)  
+      : info->height;
 #else
    d3d9_get_video_size(d3d, &full_x, &full_y);
 #endif
@@ -1764,12 +1766,12 @@ static const video_poke_interface_t d3d9_hlsl_poke_interface = {
    d3d9_unload_texture,
    d3d9_set_video_mode,
 #if defined(_XBOX) || defined(__WINRT__)
-   NULL,
+   NULL, /* get_refresh_rate */
 #else
    /* UWP does not expose this information easily */
    win32_get_refresh_rate,
 #endif
-   NULL,
+   NULL, /* set_filtering */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */
@@ -1780,16 +1782,15 @@ static const video_poke_interface_t d3d9_hlsl_poke_interface = {
    d3d9_set_menu_texture_frame,
    d3d9_set_menu_texture_enable,
    d3d9_set_osd_msg,
-
    win32_show_cursor,
-   NULL,                         /* grab_mouse_toggle */
-   NULL,                         /* get_current_shader */
-   NULL,                         /* get_current_software_framebuffer */
-   NULL,                         /* get_hw_render_interface */
-   NULL,                         /* set_hdr_max_nits */
-   NULL,                         /* set_hdr_paper_white_nits */
-   NULL,                         /* set_hdr_contrast */
-   NULL                          /* set_hdr_expand_gamut */
+   NULL, /* grab_mouse_toggle */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
+   NULL, /* set_hdr_max_nits */
+   NULL, /* set_hdr_paper_white_nits */
+   NULL, /* set_hdr_contrast */
+   NULL  /* set_hdr_expand_gamut */
 };
 
 static void d3d9_hlsl_get_poke_interface(void *data,
@@ -1882,10 +1883,7 @@ static void d3d9_hlsl_set_nonblock_state(void *data, bool state,
 }
 
 #ifdef _XBOX
-static bool d3d9_hlsl_suppress_screensaver(void *data, bool enable)
-{
-   return true;
-}
+static bool d3d9_hlsl_suspend_screensaver(void *data, bool enable) { return true; }
 #endif
 
 video_driver_t video_d3d9_hlsl = {
@@ -1893,11 +1891,11 @@ video_driver_t video_d3d9_hlsl = {
    d3d9_hlsl_frame,
    d3d9_hlsl_set_nonblock_state,
    d3d9_hlsl_alive,
-   NULL,                      /* focus */
+   NULL, /* focus */
 #ifdef _XBOX
-   d3d9_hlsl_suppress_screensaver,
+   d3d9_hlsl_suspend_screensaver,
 #else
-   win32_suppress_screensaver,
+   win32_suspend_screensaver,
 #endif
    d3d9_has_windowed,
    d3d9_hlsl_set_shader,
@@ -1907,7 +1905,7 @@ video_driver_t video_d3d9_hlsl = {
    d3d9_set_rotation,
    d3d9_viewport_info,
    d3d9_read_viewport,
-   NULL,                      /* read_frame_raw */
+   NULL, /* read_frame_raw */
 #ifdef HAVE_OVERLAY
    d3d9_get_overlay_interface,
 #endif

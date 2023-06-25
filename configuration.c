@@ -143,9 +143,18 @@ enum audio_driver_enum
    AUDIO_NULL
 };
 
+enum microphone_driver_enum
+{
+   MICROPHONE_ALSA = AUDIO_NULL + 1,
+   MICROPHONE_ALSATHREAD,
+   MICROPHONE_SDL2,
+   MICROPHONE_WASAPI,
+   MICROPHONE_NULL
+};
+
 enum audio_resampler_driver_enum
 {
-   AUDIO_RESAMPLER_CC       = AUDIO_NULL + 1,
+   AUDIO_RESAMPLER_CC       = MICROPHONE_NULL + 1,
    AUDIO_RESAMPLER_SINC,
    AUDIO_RESAMPLER_NEAREST,
    AUDIO_RESAMPLER_NULL
@@ -535,6 +544,23 @@ static const enum audio_driver_enum AUDIO_DEFAULT_DRIVER = AUDIO_EXT;
 static const enum audio_driver_enum AUDIO_DEFAULT_DRIVER = AUDIO_NULL;
 #endif
 
+#if defined(HAVE_MICROPHONE)
+#if defined(HAVE_WASAPI)
+/* The default mic driver on Windows is WASAPI if it's available. */
+static const enum microphone_driver_enum MICROPHONE_DEFAULT_DRIVER = MICROPHONE_WASAPI;
+#elif defined(HAVE_ALSA) && defined(HAVE_THREADS)
+/* The default mic driver on Linux is the threaded ALSA driver, if available. */
+static const enum microphone_driver_enum MICROPHONE_DEFAULT_DRIVER = MICROPHONE_ALSATHREAD;
+#elif defined(HAVE_ALSA)
+static const enum microphone_driver_enum MICROPHONE_DEFAULT_DRIVER = MICROPHONE_ALSA;
+#elif defined(HAVE_SDL2)
+/* The default fallback driver is SDL2, if available. */
+static const enum microphone_driver_enum MICROPHONE_DEFAULT_DRIVER = MICROPHONE_SDL2;
+#else
+static const enum microphone_driver_enum MICROPHONE_DEFAULT_DRIVER = MICROPHONE_NULL;
+#endif
+#endif
+
 #if defined(RS90) || defined(MIYOO)
 static const enum audio_resampler_driver_enum AUDIO_DEFAULT_RESAMPLER_DRIVER = AUDIO_RESAMPLER_NEAREST;
 #elif defined(PSP) || defined(EMSCRIPTEN)
@@ -920,6 +946,37 @@ const char *config_get_default_audio(void)
 
    return "null";
 }
+
+#if defined(HAVE_MICROPHONE)
+/**
+ * config_get_default_microphone:
+ *
+ * Gets default microphone driver.
+ *
+ * Returns: Default microphone driver.
+ **/
+const char *config_get_default_microphone(void)
+{
+   enum microphone_driver_enum default_driver = MICROPHONE_DEFAULT_DRIVER;
+
+   switch (default_driver)
+   {
+      case MICROPHONE_ALSA:
+         return "alsa";
+      case MICROPHONE_ALSATHREAD:
+         return "alsathread";
+      case MICROPHONE_WASAPI:
+         return "wasapi";
+      case MICROPHONE_SDL2:
+         return "sdl2";
+      case MICROPHONE_NULL:
+         break;
+   }
+
+   return "null";
+}
+#endif
+
 
 const char *config_get_default_record(void)
 {
@@ -1465,6 +1522,11 @@ static struct config_array_setting *populate_settings_array(settings_t *settings
    SETTING_ARRAY("discord_app_id",           settings->arrays.discord_app_id, true, DEFAULT_DISCORD_APP_ID, true);
    SETTING_ARRAY("ai_service_url",           settings->arrays.ai_service_url, true, DEFAULT_AI_SERVICE_URL, true);
    SETTING_ARRAY("crt_switch_timings",       settings->arrays.crt_switch_timings, false, NULL, true);
+#ifdef HAVE_MICROPHONE
+   SETTING_ARRAY("microphone_device",        settings->arrays.microphone_device,    false, NULL, true);
+   SETTING_ARRAY("microphone_driver",        settings->arrays.microphone_driver,    false, NULL, true);
+   SETTING_ARRAY("microphone_resampler",     settings->arrays.microphone_resampler, false, NULL, true);
+#endif
 #ifdef HAVE_LAKKA
    SETTING_ARRAY("cpu_main_gov",             settings->arrays.cpu_main_gov, false, NULL, true);
    SETTING_ARRAY("cpu_menu_gov",             settings->arrays.cpu_menu_gov, false, NULL, true);
@@ -2098,6 +2160,15 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("gcdwebserver_alert",    &settings->bools.gcdwebserver_alert, true, true, false);
 #endif
 
+#ifdef HAVE_MICROPHONE
+   SETTING_BOOL("microphone_enable",             &settings->bools.microphone_enable, true, DEFAULT_MICROPHONE_ENABLE, false);
+
+#ifdef HAVE_WASAPI
+   SETTING_BOOL("microphone_wasapi_exclusive_mode",  &settings->bools.microphone_wasapi_exclusive_mode, true, DEFAULT_WASAPI_EXCLUSIVE_MODE, false);
+   SETTING_BOOL("microphone_wasapi_float_format",    &settings->bools.microphone_wasapi_float_format, true, DEFAULT_WASAPI_FLOAT_FORMAT, false);
+#endif
+#endif
+
    *size = count;
 
    return tmp;
@@ -2423,6 +2494,16 @@ static struct config_uint_setting *populate_settings_uint(
    SETTING_UINT("steam_rich_presence_format",   &settings->uints.steam_rich_presence_format, true, DEFAULT_STEAM_RICH_PRESENCE_FORMAT, false);
 #endif
 
+#ifdef HAVE_MICROPHONE
+   SETTING_UINT("microphone_latency",           &settings->uints.microphone_latency, false, 0 /* TODO */, false);
+   SETTING_UINT("microphone_resampler_quality", &settings->uints.microphone_resampler_quality, true, DEFAULT_AUDIO_RESAMPLER_QUALITY_LEVEL, false);
+   SETTING_UINT("microphone_block_frames",      &settings->uints.microphone_block_frames, true, 0, false);
+   SETTING_UINT("microphone_rate",              &settings->uints.microphone_sample_rate, true, DEFAULT_INPUT_RATE, false);
+#ifdef HAVE_WASAPI
+   SETTING_UINT("microphone_wasapi_sh_buffer_length", &settings->uints.microphone_wasapi_sh_buffer_length, true, DEFAULT_WASAPI_MICROPHONE_SH_BUFFER_LENGTH, false);
+#endif
+#endif
+
    *size = count;
 
    return tmp;
@@ -2529,6 +2610,9 @@ void config_set_defaults(void *data)
    int size_settings_size           = sizeof(settings->sizes)   / sizeof(settings->sizes.placeholder);
    const char *def_video            = config_get_default_video();
    const char *def_audio            = config_get_default_audio();
+#ifdef HAVE_MICROPHONE
+   const char *def_microphone       = config_get_default_microphone();
+#endif
    const char *def_audio_resampler  = config_get_default_audio_resampler();
    const char *def_input            = config_get_default_input();
    const char *def_joypad           = config_get_default_joypad();
@@ -2633,6 +2717,16 @@ void config_set_defaults(void *data)
       configuration_set_string(settings,
             settings->arrays.audio_driver,
             def_audio);
+#ifdef HAVE_MICROPHONE
+   if (def_microphone)
+      configuration_set_string(settings,
+            settings->arrays.microphone_driver,
+            def_microphone);
+   if (def_audio_resampler)  /* not a typo, microphone's default sampler is the same as audio's */
+      configuration_set_string(settings,
+            settings->arrays.microphone_resampler,
+            def_audio_resampler);
+#endif
    if (def_audio_resampler)
       configuration_set_string(settings,
             settings->arrays.audio_resampler,
@@ -2702,9 +2796,22 @@ void config_set_defaults(void *data)
 
    settings->uints.audio_latency               = g_defaults.settings_out_latency;
 
+   if (!g_defaults.settings_in_latency)
+      g_defaults.settings_in_latency          = DEFAULT_IN_LATENCY;
+
+
    audio_set_float(AUDIO_ACTION_VOLUME_GAIN, settings->floats.audio_volume);
 #ifdef HAVE_AUDIOMIXER
    audio_set_float(AUDIO_ACTION_MIXER_VOLUME_GAIN, settings->floats.audio_mixer_volume);
+#endif
+
+#ifdef HAVE_MICROPHONE
+   if (DEFAULT_MICROPHONE_DEVICE)
+      configuration_set_string(settings,
+            settings->arrays.microphone_device,
+            DEFAULT_MICROPHONE_DEVICE);
+
+   settings->uints.microphone_latency         = g_defaults.settings_in_latency;
 #endif
 
 #ifdef HAVE_LAKKA
@@ -3545,21 +3652,20 @@ static bool config_load_file(global_t *global,
       size_t _len = strlcpy(prefix, "input_player", sizeof(prefix));
       for (i = 0; i < MAX_USERS; i++)
       {
+         size_t _len2;
          char buf[64];
-         buf[0]    = '\0';
          snprintf(prefix + _len, sizeof(prefix) - _len, "%u", i + 1);
 
-         strlcpy(buf, prefix, sizeof(buf));
-         strlcat(buf, "_analog_dpad_mode", sizeof(buf));
-         CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], buf);
+         _len2     = strlcpy(buf, prefix, sizeof(buf));
 
-         strlcpy(buf, prefix, sizeof(buf));
-         strlcat(buf, "_joypad_index", sizeof(buf));
+         strlcpy(buf + _len2, "_mouse_index", sizeof(buf) - _len2);
+         CONFIG_GET_INT_BASE(conf, settings, uints.input_mouse_index[i], buf);
+
+         strlcpy(buf + _len2, "_joypad_index", sizeof(buf) - _len2);
          CONFIG_GET_INT_BASE(conf, settings, uints.input_joypad_index[i], buf);
 
-         strlcpy(buf, prefix, sizeof(buf));
-         strlcat(buf, "_mouse_index", sizeof(buf));
-         CONFIG_GET_INT_BASE(conf, settings, uints.input_mouse_index[i], buf);
+         strlcpy(buf + _len2, "_analog_dpad_mode", sizeof(buf) - _len2);
+         CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], buf);
       }
    }
 
@@ -4095,9 +4201,9 @@ bool config_load_override(void *data)
          size_t _len      = strlcpy(tmp_path,
                path_get(RARCH_PATH_CONFIG_OVERRIDE),
                sizeof(tmp_path));
-         tmp_path[_len  ] = '|';
-         tmp_path[_len+1] = '\0';
-         strlcat(tmp_path, core_path, sizeof(tmp_path));
+         tmp_path[  _len] = '|';
+         tmp_path[++_len] = '\0';
+         strlcpy(tmp_path + _len, core_path, sizeof(tmp_path) - _len);
          RARCH_LOG("[Overrides]: Core-specific overrides stacking on top of previous overrides.\n");
       }
       else
@@ -4125,9 +4231,9 @@ bool config_load_override(void *data)
             size_t _len      = strlcpy(tmp_path,
                   path_get(RARCH_PATH_CONFIG_OVERRIDE),
                   sizeof(tmp_path));
-            tmp_path[_len  ] = '|';
-            tmp_path[_len+1] = '\0';
-            strlcat(tmp_path, content_path, sizeof(tmp_path));
+            tmp_path[  _len] = '|';
+            tmp_path[++_len] = '\0';
+            strlcpy(tmp_path + _len, content_path, sizeof(tmp_path) - _len);
             RARCH_LOG("[Overrides]: Content dir-specific overrides stacking on top of previous overrides.\n");
          }
          else
@@ -4153,9 +4259,9 @@ bool config_load_override(void *data)
             size_t _len      = strlcpy(tmp_path,
 			    path_get(RARCH_PATH_CONFIG_OVERRIDE),
 			    sizeof(tmp_path));
-            tmp_path[_len  ] = '|';
-            tmp_path[_len+1] = '\0';
-            strlcat(tmp_path, game_path, sizeof(tmp_path));
+            tmp_path[  _len] = '|';
+            tmp_path[++_len] = '\0';
+            strlcpy(tmp_path + _len, game_path, sizeof(tmp_path) - _len);
             RARCH_LOG("[Overrides]: Game-specific overrides stacking on top of previous overrides.\n");
          }
          else
@@ -4456,30 +4562,31 @@ static void video_driver_save_settings(global_t *global, config_file_t *conf)
 static void save_keybind_hat(config_file_t *conf, const char *key,
       const struct retro_keybind *bind)
 {
+   size_t _len;
    char config[16];
    unsigned hat     = (unsigned)GET_HAT(bind->joykey);
 
    config[0]        = 'h';
    config[1]        = '\0';
 
-   snprintf(config + 1, sizeof(config) - 1, "%u", hat); 
+   _len             = snprintf(config + 1, sizeof(config) - 1, "%u", hat); 
 
    switch (GET_HAT_DIR(bind->joykey))
    {
       case HAT_UP_MASK:
-         strlcat(config, "up", sizeof(config));
+         strlcpy(config + _len, "up",    sizeof(config) - _len);
          break;
 
       case HAT_DOWN_MASK:
-         strlcat(config, "down", sizeof(config));
+         strlcpy(config + _len, "down",  sizeof(config) - _len);
          break;
 
       case HAT_LEFT_MASK:
-         strlcat(config, "left", sizeof(config));
+         strlcpy(config + _len, "left",  sizeof(config) - _len);
          break;
 
       case HAT_RIGHT_MASK:
-         strlcat(config, "right", sizeof(config));
+         strlcpy(config + _len, "right", sizeof(config) - _len);
          break;
 
       default:
@@ -4497,11 +4604,7 @@ static void save_keybind_joykey(config_file_t *conf,
    char key[64];
    size_t len = fill_pathname_join_delim(key, prefix,
          base, '_', sizeof(key));
-   key[len  ] = '_';
-   key[len+1] = 'b';
-   key[len+2] = 't';
-   key[len+3] = 'n';
-   key[len+4] = '\0';
+   strlcpy(key + len, "_btn", sizeof(key) - len);
 
    if (bind->joykey == NO_BTN)
    {
@@ -4521,12 +4624,7 @@ static void save_keybind_axis(config_file_t *conf,
 {
    char key[64];
    size_t len = fill_pathname_join_delim(key, prefix, base, '_', sizeof(key));
-   key[len  ] = '_';
-   key[len+1] = 'a';
-   key[len+2] = 'x';
-   key[len+3] = 'i';
-   key[len+4] = 's';
-   key[len+5] = '\0';
+   strlcpy(key + len, "_axis", sizeof(key) - len);
 
    if (bind->joyaxis == AXIS_NONE)
    {
@@ -4561,12 +4659,7 @@ static void save_keybind_mbutton(config_file_t *conf,
    char key[64];
    size_t len = fill_pathname_join_delim(key, prefix,
       base, '_', sizeof(key));
-   key[len  ] = '_';
-   key[len+1] = 'm';
-   key[len+2] = 'b';
-   key[len+3] = 't';
-   key[len+4] = 'n';
-   key[len+5] = '\0';
+   strlcpy(key + len, "_mbtn", sizeof(key) - len);
 
    switch (bind->mbutton)
    {
@@ -4816,11 +4909,7 @@ bool config_save_autoconf_profile(const
    else
       len = fill_pathname_join_special(autoconf_file, autoconf_dir,
             sanitised_name, sizeof(autoconf_file));
-   autoconf_file[len  ] = '.';
-   autoconf_file[len+1] = 'c';
-   autoconf_file[len+2] = 'f';
-   autoconf_file[len+3] = 'g';
-   autoconf_file[len+4] = '\0';
+   strlcpy(autoconf_file + len, ".cfg", sizeof(autoconf_file) - len);
 
    /* Open config file */
    if (     !(conf = config_file_new_from_path_to_string(autoconf_file))
@@ -5003,6 +5092,7 @@ bool config_save_file(const char *path)
 
    for (i = 0; i < MAX_USERS; i++)
    {
+      size_t _len;
       char cfg[64];
       char formatted_number[4];
 
@@ -5010,24 +5100,21 @@ bool config_save_file(const char *path)
 
       snprintf(formatted_number, sizeof(formatted_number), "%u", i + 1);
 
-      strlcpy(cfg, "input_device_p",     sizeof(cfg));
-      strlcat(cfg, formatted_number,     sizeof(cfg));
+      _len = strlcpy(cfg, "input_device_p",     sizeof(cfg));
+      strlcpy(cfg + _len, formatted_number,     sizeof(cfg) - _len);
       config_set_int(conf, cfg, settings->uints.input_device[i]);
 
-      strlcpy(cfg, "input_player",       sizeof(cfg));
-      strlcat(cfg, formatted_number,     sizeof(cfg));
-      strlcat(cfg, "_analog_dpad_mode",  sizeof(cfg));
-      config_set_int(conf, cfg, settings->uints.input_analog_dpad_mode[i]);
+      _len  = strlcpy(cfg, "input_player",          sizeof(cfg));
+      _len += strlcpy(cfg + _len, formatted_number, sizeof(cfg) - _len);
 
-      strlcpy(cfg, "input_player",       sizeof(cfg));
-      strlcat(cfg, formatted_number,     sizeof(cfg));
-      strlcat(cfg, "_joypad_index",      sizeof(cfg));
+      strlcpy(cfg + _len, "_mouse_index",       sizeof(cfg) - _len);
+      config_set_int(conf, cfg, settings->uints.input_mouse_index[i]);
+
+      strlcpy(cfg + _len, "_joypad_index",      sizeof(cfg) - _len);
       config_set_int(conf, cfg, settings->uints.input_joypad_index[i]);
 
-      strlcpy(cfg, "input_player",       sizeof(cfg));
-      strlcat(cfg, formatted_number,     sizeof(cfg));
-      strlcat(cfg, "_mouse_index",       sizeof(cfg));
-      config_set_int(conf, cfg, settings->uints.input_mouse_index[i]);
+      strlcpy(cfg + _len, "_analog_dpad_mode",  sizeof(cfg) - _len);
+      config_set_int(conf, cfg, settings->uints.input_analog_dpad_mode[i]);
    }
 
    /* Boolean settings */
@@ -5317,6 +5404,7 @@ int8_t config_save_overrides(enum override_type type, void *data, bool remove)
 
       for (i = 0; i < MAX_USERS; i++)
       {
+         size_t _len;
          uint8_t j;
          char cfg[64];
          char formatted_number[4];
@@ -5327,40 +5415,37 @@ int8_t config_save_overrides(enum override_type type, void *data, bool remove)
          if (settings->uints.input_device[i]
                != overrides->uints.input_device[i])
          {
-            strlcpy(cfg, "input_device_p", sizeof(cfg));
-            strlcat(cfg, formatted_number, sizeof(cfg));
+            size_t _len = strlcpy(cfg, "input_device_p", sizeof(cfg));
+            strlcpy(cfg + _len, formatted_number, sizeof(cfg) - _len);
             config_set_int(conf, cfg, overrides->uints.input_device[i]);
             RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_device[i]);
          }
 
-         if (settings->uints.input_analog_dpad_mode[i]
-               != overrides->uints.input_analog_dpad_mode[i])
+         _len  = strlcpy(cfg, "input_player",          sizeof(cfg));
+         _len += strlcpy(cfg + _len, formatted_number, sizeof(cfg) - _len);
+
+         if (settings->uints.input_mouse_index[i]
+               != overrides->uints.input_mouse_index[i])
          {
-            strlcpy(cfg, "input_player",      sizeof(cfg));
-            strlcat(cfg, formatted_number,    sizeof(cfg));
-            strlcat(cfg, "_analog_dpad_mode", sizeof(cfg));
-            config_set_int(conf, cfg, overrides->uints.input_analog_dpad_mode[i]);
-            RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_analog_dpad_mode[i]);
+            strlcpy(cfg + _len, "_mouse_index",   sizeof(cfg) - _len);
+            config_set_int(conf, cfg, overrides->uints.input_mouse_index[i]);
+            RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_mouse_index[i]);
          }
 
          if (settings->uints.input_joypad_index[i]
                != overrides->uints.input_joypad_index[i])
          {
-            strlcpy(cfg, "input_player",   sizeof(cfg));
-            strlcat(cfg, formatted_number, sizeof(cfg));
-            strlcat(cfg, "_joypad_index",  sizeof(cfg));
+            strlcpy(cfg + _len, "_joypad_index",  sizeof(cfg) - _len);
             config_set_int(conf, cfg, overrides->uints.input_joypad_index[i]);
             RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_joypad_index[i]);
          }
 
-         if (settings->uints.input_mouse_index[i]
-               != overrides->uints.input_mouse_index[i])
+         if (settings->uints.input_analog_dpad_mode[i]
+               != overrides->uints.input_analog_dpad_mode[i])
          {
-            strlcpy(cfg, "input_player",   sizeof(cfg));
-            strlcat(cfg, formatted_number, sizeof(cfg));
-            strlcat(cfg, "_mouse_index",   sizeof(cfg));
-            config_set_int(conf, cfg, overrides->uints.input_mouse_index[i]);
-            RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_mouse_index[i]);
+            strlcpy(cfg + _len, "_analog_dpad_mode", sizeof(cfg) - _len);
+            config_set_int(conf, cfg, overrides->uints.input_analog_dpad_mode[i]);
+            RARCH_DBG("[Overrides]: %s = \"%u\"\n", cfg, overrides->uints.input_analog_dpad_mode[i]);
          }
 
          for (j = 0; j < RARCH_BIND_LIST_END; j++)
@@ -5549,26 +5634,14 @@ bool input_remapping_load_file(void *data, const char *path)
       char formatted_number[4];
       formatted_number[0] = '\0';
       snprintf(formatted_number, sizeof(formatted_number), "%u", i + 1);
-      strlcpy(prefix, "input_player",   sizeof(prefix));
-      strlcat(prefix, formatted_number, sizeof(prefix));
+      _len       = strlcpy(prefix, "input_player",   sizeof(prefix));
+      strlcpy(prefix + _len, formatted_number, sizeof(prefix) - _len);
       _len       = strlcpy(s1, prefix, sizeof(s1));
-      s1[_len  ] = '_';
-      s1[_len+1] = 'b';
-      s1[_len+2] = 't';
-      s1[_len+3] = 'n';
-      s1[_len+4] = '\0';
+      strlcpy(s1 + _len, "_btn", sizeof(s1) - _len);
       _len       = strlcpy(s2, prefix, sizeof(s2));
-      s2[_len  ] = '_';
-      s2[_len+1] = 'k';
-      s2[_len+2] = 'e';
-      s2[_len+3] = 'y';
-      s2[_len+4] = '\0';
+      strlcpy(s2 + _len, "_key", sizeof(s2) - _len);
       _len       = strlcpy(s3, prefix, sizeof(s3));
-      s3[_len  ] = '_';
-      s3[_len+1] = 's';
-      s3[_len+2] = 't';
-      s3[_len+3] = 'k';
-      s3[_len+4] = '\0';
+      strlcpy(s3 + _len, "_stk", sizeof(s3) - _len);
 
       for (j = 0; j < RARCH_FIRST_CUSTOM_BIND + 8; j++)
       {
@@ -5631,16 +5704,16 @@ bool input_remapping_load_file(void *data, const char *path)
          }
       }
 
-      strlcpy(s1, prefix,                     sizeof(s1));
-      strlcat(s1, "_analog_dpad_mode",        sizeof(s1));
+      _len = strlcpy(s1, prefix, sizeof(s1));
+      strlcpy(s1 + _len, "_analog_dpad_mode", sizeof(s1) - _len);
       CONFIG_GET_INT_BASE(conf, settings, uints.input_analog_dpad_mode[i], s1);
 
-      strlcpy(s1, "input_libretro_device_p",  sizeof(s1));
-      strlcat(s1, formatted_number,           sizeof(s1));
+      _len = strlcpy(s1, "input_libretro_device_p", sizeof(s1));
+      strlcpy(s1 + _len, formatted_number, sizeof(s1) - _len);
       CONFIG_GET_INT_BASE(conf, settings, uints.input_libretro_device[i], s1);
 
-      strlcpy(s1, "input_remap_port_p",       sizeof(s1));
-      strlcat(s1, formatted_number,           sizeof(s1));
+      _len = strlcpy(s1, "input_remap_port_p", sizeof(s1));
+      strlcpy(s1 + _len, formatted_number, sizeof(s1) - _len);
       CONFIG_GET_INT_BASE(conf, settings, uints.input_remap_ports[i], s1);
    }
 
@@ -5727,26 +5800,14 @@ bool input_remapping_save_file(const char *path)
          continue;
 
       snprintf(formatted_number, sizeof(formatted_number), "%u", i + 1);
-      strlcpy(prefix, "input_player",   sizeof(prefix));
-      strlcat(prefix, formatted_number, sizeof(prefix));
+      _len       = strlcpy(prefix, "input_player",   sizeof(prefix));
+      strlcpy(prefix + _len, formatted_number, sizeof(prefix) - _len);
       _len       = strlcpy(s1, prefix, sizeof(s1));
-      s1[_len  ] = '_';
-      s1[_len+1] = 'b';
-      s1[_len+2] = 't';
-      s1[_len+3] = 'n';
-      s1[_len+4] = '\0';
+      strlcpy(s1 + _len, "_btn", sizeof(s1) - _len);
       _len       = strlcpy(s2, prefix, sizeof(s2));
-      s2[_len  ] = '_';
-      s2[_len+1] = 'k';
-      s2[_len+2] = 'e';
-      s2[_len+3] = 'y';
-      s2[_len+4] = '\0';
+      strlcpy(s2 + _len, "_key", sizeof(s2) - _len);
       _len       = strlcpy(s3, prefix, sizeof(s3));
-      s3[_len  ] = '_';
-      s3[_len+1] = 's';
-      s3[_len+2] = 't';
-      s3[_len+3] = 'k';
-      s3[_len+4] = '\0';
+      strlcpy(s3 + _len, "_stk", sizeof(s3) - _len);
 
       for (j = 0; j < RARCH_FIRST_CUSTOM_BIND; j++)
       {
@@ -5814,16 +5875,16 @@ bool input_remapping_save_file(const char *path)
                   settings->uints.input_keymapper_ids[i][j]);
       }
 
-      strlcpy(s1, "input_libretro_device_p", sizeof(s1));
-      strlcat(s1, formatted_number,          sizeof(s1));
+      _len = strlcpy(s1, "input_libretro_device_p", sizeof(s1));
+      strlcpy(s1 + _len, formatted_number, sizeof(s1) - _len);
       config_set_int(conf, s1, input_config_get_device(i));
 
-      strlcpy(s1, prefix,                    sizeof(s1));
-      strlcat(s1, "_analog_dpad_mode",       sizeof(s1));
+      _len = strlcpy(s1, prefix, sizeof(s1));
+      strlcpy(s1 + _len, "_analog_dpad_mode", sizeof(s1) - _len);
       config_set_int(conf, s1, settings->uints.input_analog_dpad_mode[i]);
 
-      strlcpy(s1, "input_remap_port_p",      sizeof(s1));
-      strlcat(s1, formatted_number,          sizeof(s1));
+      _len = strlcpy(s1, "input_remap_port_p", sizeof(s1));
+      strlcpy(s1 + _len, formatted_number, sizeof(s1) - _len);
       config_set_int(conf, s1, settings->uints.input_remap_ports[i]);
    }
 

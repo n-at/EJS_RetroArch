@@ -478,6 +478,30 @@ void win32_monitor_info(void *data, void *hm_data, unsigned *mon_id)
    }
 }
 
+void win32_get_video_size(void *data,
+      unsigned *width, unsigned *height)
+{
+   HWND         window     = win32_get_window();
+
+   if (window)
+   {
+      *width               = g_win32_resize_width;
+      *height              = g_win32_resize_height;
+   }
+   else
+   {
+      RECT mon_rect;
+      MONITORINFOEX current_mon;
+      unsigned mon_id      = 0;
+      HMONITOR hm_to_use   = NULL;
+
+      win32_monitor_info(&current_mon, &hm_to_use, &mon_id);
+      mon_rect             = current_mon.rcMonitor;
+      *width               = mon_rect.right - mon_rect.left;
+      *height              = mon_rect.bottom - mon_rect.top;
+   }
+}
+
 bool win32_load_content_from_gui(const char *szFilename)
 {
    /* poll list of current cores */
@@ -2010,7 +2034,7 @@ static const char *meta_key_to_name(unsigned int meta_key)
       const struct input_key_map* entry = &input_config_key_map[i];
       if (!entry->str)
          break;
-      if (entry->key == key_code)
+      if (entry->key == (enum retro_key)key_code)
          return entry->str;
       i++;
    }
@@ -2101,9 +2125,9 @@ static void win32_localize_menu(HMENU menu)
                new_label2              = new_label_text;
                _len                    = strlcpy(new_label_text, new_label,
                      buf_size);
-               new_label_text[_len  ]  = '\t';
-               new_label_text[_len+1]  = '\0';
-               strlcat(new_label_text, meta_key_name, buf_size);
+               new_label_text[  _len]  = '\t';
+               new_label_text[++_len]  = '\0';
+               strlcpy(new_label_text + _len, meta_key_name, buf_size - _len);
                /* Make first character of shortcut name uppercase */
                new_label_text[len1 + 1] = toupper(new_label_text[len1 + 1]);
             }
@@ -2190,7 +2214,7 @@ bool win32_has_focus(void *data)
 
 HWND win32_get_window(void) { return main_window.hwnd; }
 
-bool win32_suppress_screensaver(void *data, bool enable)
+bool win32_suspend_screensaver(void *data, bool enable)
 {
    if (enable)
    {
@@ -2657,16 +2681,15 @@ bool win32_get_video_output(DEVMODE *dm, int mode, size_t len)
    dm->dmSize  = len;
    if (WIN32_GET_VIDEO_OUTPUT((mode == -1) 
             ? ENUM_CURRENT_SETTINGS 
-            : mode,
+            : (DWORD)mode,
             dm) == 0)
       return false;
    return true;
 }
 
-void win32_get_video_output_size(unsigned *width, unsigned *height, char *desc, size_t desc_len)
+void win32_get_video_output_size(void *data, unsigned *width, unsigned *height, char *desc, size_t desc_len)
 {
    DEVMODE dm;
-
    if (win32_get_video_output(&dm, -1, sizeof(dm)))
    {
       *width  = dm.dmPelsWidth;

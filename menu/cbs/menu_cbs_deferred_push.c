@@ -218,7 +218,9 @@ GENERIC_DEFERRED_PUSH(deferred_push_privacy_settings_list,          DISPLAYLIST_
 GENERIC_DEFERRED_PUSH(deferred_push_midi_settings_list,             DISPLAYLIST_MIDI_SETTINGS_LIST)
 GENERIC_DEFERRED_PUSH(deferred_push_audio_settings_list,            DISPLAYLIST_AUDIO_SETTINGS_LIST)
 GENERIC_DEFERRED_PUSH(deferred_push_audio_output_settings_list,            DISPLAYLIST_AUDIO_OUTPUT_SETTINGS_LIST)
-GENERIC_DEFERRED_PUSH(deferred_push_audio_resampler_settings_list,            DISPLAYLIST_AUDIO_RESAMPLER_SETTINGS_LIST)
+#ifdef HAVE_MICROPHONE
+GENERIC_DEFERRED_PUSH(deferred_push_microphone_settings_list,       DISPLAYLIST_MICROPHONE_SETTINGS_LIST)
+#endif
 GENERIC_DEFERRED_PUSH(deferred_push_audio_synchronization_settings_list,            DISPLAYLIST_AUDIO_SYNCHRONIZATION_SETTINGS_LIST)
 GENERIC_DEFERRED_PUSH(deferred_push_audio_mixer_settings_list,      DISPLAYLIST_AUDIO_MIXER_SETTINGS_LIST)
 GENERIC_DEFERRED_PUSH(deferred_push_input_settings_list,            DISPLAYLIST_INPUT_SETTINGS_LIST)
@@ -419,19 +421,15 @@ static int general_push(menu_displaylist_info_t *info,
    {
       /* Need to use the scratch buffer here */
       char tmp_str[PATH_MAX_LENGTH];
-      char tmp_str2[PATH_MAX_LENGTH];
       fill_pathname_join_special(tmp_str, menu->scratch2_buf,
             menu->scratch_buf, sizeof(tmp_str));
-      fill_pathname_join_special(tmp_str2, menu->scratch2_buf,
-            menu->scratch_buf, sizeof(tmp_str2));
 
       if (!string_is_empty(info->path))
          free(info->path);
+      info->path      = strdup(tmp_str);
       if (!string_is_empty(info->label))
          free(info->label);
-
-      info->path      = strdup(tmp_str);
-      info->label     = strdup(tmp_str2);
+      info->label     = strdup(tmp_str);
    }
 
    info->type_default = FILE_TYPE_PLAIN;
@@ -627,6 +625,9 @@ GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list, PUSH_DEFAULT, DIS
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_special, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_SPECIAL)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_resolution, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_RESOLUTION)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_audio_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_AUDIO_DEVICE)
+#ifdef HAVE_MICROPHONE
+GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_microphone_device, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_MICROPHONE_DEVICE)
+#endif
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_video_shader_num_passes, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_NUM_PASSES)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_shader_parameter, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_PARAMETER)
 GENERIC_DEFERRED_PUSH_GENERAL(deferred_push_dropdown_box_list_shader_preset_parameter, PUSH_DEFAULT, DISPLAYLIST_DROPDOWN_LIST_VIDEO_SHADER_PRESET_PARAMETER)
@@ -670,6 +671,10 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_SPECIAL, deferred_push_dropdown_box_list_special},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_RESOLUTION, deferred_push_dropdown_box_list_resolution},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_AUDIO_DEVICE, deferred_push_dropdown_box_list_audio_device},
+#ifdef HAVE_MICROPHONE
+      {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE, deferred_push_dropdown_box_list_microphone_device},
+      {MENU_ENUM_LABEL_DEFERRED_MICROPHONE_SETTINGS_LIST, deferred_push_microphone_settings_list},
+#endif
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_VIDEO_SHADER_NUM_PASSES, deferred_push_dropdown_box_list_video_shader_num_passes},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_VIDEO_SHADER_PARAMETER, deferred_push_dropdown_box_list_shader_parameter},
       {MENU_ENUM_LABEL_DEFERRED_DROPDOWN_BOX_LIST_VIDEO_SHADER_PRESET_PARAMETER, deferred_push_dropdown_box_list_shader_preset_parameter},
@@ -774,7 +779,6 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
       {MENU_ENUM_LABEL_DEFERRED_AUDIO_SETTINGS_LIST, deferred_push_audio_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_AUDIO_SYNCHRONIZATION_SETTINGS_LIST, deferred_push_audio_synchronization_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_AUDIO_OUTPUT_SETTINGS_LIST, deferred_push_audio_output_settings_list},
-      {MENU_ENUM_LABEL_DEFERRED_AUDIO_RESAMPLER_SETTINGS_LIST, deferred_push_audio_resampler_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_AUDIO_MIXER_SETTINGS_LIST, deferred_push_audio_mixer_settings_list},
       {MENU_ENUM_LABEL_DEFERRED_LATENCY_SETTINGS_LIST, deferred_push_latency_settings_list},
 #ifdef HAVE_LAKKA_SWITCH
@@ -1278,9 +1282,11 @@ static int menu_cbs_init_bind_deferred_push_compare_label(
          case MENU_ENUM_LABEL_DEFERRED_AUDIO_OUTPUT_SETTINGS_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_audio_output_settings_list);
             break;
-         case MENU_ENUM_LABEL_DEFERRED_AUDIO_RESAMPLER_SETTINGS_LIST:
-            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_audio_resampler_settings_list);
+#ifdef HAVE_MICROPHONE
+         case MENU_ENUM_LABEL_DEFERRED_MICROPHONE_SETTINGS_LIST:
+            BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_microphone_settings_list);
             break;
+#endif
          case MENU_ENUM_LABEL_DEFERRED_AUDIO_SYNCHRONIZATION_SETTINGS_LIST:
             BIND_ACTION_DEFERRED_PUSH(cbs, deferred_push_audio_synchronization_settings_list);
             break;

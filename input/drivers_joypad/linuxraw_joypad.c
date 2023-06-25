@@ -193,9 +193,9 @@ retry:
                 * access to it is established. */
                else if (event->mask & (IN_CREATE | IN_ATTRIB))
                {
-                  char path[PATH_MAX_LENGTH];
-                  strlcpy(path, "/dev/input/", sizeof(path));
-                  strlcat(path, event->name,   sizeof(path));
+                  char path[256];
+                  size_t _len = strlcpy(path, "/dev/input/", sizeof(path));
+                  strlcpy(path + _len, event->name, sizeof(path) - _len);
 
                   if (     !string_is_empty(linuxraw_pads[idx].ident)
                         && linuxraw_joypad_init_pad(path, &linuxraw_pads[idx]))
@@ -298,7 +298,7 @@ static int32_t linuxraw_joypad_button(unsigned port, uint16_t joykey)
 {
    const struct linuxraw_joypad    *pad = (const struct linuxraw_joypad*)
       &linuxraw_pads[port];
-   if (port >= DEFAULT_MAX_PADS)
+   if (port >= MAX_USERS)
       return 0;
    if (joykey < NUM_BUTTONS)
       return (BIT32_GET(pad->buttons, joykey));
@@ -356,7 +356,7 @@ static int16_t linuxraw_joypad_state(
    const struct linuxraw_joypad    *pad = (const struct linuxraw_joypad*)
       &linuxraw_pads[port_idx];
 
-   if (port_idx >= DEFAULT_MAX_PADS)
+   if (port_idx >= MAX_USERS)
       return 0;
 
    for (i = 0; i < RARCH_FIRST_CUSTOM_BIND; i++)

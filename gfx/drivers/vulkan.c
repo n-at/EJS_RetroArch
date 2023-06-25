@@ -1509,7 +1509,7 @@ static void vulkan_font_render_message(vk_t *vk,
    for (;;)
    {
       const char *delim = strchr(msg, '\n');
-      size_t msg_len    = delim ? (delim - msg) : strlen(msg);
+      size_t msg_len    = delim ? (size_t)(delim - msg) : strlen(msg);
 
       /* Draw the line */
       vulkan_font_render_line(vk, font, glyph_q, msg, msg_len,
@@ -2327,7 +2327,7 @@ static void vulkan_init_pipelines(vk_t *vk)
    vkDestroyShaderModule(vk->context->device, shader_stages[0].module, NULL);
 
    /* Other menu pipelines. */
-   for (i = 0; i < ARRAY_SIZE(vk->display.pipelines) - 6; i++)
+   for (i = 0; i < (int)ARRAY_SIZE(vk->display.pipelines) - 6; i++)
    {
       switch (i >> 1)
       {
@@ -2612,7 +2612,7 @@ static void vulkan_deinit_pipelines(vk_t *vk)
          vk->pipelines.hdr, NULL);
 #endif /* VULKAN_HDR_SWAPCHAIN */
 
-   for (i = 0; i < ARRAY_SIZE(vk->display.pipelines); i++)
+   for (i = 0; i < (int)ARRAY_SIZE(vk->display.pipelines); i++)
       vkDestroyPipeline(vk->context->device,
             vk->display.pipelines[i], NULL);
 }
@@ -3692,12 +3692,6 @@ static void vulkan_set_viewport(void *data, unsigned viewport_width,
          {
             delta           = (device_aspect / desired_aspect - 1.0f)
                / 2.0f + 0.5f;
-#if defined(RARCH_MOBILE)
-            /* In portrait mode, we want viewport to gravitate to top of screen. */
-            if (device_aspect < 1.0f)
-                y = 0;
-            else
-#endif
             y               = (int)roundf(viewport_height * (0.5f - delta));
             viewport_height = (unsigned)roundf(2.0f * viewport_height * delta);
          }
@@ -3715,6 +3709,12 @@ static void vulkan_set_viewport(void *data, unsigned viewport_width,
       vk->vp.width  = viewport_width;
       vk->vp.height = viewport_height;
    }
+
+#if defined(RARCH_MOBILE)
+   /* In portrait mode, we want viewport to gravitate to top of screen. */
+   if (device_aspect < 1.0f)
+      vk->vp.y = 0;
+#endif
 
    vulkan_set_projection(vk, &ortho, allow_rotate);
 
@@ -5177,20 +5177,20 @@ static const video_poke_interface_t vulkan_poke_interface = {
    vulkan_load_texture,
    vulkan_unload_texture,
    vulkan_set_video_mode,
-   vulkan_get_refresh_rate,            /* get_refresh_rate */
-   NULL,                               /* set_filtering */
+   vulkan_get_refresh_rate,
+   NULL, /* set_filtering */
    vulkan_get_video_output_size,
    vulkan_get_video_output_prev,
    vulkan_get_video_output_next,
-   NULL,                               /* get_current_framebuffer */
-   NULL,                               /* get_proc_address */
+   NULL, /* get_current_framebuffer */
+   NULL, /* get_proc_address */
    vulkan_set_aspect_ratio,
    vulkan_apply_state_changes,
    vulkan_set_texture_frame,
    vulkan_set_texture_enable,
    font_driver_render_msg,
    vulkan_show_mouse,
-   NULL,                               /* grab_mouse_toggle */
+   NULL, /* grab_mouse_toggle */
    vulkan_get_current_shader,
    vulkan_get_current_sw_framebuffer,
    vulkan_get_hw_render_interface,
@@ -5621,13 +5621,12 @@ video_driver_t video_vulkan = {
    vulkan_set_rotation,
    vulkan_viewport_info,
    vulkan_read_viewport,
-   NULL,                         /* vulkan_read_frame_raw */
-
+   NULL, /* read_frame_raw */
 #ifdef HAVE_OVERLAY
    vulkan_get_overlay_interface,
 #endif
    vulkan_get_poke_interface,
-   NULL,                         /* vulkan_wrap_type_to_enum */
+   NULL, /* wrap_type_to_enum */
 #ifdef HAVE_GFX_WIDGETS
    vulkan_gfx_widgets_enabled
 #endif

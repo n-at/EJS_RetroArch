@@ -123,6 +123,10 @@
 #include "location_driver.h"
 #include "record/record_driver.h"
 
+#ifdef HAVE_MICROPHONE
+#include "audio/microphone_driver.h"
+#endif
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -430,6 +434,18 @@ static const void *find_driver_nonempty(
          return audio_drivers[i];
       }
    }
+#ifdef HAVE_MICROPHONE
+   else if (string_is_equal(label, "microphone_driver"))
+   {
+      if (microphone_drivers[i])
+      {
+         const char *ident = microphone_drivers[i]->ident;
+
+         strlcpy(s, ident, len);
+         return microphone_drivers[i];
+      }
+   }
+#endif
    else if (string_is_equal(label, "record_driver"))
    {
       if (record_drivers[i])
@@ -768,12 +784,16 @@ void driver_set_nonblock_state(void)
 void drivers_init(
       settings_t *settings,
       int flags,
+      enum driver_lifetime_flags lifetime_flags,
       bool verbosity_enabled)
 {
-   runloop_state_t *runloop_st    = runloop_state_get_ptr();
-   audio_driver_state_t *audio_st = audio_state_get_ptr();
-   input_driver_state_t *input_st = input_state_get_ptr();
-   video_driver_state_t *video_st = video_state_get_ptr();
+   runloop_state_t *runloop_st       = runloop_state_get_ptr();
+   audio_driver_state_t *audio_st    = audio_state_get_ptr();
+   input_driver_state_t *input_st    = input_state_get_ptr();
+   video_driver_state_t *video_st    = video_state_get_ptr();
+#ifdef HAVE_MICROPHONE
+   microphone_driver_state_t *mic_st = microphone_state_get_ptr();
+#endif
 #ifdef HAVE_MENU
    struct menu_state *menu_st     = menu_state_get_ptr();
 #endif
@@ -842,6 +862,15 @@ void drivers_init(
             audio_st->current_audio->device_list_new(
                   audio_st->context_audio_data);
    }
+
+#ifdef HAVE_MICROPHONE
+   if (flags & DRIVER_MICROPHONE_MASK)
+   {
+      microphone_driver_init_internal(settings);
+      if (mic_st->driver && mic_st->driver->device_list_new && mic_st->driver_context)
+         mic_st->devices_list = mic_st->driver->device_list_new(mic_st->driver_context);
+   }
+#endif
 
    /* Regular display refresh rate startup autoswitch based on content av_info */
    if (flags & (DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK))
@@ -1022,7 +1051,7 @@ void drivers_init(
 #endif /* #ifndef HAVE_LAKKA_SWITCH */
 }
 
-void driver_uninit(int flags)
+void driver_uninit(int flags, enum driver_lifetime_flags lifetime_flags)
 {
    runloop_state_t *runloop_st      = runloop_state_get_ptr();
    video_driver_state_t *video_st   = video_state_get_ptr();
@@ -1109,6 +1138,11 @@ void driver_uninit(int flags)
 
    if ((flags & DRIVER_AUDIO_MASK))
       audio_state_get_ptr()->context_audio_data = NULL;
+
+#ifdef HAVE_MICROPHONE
+   if (flags & DRIVER_MICROPHONE_MASK)
+      microphone_driver_deinit(lifetime_flags & DRIVER_LIFETIME_RESET);
+#endif
 
    if (flags & DRIVER_MIDI_MASK)
       midi_driver_free();
@@ -1485,6 +1519,17 @@ struct string_list *string_list_new_special(enum string_list_type type,
             string_list_append(s, opt, attr);
          }
          break;
+#ifdef HAVE_MICROPHONE
+      case STRING_LIST_MICROPHONE_DRIVERS:
+         for (i = 0; microphone_drivers[i]; i++)
+         {
+            const char *opt  = microphone_drivers[i]->ident;
+            *len            += strlen(opt) + 1;
+
+            string_list_append(s, opt, attr);
+         }
+         break;
+#endif
       case STRING_LIST_AUDIO_RESAMPLER_DRIVERS:
          for (i = 0; audio_resampler_driver_find_handle(i); i++)
          {
@@ -2826,6 +2871,12 @@ bool command_event(enum event_command cmd, void *data)
          command_event_reinit(
                data ? *(const int*)data : DRIVERS_CMD_ALL);
 
+#if defined(HAVE_AUDIOMIXER) && defined(HAVE_MENU)
+         /* Menu sounds require audio reinit. */
+         if (settings->bools.audio_enable_menu)
+            command_event(CMD_EVENT_AUDIO_REINIT, NULL);
+#endif
+
          /* Recalibrate frame delay target */
          if (settings->bools.video_frame_delay_auto)
             video_st->frame_delay_target = 0;
@@ -2914,14 +2965,34 @@ bool command_event(enum event_command cmd, void *data)
          break;
       case CMD_EVENT_AUDIO_STOP:
          midi_driver_set_all_sounds_off();
+#if defined(HAVE_AUDIOMIXER) && defined(HAVE_MENU)
+         if (     settings->bools.audio_enable_menu
+               && menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE)
+            return false;
+#endif
          if (!audio_driver_stop())
             return false;
          break;
       case CMD_EVENT_AUDIO_START:
+#if defined(HAVE_AUDIOMIXER) && defined(HAVE_MENU)
+         if (     settings->bools.audio_enable_menu
+               && menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE)
+            return false;
+#endif
          if (!audio_driver_start(runloop_st->flags &
                   RUNLOOP_FLAG_SHUTDOWN_INITIATED))
             return false;
          break;
+#ifdef HAVE_MICROPHONE
+      case CMD_EVENT_MICROPHONE_STOP:
+         if (!microphone_driver_stop())
+            return false;
+         break;
+      case CMD_EVENT_MICROPHONE_START:
+         if (!microphone_driver_start())
+            return false;
+         break;
+#endif
       case CMD_EVENT_AUDIO_MUTE_TOGGLE:
          {
             audio_driver_state_t
@@ -3309,12 +3380,18 @@ bool command_event(enum event_command cmd, void *data)
 #endif
          break;
       case CMD_EVENT_AUDIO_REINIT:
-         driver_uninit(DRIVER_AUDIO_MASK);
-         drivers_init(settings, DRIVER_AUDIO_MASK, verbosity_is_enabled());
+         driver_uninit(DRIVER_AUDIO_MASK, DRIVER_LIFETIME_RESET);
+         drivers_init(settings, DRIVER_AUDIO_MASK, DRIVER_LIFETIME_RESET, verbosity_is_enabled());
 #if defined(HAVE_AUDIOMIXER)
          audio_driver_load_system_sounds();
 #endif
          break;
+#ifdef HAVE_MICROPHONE
+      case CMD_EVENT_MICROPHONE_REINIT:
+         driver_uninit(DRIVER_MICROPHONE_MASK, DRIVER_LIFETIME_RESET);
+         drivers_init(settings, DRIVER_MICROPHONE_MASK, DRIVER_LIFETIME_RESET, verbosity_is_enabled());
+         break;
+#endif
       case CMD_EVENT_SHUTDOWN:
 #if defined(__linux__) && !defined(ANDROID)
          if (settings->bools.config_save_on_exit)
@@ -3577,9 +3654,19 @@ bool command_event(enum event_command cmd, void *data)
             bool menu_pause_libretro  = settings->bools.menu_pause_libretro;
 #endif
             if (menu_pause_libretro)
+            { /* If entering the menu pauses the game... */
                command_event(CMD_EVENT_AUDIO_STOP, NULL);
+#ifdef HAVE_MICROPHONE
+               command_event(CMD_EVENT_MICROPHONE_STOP, NULL);
+#endif
+            }
             else
+            {
                command_event(CMD_EVENT_AUDIO_START, NULL);
+#ifdef HAVE_MICROPHONE
+               command_event(CMD_EVENT_MICROPHONE_START, NULL);
+#endif
+            }
          }
          else
          {
@@ -4619,7 +4706,7 @@ void main_exit(void *args)
 #endif
 
    runloop_msg_queue_deinit();
-   driver_uninit(DRIVERS_CMD_ALL);
+   driver_uninit(DRIVERS_CMD_ALL, 0);
 
    retro_main_log_file_deinit();
 
@@ -4713,7 +4800,7 @@ int rarch_main(int argc, char *argv[], void *data)
    frontend_driver_init_first(data);
 
    if (runloop_st->flags & RUNLOOP_FLAG_IS_INITED)
-      driver_uninit(DRIVERS_CMD_ALL);
+      driver_uninit(DRIVERS_CMD_ALL, 0);
 
 #ifdef HAVE_THREAD_STORAGE
    sthread_tls_create(&p_rarch->rarch_tls);
@@ -5042,7 +5129,7 @@ static void retroarch_print_version(void)
 #endif
    fprintf(stdout, " " __DATE__ "\n");
 
-   retroarch_get_capabilities(RARCH_CAPABILITIES_COMPILER, str, sizeof(str), 0);
+   retroarch_get_capabilities(RARCH_CAPABILITIES_COMPILER, str, sizeof(str));
    fprintf(stdout, "%s\n", str);
 }
 
@@ -5396,21 +5483,12 @@ static void retroarch_parse_input_libretro_path(const char *path)
 
       if (!string_ends_with_size(tmp_path, "_libretro",
             strlen(tmp_path), STRLEN_CONST("_libretro")))
-      {
-         tmp_path[_len  ] = '_';
-         tmp_path[_len+1] = 'l';
-         tmp_path[_len+2] = 'i';
-         tmp_path[_len+3] = 'b';
-         tmp_path[_len+4] = 'r';
-         tmp_path[_len+5] = 'e';
-         tmp_path[_len+6] = 't';
-         tmp_path[_len+7] = 'r';
-         tmp_path[_len+8] = 'o';
-         tmp_path[_len+9] = '\0';
-      }
+         strlcpy(tmp_path       + _len,
+               "_libretro",
+               sizeof(tmp_path) - _len);
 
-      if (!core_info_find(tmp_path, &core_info) ||
-          string_is_empty(core_info->path))
+      if (  !core_info_find(tmp_path, &core_info)
+          || string_is_empty(core_info->path))
          goto end;
 
       core_path         = core_info->path;
@@ -5538,13 +5616,14 @@ static bool retroarch_parse_input_and_config(
 
    if (first_run)
    {
+      size_t _len = 0;
       /* Copy the args into a buffer so launch arguments can be reused */
       for (i = 0; i < (unsigned)argc; i++)
       {
-         strlcat(p_rarch->launch_arguments,
-               argv[i], sizeof(p_rarch->launch_arguments));
-         strlcat(p_rarch->launch_arguments, " ",
-               sizeof(p_rarch->launch_arguments));
+         _len += strlcpy(p_rarch->launch_arguments        + _len,
+               argv[i], sizeof(p_rarch->launch_arguments) - _len);
+         _len += strlcpy(p_rarch->launch_arguments        + _len,
+               " ",     sizeof(p_rarch->launch_arguments) - _len);
       }
       string_trim_whitespace_left(p_rarch->launch_arguments);
       string_trim_whitespace_right(p_rarch->launch_arguments);
@@ -6104,7 +6183,7 @@ static bool retroarch_parse_input_and_config(
                   int reinit_flags               = DRIVERS_CMD_ALL &
                         ~(DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK | DRIVER_INPUT_MASK | DRIVER_MIDI_MASK);
 
-                  drivers_init(settings, reinit_flags, false);
+                  drivers_init(settings, reinit_flags, 0, false);
                   retroarch_init_task_queue();
 
                   if (explicit_menu)
@@ -6120,7 +6199,7 @@ static bool retroarch_parse_input_and_config(
                   if (!explicit_menu)
                   {
                      task_queue_wait(NULL, NULL);
-                     driver_uninit(DRIVERS_CMD_ALL);
+                     driver_uninit(DRIVERS_CMD_ALL, 0);
                      exit(0);
                   }
                }
@@ -6316,23 +6395,21 @@ bool retroarch_main_init(int argc, char *argv[])
    {
       {
          char str_output[256];
-         const char *cpu_model  = NULL;
-         str_output[0] = '\0';
-
-         cpu_model     = frontend_driver_get_cpu_model_name();
-
-         strlcpy(str_output,
+         const char *cpu_model  = frontend_driver_get_cpu_model_name();
+         size_t _len = strlcpy(str_output,
                "=== Build =======================================\n",
                sizeof(str_output));
 
          if (!string_is_empty(cpu_model))
          {
-            size_t _len;
-            strlcat(str_output, FILE_PATH_LOG_INFO " CPU Model Name: ",
-                  sizeof(str_output));
-            _len               = strlcat(str_output, cpu_model, sizeof(str_output));
-            str_output[_len  ] = '\n';
-            str_output[_len+1] = '\0';
+            /* TODO/FIXME - localize */
+            _len += strlcpy(str_output + _len,
+                  FILE_PATH_LOG_INFO " CPU Model Name: ",
+                  sizeof(str_output)   - _len);
+            _len              += strlcpy(str_output + _len, cpu_model,
+                                 sizeof(str_output) - _len);
+            str_output[  _len] = '\n';
+            str_output[++_len] = '\0';
          }
 
          RARCH_LOG_OUTPUT("%s", str_output);
@@ -6341,7 +6418,7 @@ bool retroarch_main_init(int argc, char *argv[])
       {
          char str_output[256];
          char str[128];
-         retroarch_get_capabilities(RARCH_CAPABILITIES_CPU, str, sizeof(str), 0);
+         retroarch_get_capabilities(RARCH_CAPABILITIES_CPU, str, sizeof(str));
 
 #ifdef HAVE_GIT_VERSION
          snprintf(str_output, sizeof(str_output),
@@ -6535,7 +6612,7 @@ bool retroarch_main_init(int argc, char *argv[])
 #endif
          );
 #endif
-   drivers_init(settings, DRIVERS_CMD_ALL, verbosity_enabled);
+   drivers_init(settings, DRIVERS_CMD_ALL, 0, verbosity_enabled);
 #ifdef HAVE_COMMAND
    input_driver_deinit_command(input_st);
    input_driver_init_command(input_st, settings);
@@ -6906,207 +6983,63 @@ bool retroarch_override_setting_is_set(
 }
 
 int retroarch_get_capabilities(enum rarch_capabilities type,
-      char *s, size_t len, size_t _len)
+      char *str_out, size_t str_len)
 {
    switch (type)
    {
       case RARCH_CAPABILITIES_CPU:
          {
             uint64_t cpu = cpu_features_get();
-
-            if (cpu & RETRO_SIMD_MMX)
-            {
-               s[_len++] = 'M';
-               s[_len++] = 'M';
-               s[_len++] = 'X';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_MMXEXT)
-            {
-               s[_len++] = 'M';
-               s[_len++] = 'M';
-               s[_len++] = 'X';
-               s[_len++] = 'E';
-               s[_len++] = 'X';
-               s[_len++] = 'T';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_SSE)
-            {
-               s[_len++] = 'S';
-               s[_len++] = 'S';
-               s[_len++] = 'E';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_SSE2)
-            {
-               s[_len++] = 'S';
-               s[_len++] = 'S';
-               s[_len++] = 'E';
-               s[_len++] = '2';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_SSE3)
-            {
-               s[_len++] = 'S';
-               s[_len++] = 'S';
-               s[_len++] = 'E';
-               s[_len++] = '3';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_SSE4)
-            {
-               s[_len++] = 'S';
-               s[_len++] = 'S';
-               s[_len++] = 'E';
-               s[_len++] = '4';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_SSE42)
-            {
-               s[_len++] = 'S';
-               s[_len++] = 'S';
-               s[_len++] = 'E';
-               s[_len++] = '4';
-               s[_len++] = '.';
-               s[_len++] = '2';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_AES)
-            {
-               s[_len++] = 'A';
-               s[_len++] = 'E';
-               s[_len++] = 'S';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_AVX)
-            {
-               s[_len++] = 'A';
-               s[_len++] = 'V';
-               s[_len++] = 'X';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_AVX2)
-            {
-               s[_len++] = 'A';
-               s[_len++] = 'V';
-               s[_len++] = 'X';
-               s[_len++] = '2';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_NEON)
-            {
-               s[_len++] = 'N';
-               s[_len++] = 'E';
-               s[_len++] = 'O';
-               s[_len++] = 'N';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_VFPV3)
-            {
-               s[_len++] = 'V';
-               s[_len++] = 'F';
-               s[_len++] = 'P';
-               s[_len++] = 'v';
-               s[_len++] = '3';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_VFPV4)
-            {
-               s[_len++] = 'V';
-               s[_len++] = 'F';
-               s[_len++] = 'P';
-               s[_len++] = 'v';
-               s[_len++] = '4';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_VMX)
-            {
-               s[_len++] = 'V';
-               s[_len++] = 'M';
-               s[_len++] = 'X';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_VMX128)
-            {
-               s[_len++] = 'V';
-               s[_len++] = 'M';
-               s[_len++] = 'X';
-               s[_len++] = '1';
-               s[_len++] = '2';
-               s[_len++] = '8';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_VFPU)
-            {
-               s[_len++] = 'V';
-               s[_len++] = 'F';
-               s[_len++] = 'P';
-               s[_len++] = 'U';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_PS)
-            {
-               s[_len++] = 'P';
-               s[_len++] = 'S';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            if (cpu & RETRO_SIMD_ASIMD)
-            {
-               s[_len++] = 'A';
-               s[_len++] = 'S';
-               s[_len++] = 'I';
-               s[_len++] = 'M';
-               s[_len++] = 'D';
-               s[_len++] = ' ';
-               s[_len+1] = '\0';
-            }
-            s[_len-1] = '\0';
+            snprintf(str_out, str_len,
+               "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+               cpu & RETRO_SIMD_MMX ? "MMX " : "",
+               cpu & RETRO_SIMD_MMXEXT ? "MMXEXT " : "",
+               cpu & RETRO_SIMD_SSE ? "SSE " : "",
+               cpu & RETRO_SIMD_SSE2 ? "SSE2 " : "",
+               cpu & RETRO_SIMD_SSE3 ? "SSE3 " : "",
+               cpu & RETRO_SIMD_SSSE3 ? "SSSE3 " : "",
+               cpu & RETRO_SIMD_SSE4 ? "SSE4 " : "",
+               cpu & RETRO_SIMD_SSE42 ? "SSE42 " : "",
+               cpu & RETRO_SIMD_AES ? "AES " : "",
+               cpu & RETRO_SIMD_AVX ? "AVX " : "",
+               cpu & RETRO_SIMD_AVX2 ? "AVX2 " : "",
+               cpu & RETRO_SIMD_NEON ? "NEON " : "",
+               cpu & RETRO_SIMD_VFPV3 ? "VFPV3 " : "",
+               cpu & RETRO_SIMD_VFPV4 ? "VFPV4 " : "",
+               cpu & RETRO_SIMD_VMX ? "VMX " : "",
+               cpu & RETRO_SIMD_VMX128 ? "VMX128 " : "",
+               cpu & RETRO_SIMD_VFPU ? "VFPU " : "",
+               cpu & RETRO_SIMD_PS ? "PS " : "",
+               cpu & RETRO_SIMD_ASIMD ? "ASIMD " : "");
+            break;
          }
          break;
       case RARCH_CAPABILITIES_COMPILER:
 #if defined(_MSC_VER)
-         snprintf(s, len, "%s: MSVC (%d) %u-bit",
+         snprintf(str_out, str_len, "%s: MSVC (%d) %u-bit",
                msg_hash_to_str(MSG_COMPILER),
                _MSC_VER, (unsigned)
                (CHAR_BIT * sizeof(size_t)));
 #elif defined(__SNC__)
-         snprintf(s, len, "%s: SNC (%d) %u-bit",
+         snprintf(str_out, str_len, "%s: SNC (%d) %u-bit",
                msg_hash_to_str(MSG_COMPILER),
                __SN_VER__, (unsigned)(CHAR_BIT * sizeof(size_t)));
 #elif defined(_WIN32) && defined(__GNUC__)
-         snprintf(s, len, "%s: MinGW (%d.%d.%d) %u-bit",
+         snprintf(str_out, str_len, "%s: MinGW (%d.%d.%d) %u-bit",
                msg_hash_to_str(MSG_COMPILER),
                __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__, (unsigned)
                (CHAR_BIT * sizeof(size_t)));
 #elif defined(__clang__)
-         snprintf(s, len, "%s: Clang/LLVM (%s) %u-bit",
+         snprintf(str_out, str_len, "%s: Clang/LLVM (%s) %u-bit",
                msg_hash_to_str(MSG_COMPILER),
                __clang_version__, (unsigned)(CHAR_BIT * sizeof(size_t)));
 #elif defined(__GNUC__)
-         snprintf(s, len, "%s: GCC (%d.%d.%d) %u-bit",
+         snprintf(str_out, str_len, "%s: GCC (%d.%d.%d) %u-bit",
                msg_hash_to_str(MSG_COMPILER),
                __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__, (unsigned)
                (CHAR_BIT * sizeof(size_t)));
 #else
-         snprintf(s, len, "%s %u-bit",
+         snprintf(str_out, str_len, "%s %u-bit",
                msg_hash_to_str(MSG_UNKNOWN_COMPILER),
                (unsigned)(CHAR_BIT * sizeof(size_t)));
 #endif

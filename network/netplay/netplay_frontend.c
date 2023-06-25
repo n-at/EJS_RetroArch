@@ -761,6 +761,7 @@ static bool netplay_handshake_init_send(netplay_t *netplay,
 #ifdef HAVE_MENU
 static void handshake_password(void *userdata, const char *line)
 {
+   size_t _len;
    struct password_buf_s password_buf;
    char password[8+NETPLAY_PASS_LEN]; /* 8 for salt, 128 for password */
    char hash[NETPLAY_PASS_HASH_LEN+1]; /* + NULL terminator */
@@ -772,10 +773,12 @@ static void handshake_password(void *userdata, const char *line)
       return;
 
    connection = &netplay->connections[0];
-
-   snprintf(password, sizeof(password), "%08lX", (unsigned long)connection->salt);
+   _len       = snprintf(password, sizeof(password),
+         "%08lX", (unsigned long)connection->salt);
    if (!string_is_empty(line))
-      strlcat(password, line, sizeof(password));
+      strlcpy(password       + _len,
+            line,
+            sizeof(password) - _len);
 
    password_buf.cmd[0] = htonl(NETPLAY_CMD_PASSWORD);
    password_buf.cmd[1] = htonl(sizeof(password_buf.password));
@@ -3443,7 +3446,7 @@ static int handle_mitm_connection(netplay_t *netplay, netplay_address_t *addr,
             netplay->mitm_handler->id_recvd = 0;
 
             if (socket_send_all_nonblocking(netplay->listen_fd,
-                  ping, len, true) != len)
+                  ping, len, true) != (ssize_t)len)
             {
                /* We couldn't send our ping reply in one call. Assume error. */
                RARCH_ERR("[Netplay] Tunnel ping reply failed.\n");
@@ -6739,16 +6742,15 @@ static bool netplay_init_socket_buffers(netplay_t *netplay)
 
 static bool netplay_init_serialization(netplay_t *netplay)
 {
-   size_t i;
-   retro_ctx_size_info_t info = {0};
+   size_t i, info_size;
 
    if (netplay->state_size)
       return true;
 
-   core_serialize_size_special(&info);
-   if (!info.size)
+   info_size = core_serialize_size_special();
+   if (!info_size)
       return false;
-   netplay->state_size = info.size;
+   netplay->state_size = info_size;
 
    for (i = 0; i < netplay->buffer_size; i++)
    {

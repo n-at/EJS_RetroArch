@@ -162,6 +162,10 @@
 #include "input/input_keymaps.h"
 #include "input/input_remapping.h"
 
+#ifdef HAVE_MICROPHONE
+#include "audio/microphone_driver.h"
+#endif
+
 #ifdef HAVE_CHEEVOS
 #include "cheevos/cheevos.h"
 #include "cheevos/cheevos_menu.h"
@@ -329,12 +333,14 @@ runloop_state_t *runloop_state_get_ptr(void)
    return &runloop_state;
 }
 
-#ifdef HAVE_REWIND
 bool state_manager_frame_is_reversed(void)
 {
+#ifdef HAVE_REWIND
    return (runloop_state.rewind_st.flags & STATE_MGR_REWIND_ST_FLAG_FRAME_IS_REVERSED) > 0;
-}
+#else
+   return false;
 #endif
+}
 
 content_state_t *content_state_get_ptr(void)
 {
@@ -663,7 +669,7 @@ void runloop_runtime_log_deinit(
 {
    if (verbosity_is_enabled())
    {
-      char log[PATH_MAX_LENGTH] = {0};
+      char log[256]             = {0};
       unsigned hours            = 0;
       unsigned minutes          = 0;
       unsigned seconds          = 0;
@@ -704,6 +710,7 @@ void runloop_runtime_log_deinit(
 static bool runloop_clear_all_thread_waits(
       unsigned clear_threads, void *data)
 {
+   /* Does this need to treat the microphone driver the same way? */
    if (clear_threads > 0)
       audio_driver_start(false);
    else
@@ -1129,8 +1136,8 @@ static bool validate_game_specific_options(char **output)
    if (!validate_game_options(
             runloop_st->system.info.library_name,
             game_options_path,
-            sizeof(game_options_path), false) ||
-       !path_is_valid(game_options_path))
+            sizeof(game_options_path), false)
+       || !path_is_valid(game_options_path))
       return false;
 
    RARCH_LOG("[Core]: %s \"%s\".\n",
@@ -1175,8 +1182,8 @@ static bool validate_folder_specific_options(
 
    if (!validate_folder_options(
             folder_options_path,
-            sizeof(folder_options_path), false) ||
-       !path_is_valid(folder_options_path))
+            sizeof(folder_options_path), false)
+       || !path_is_valid(folder_options_path))
       return false;
 
    RARCH_LOG("[Core]: %s \"%s\".\n",
@@ -1358,15 +1365,15 @@ static void runloop_core_msg_queue_push(
    switch (msg->level)
    {
       case RETRO_LOG_WARN:
-         category = MESSAGE_QUEUE_CATEGORY_WARNING;
+         category  = MESSAGE_QUEUE_CATEGORY_WARNING;
          break;
       case RETRO_LOG_ERROR:
-         category = MESSAGE_QUEUE_CATEGORY_ERROR;
+         category  = MESSAGE_QUEUE_CATEGORY_ERROR;
          break;
       case RETRO_LOG_INFO:
       case RETRO_LOG_DEBUG:
       default:
-         category = MESSAGE_QUEUE_CATEGORY_INFO;
+         category  = MESSAGE_QUEUE_CATEGORY_INFO;
          break;
    }
 
@@ -2914,9 +2921,9 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
          /* Can potentially be called every frame,
           * don't do anything unless required. */
-         if (  (geom->base_width   != in_geom->base_width)  ||
-               (geom->base_height  != in_geom->base_height) ||
-               (geom->aspect_ratio != in_geom->aspect_ratio))
+         if (     (geom->base_width   != in_geom->base_width)
+               || (geom->base_height  != in_geom->base_height) 
+               || (geom->aspect_ratio != in_geom->aspect_ratio))
          {
             geom->base_width   = in_geom->base_width;
             geom->base_height  = in_geom->base_height;
@@ -3384,7 +3391,73 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             }
          }
          break;
+      case RETRO_ENVIRONMENT_GET_MICROPHONE_INTERFACE:
+#ifdef HAVE_MICROPHONE
+         {
+            struct retro_microphone_interface* microphone = (struct retro_microphone_interface *)data;
+            microphone_driver_state_t *mic_st             = microphone_state_get_ptr();
+            const microphone_driver_t *driver             = mic_st->driver;
 
+            RARCH_LOG("[Environ]: RETRO_ENVIRONMENT_GET_MICROPHONE_INTERFACE.\n");
+
+            if (!microphone)
+               return false;
+            /* User didn't provide a pointer for a response, what can we do? */
+
+            if (microphone->interface_version != RETRO_MICROPHONE_INTERFACE_VERSION)
+            {
+               RARCH_ERR("[Environ]: Core requested unexpected microphone interface version %u, only %u is available\n",
+                  microphone->interface_version,
+                  RETRO_MICROPHONE_INTERFACE_VERSION);
+
+               return false;
+            }
+
+            /* Initialize the interface... */
+            memset(microphone, 0, sizeof(*microphone));
+
+            if (driver == &microphone_null)
+            { /* If the null driver is active... */
+               RARCH_ERR("[Environ]: Cannot initialize microphone interface, active driver is null\n");
+               return false;
+            }
+
+            if (!settings->bools.microphone_enable)
+            { /* If mic support is off... */
+               RARCH_WARN("[Environ]: Will not initialize microphone interface, support is turned off\n");
+               return false;
+            }
+
+            /* The core might request a mic before the mic driver is initialized,
+             * so we still have to see if the frontend intends to init a mic driver. */
+            if (!driver && string_is_equal(settings->arrays.microphone_driver, "null"))
+            { /* If we're going to load the null driver... */
+               RARCH_ERR("[Environ]: Cannot initialize microphone interface, configured driver is null\n");
+               return false;
+            }
+
+            microphone->interface_version = RETRO_MICROPHONE_INTERFACE_VERSION;
+            microphone->open_mic      = microphone_driver_open_mic;
+            microphone->close_mic     = microphone_driver_close_mic;
+            microphone->get_params    = microphone_driver_get_effective_params;
+            microphone->set_mic_state = microphone_driver_set_mic_state;
+            microphone->get_mic_state = microphone_driver_get_mic_state;
+            microphone->read_mic      = microphone_driver_read;
+         }
+#else
+         {
+            struct retro_microphone_interface* microphone = (struct retro_microphone_interface *)data;
+            RARCH_LOG("[Environ]: RETRO_ENVIRONMENT_GET_MICROPHONE_INTERFACE.\n");
+
+            if (microphone)
+               microphone->interface_version = 0;
+
+            RARCH_ERR("[Environ]: Core requested microphone interface, but this build does not include support\n");
+
+            return false;
+         }
+#endif
+         break;
       case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT:
          {
             struct retro_hw_render_context_negotiation_interface *iface =
@@ -3869,6 +3942,10 @@ static bool core_unload_game(void)
 
    audio_driver_stop();
 
+#ifdef HAVE_MICROPHONE
+   microphone_driver_stop();
+#endif
+
    return true;
 }
 
@@ -4004,7 +4081,7 @@ void runloop_event_deinit_core(void)
    if (settings->bools.video_frame_delay_auto)
       video_st->frame_delay_target = 0;
 
-   driver_uninit(DRIVERS_CMD_ALL);
+   driver_uninit(DRIVERS_CMD_ALL, 0);
 
 #ifdef HAVE_CONFIGFILE
    if (runloop_st->flags & RUNLOOP_FLAG_OVERRIDES_ACTIVE)
@@ -4048,12 +4125,13 @@ static bool runloop_path_init_subsystem(runloop_state_t *runloop_st)
             union string_list_elem_attr attr;
             char savename[PATH_MAX_LENGTH];
             char path[PATH_MAX_LENGTH];
+            size_t _len = 0;
             const struct retro_subsystem_memory_info *mem =
                (const struct retro_subsystem_memory_info*)
                &info->roms[i].memory[j];
-            ext[0]  = '.';
-            ext[1]  = '\0';
-            strlcat(ext, mem->extension, sizeof(ext));
+            ext[  _len]  = '.';
+            ext[++_len]  = '\0';
+            strlcpy(ext + _len, mem->extension, sizeof(ext) - _len);
             strlcpy(savename,
                   runloop_st->subsystem_fullpaths->elems[i].data,
                   sizeof(savename));
@@ -4088,11 +4166,9 @@ static bool runloop_path_init_subsystem(runloop_state_t *runloop_st)
       size_t len = strlcpy(runloop_st->name.savefile,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.savefile));
-      runloop_st->name.savefile[len  ] = '.';
-      runloop_st->name.savefile[len+1] = 's';
-      runloop_st->name.savefile[len+2] = 'r';
-      runloop_st->name.savefile[len+3] = 'm';
-      runloop_st->name.savefile[len+4] = '\0';
+      strlcpy(runloop_st->name.savefile       + len,
+            ".srm",
+            sizeof(runloop_st->name.savefile) - len);
    }
 
    if (path_is_directory(runloop_st->name.savefile))
@@ -4525,24 +4601,6 @@ bool runloop_event_init_core(
 #ifdef HAVE_NETWORKING
    if (netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL))
    {
-#ifdef HAVE_UPDATE_CORES
-      /* If netplay is enabled, update the core before initializing. */
-      const char *path_core = path_get(RARCH_PATH_CORE);
-
-      if (!string_is_empty(path_core) &&
-            !string_is_equal(path_core, "builtin"))
-      {
-         if (task_push_update_single_core(path_core,
-               settings->bools.core_updater_auto_backup,
-               settings->uints.core_updater_auto_backup_history_size,
-               settings->paths.directory_libretro,
-               settings->paths.directory_core_assets))
-            /* We must wait for the update to finish
-               before starting the core. */
-            task_queue_wait(NULL, NULL);
-      }
-#endif
-
       /* We need this in order for core_info_current_supports_netplay
          to work correctly at init_netplay,
          called later at event_init_content. */
@@ -4574,16 +4632,16 @@ bool runloop_event_init_core(
          video_st->title_buf,
          msg_hash_to_str(MSG_PROGRAM),
          sizeof(video_st->title_buf));
-   video_st->title_buf[len  ] = ' ';
-   video_st->title_buf[len+1] = '\0';
-   len = strlcat(video_st->title_buf,
+   video_st->title_buf[  len] = ' ';
+   video_st->title_buf[++len] = '\0';
+   len += strlcpy(video_st->title_buf + len,
          sys_info->info.library_name,
-         sizeof(video_st->title_buf));
-   video_st->title_buf[len  ] = ' ';
-   video_st->title_buf[len+1] = '\0';
-   strlcat(video_st->title_buf,
+         sizeof(video_st->title_buf)  - len);
+   video_st->title_buf[  len] = ' ';
+   video_st->title_buf[++len] = '\0';
+   strlcpy(video_st->title_buf        + len,
          sys_info->info.library_version,
-         sizeof(video_st->title_buf));
+         sizeof(video_st->title_buf)  - len);
 
    strlcpy(sys_info->valid_extensions,
          sys_info->info.valid_extensions ?
@@ -4762,11 +4820,9 @@ void runloop_path_fill_names(void)
       size_t len = strlcpy(runloop_st->name.ups,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.ups));
-      runloop_st->name.ups[len  ] = '.';
-      runloop_st->name.ups[len+1] = 'u';
-      runloop_st->name.ups[len+2] = 'p';
-      runloop_st->name.ups[len+3] = 's';
-      runloop_st->name.ups[len+4] = '\0';
+      strlcpy(runloop_st->name.ups       + len,
+            ".ups",
+            sizeof(runloop_st->name.ups) - len);
    }
 
    if (string_is_empty(runloop_st->name.bps))
@@ -4774,11 +4830,9 @@ void runloop_path_fill_names(void)
       size_t len = strlcpy(runloop_st->name.bps,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.bps));
-      runloop_st->name.bps[len  ] = '.';
-      runloop_st->name.bps[len+1] = 'b';
-      runloop_st->name.bps[len+2] = 'p';
-      runloop_st->name.bps[len+3] = 's';
-      runloop_st->name.bps[len+4] = '\0';
+      strlcpy(runloop_st->name.bps       + len,
+            ".bps",
+            sizeof(runloop_st->name.bps) - len);
    }
 
    if (string_is_empty(runloop_st->name.ips))
@@ -4786,11 +4840,9 @@ void runloop_path_fill_names(void)
       size_t len = strlcpy(runloop_st->name.ips,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.ips));
-      runloop_st->name.ips[len  ] = '.';
-      runloop_st->name.ips[len+1] = 'i';
-      runloop_st->name.ips[len+2] = 'p';
-      runloop_st->name.ips[len+3] = 's';
-      runloop_st->name.ips[len+4] = '\0';
+      strlcpy(runloop_st->name.ips       + len,
+            ".ips",
+            sizeof(runloop_st->name.ips) - len);
    }
 }
 
@@ -4885,8 +4937,8 @@ bool core_options_remove_override(bool game_specific)
 
    /* Sanity check 1 - if there are no core options
     * or no overrides are active, there is nothing to do */
-   if (          !coreopts ||
-         (       (!(runloop_st->flags & RUNLOOP_FLAG_GAME_OPTIONS_ACTIVE))
+   if (          !coreopts
+         || (    (!(runloop_st->flags & RUNLOOP_FLAG_GAME_OPTIONS_ACTIVE))
               && (!(runloop_st->flags & RUNLOOP_FLAG_FOLDER_OPTIONS_ACTIVE))
       ))
       return true;
@@ -6489,10 +6541,12 @@ static enum runloop_state_enum runloop_check_state(
                   cur_state_slot);
          _len = strlcpy(msg, msg_hash_to_str(MSG_STATE_SLOT), sizeof(msg));
 
-         snprintf(msg + _len, sizeof(msg) - _len,
-                  ": %d", settings->ints.state_slot);
          if (cur_state_slot < 0)
-            strlcat(msg, " (Auto)", sizeof(msg));
+            snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d (Auto)", settings->ints.state_slot);
+         else
+            snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d", settings->ints.state_slot);
 
 #ifdef HAVE_GFX_WIDGETS
          if (dispwidget_get_ptr()->active)
@@ -6549,10 +6603,12 @@ static enum runloop_state_enum runloop_check_state(
                   cur_replay_slot);
          _len = strlcpy(msg, msg_hash_to_str(MSG_REPLAY_SLOT), sizeof(msg));
 
-         snprintf(msg + _len, sizeof(msg) - _len,
-                  ": %d", settings->ints.replay_slot);
          if (cur_replay_slot < 0)
-            strlcat(msg, " (Auto)", sizeof(msg));
+            snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d (Auto)", settings->ints.replay_slot);
+         else
+            snprintf(msg + _len, sizeof(msg) - _len,
+                  ": %d", settings->ints.replay_slot);
 
 #ifdef HAVE_GFX_WIDGETS
          if (dispwidget_get_ptr()->active)
@@ -7677,27 +7733,21 @@ bool core_serialize_special(retro_ctx_serialize_info_t *info)
    return ret;
 }
 
-bool core_serialize_size(retro_ctx_size_info_t *info)
+size_t core_serialize_size(void)
 {
    runloop_state_t *runloop_st  = &runloop_state;
-   if (!info)
-      return false;
-   info->size = runloop_st->current_core.retro_serialize_size();
-   return true;
+   return runloop_st->current_core.retro_serialize_size();
 }
 
-bool core_serialize_size_special(retro_ctx_size_info_t *info)
+size_t core_serialize_size_special(void)
 {
+   size_t val;
    runloop_state_t *runloop_st = &runloop_state;
-
-   if (!info)
-      return false;
-
    runloop_st->flags |=  RUNLOOP_FLAG_REQUEST_SPECIAL_SAVESTATE;
-   info->size         = runloop_st->current_core.retro_serialize_size();
+   val                = runloop_st->current_core.retro_serialize_size();
    runloop_st->flags &= ~RUNLOOP_FLAG_REQUEST_SPECIAL_SAVESTATE;
 
-   return true;
+   return val;
 }
 
 uint64_t core_serialization_quirks(void)
@@ -7809,11 +7859,9 @@ void runloop_path_set_names(void)
       size_t len = strlcpy(runloop_st->name.savefile,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.savefile));
-      runloop_st->name.savefile[len  ] = '.';
-      runloop_st->name.savefile[len+1] = 's';
-      runloop_st->name.savefile[len+2] = 'r';
-      runloop_st->name.savefile[len+3] = 'm';
-      runloop_st->name.savefile[len+4] = '\0';
+      strlcpy(runloop_st->name.savefile       + len,
+            ".srm",
+            sizeof(runloop_st->name.savefile) - len);
    }
 
    if (!retroarch_override_setting_is_set(
@@ -7823,13 +7871,9 @@ void runloop_path_set_names(void)
             runloop_st->name.savestate,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.savestate));
-      runloop_st->name.savestate[len  ] = '.';
-      runloop_st->name.savestate[len+1] = 's';
-      runloop_st->name.savestate[len+2] = 't';
-      runloop_st->name.savestate[len+3] = 'a';
-      runloop_st->name.savestate[len+4] = 't';
-      runloop_st->name.savestate[len+5] = 'e';
-      runloop_st->name.savestate[len+6] = '\0';
+      strlcpy(runloop_st->name.savestate       + len,
+            ".state",
+            sizeof(runloop_st->name.savestate) - len);
    }
 
 #ifdef HAVE_BSV_MOVIE
@@ -7840,14 +7884,9 @@ void runloop_path_set_names(void)
             runloop_st->name.replay,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.replay));
-      runloop_st->name.replay[len  ] = '.';
-      runloop_st->name.replay[len+1] = 'r';
-      runloop_st->name.replay[len+2] = 'e';
-      runloop_st->name.replay[len+3] = 'p';
-      runloop_st->name.replay[len+4] = 'l';
-      runloop_st->name.replay[len+5] = 'a';
-      runloop_st->name.replay[len+6] = 'y';
-      runloop_st->name.replay[len+7] = '\0';
+      strlcpy(runloop_st->name.replay          + len,
+            ".replay",
+            sizeof(runloop_st->name.replay)    - len);
    }
 #endif
   
@@ -7858,11 +7897,9 @@ void runloop_path_set_names(void)
             runloop_st->name.cheatfile,
             runloop_st->runtime_content_path_basename,
             sizeof(runloop_st->name.cheatfile));
-      runloop_st->name.cheatfile[len  ] = '.';
-      runloop_st->name.cheatfile[len+1] = 'c';
-      runloop_st->name.cheatfile[len+2] = 'h';
-      runloop_st->name.cheatfile[len+3] = 't';
-      runloop_st->name.cheatfile[len+4] = '\0';
+      strlcpy(runloop_st->name.cheatfile       + len,
+            ".cht",
+            sizeof(runloop_st->name.cheatfile) - len);
    }
 #endif
 }
@@ -7892,9 +7929,9 @@ void runloop_path_set_redirect(settings_t *settings,
 
    /* Get content directory name, if per-content-directory
     * saves/states are enabled */
-   if ((sort_savefiles_by_content_enable ||
-         sort_savestates_by_content_enable) &&
-       !string_is_empty(runloop_st->runtime_content_path_basename))
+   if (    (sort_savefiles_by_content_enable
+         || sort_savestates_by_content_enable)
+         && !string_is_empty(runloop_st->runtime_content_path_basename))
       fill_pathname_parent_dir_name(content_dir_name,
             runloop_st->runtime_content_path_basename,
             sizeof(content_dir_name));
@@ -7907,8 +7944,9 @@ void runloop_path_set_redirect(settings_t *settings,
 #endif
       {
          /* Per-core and/or per-content-directory saves */
-         if ((sort_savefiles_enable || sort_savefiles_by_content_enable)
-               && !string_is_empty(old_savefile_dir))
+         if ((       sort_savefiles_enable 
+                  || sort_savefiles_by_content_enable)
+                 && !string_is_empty(old_savefile_dir))
          {
             /* Append content directory name to save location */
             if (sort_savefiles_by_content_enable)

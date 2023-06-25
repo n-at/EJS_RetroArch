@@ -1126,7 +1126,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
-   "Muuta äänen ulostuloasetuksia."
+   "Muuta äänen sisään- ja ulostulo asetuksia."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS,
@@ -1480,6 +1480,16 @@ MSG_HASH(
    MENU_ENUM_LABEL_HELP_AUDIO_DRIVER_SL,
    "OpenSL-ajuri."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER,
+   "Mikrofoni"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_DRIVER,
+   "Mikrofonin ajuri."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Ääninäytteenottaja"
@@ -2205,6 +2215,16 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_OUTPUT_SETTINGS,
    "Muuta äänen ulostuloasetuksia."
    )
+#ifdef HAVE_MICROPHONE
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+   "Mikrofoni"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_SETTINGS,
+   "Muuta äänen sisääntuloasetuksia."
+   )
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
    "Näytteenottaja"
@@ -2352,6 +2372,50 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "Haluttu ääniviive millisekunneissa. Ei saateta huomioida, jos ääniajuri ei kykene tuomaan annettua viivettä."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+   "Mikrofoni"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+   "Laite"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Näytteenottajan laatu"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Pienennä tätä arvoa suosiaksesi parempaa suorituskykyä / alhaisempaa viivettä, äänen laadun kustannuksella, tai nosta arvoa saadaksesi parempi äänenlaatu, paremman suorituskyvyn / suuremman viiveen kustannuksella."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_INPUT_RATE,
+   "Sisääntulon oletustaso (Hz)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+   "Äänen sisääntulon viive (ms)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+   "WASAPI-eksklusiivinen tila"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+   "WASAPI-liukumuoto"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "WASAPI-jaetun puskurin pituus"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+   "Välipuskurin pituus (kuvissa), kun käytetään WASAPI-ajuria jaetussa tilassa."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 
@@ -3071,7 +3135,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_HALT_REPLAY_KEY,
-   "Pysäytä nauoitus/uusinta"
+   "Pysäytä nauhoitus/uusinta"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_REPLAY_SLOT_PLUS,
@@ -6936,6 +7000,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_MANUAL_CONTENT_SCAN_LIST,
    "Muokattava skannaus sisältötiedostojen nimien perusteella. Ei vaadi tietokannan mukaista sisältöä."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SCAN_ENTRY,
+   "Skannaa"
    )
 
 /* Import Content > Scan File */
@@ -11143,6 +11211,14 @@ MSG_HASH(
    "Tietokanta - Suodatin: Käyttäjien enimmäismäärä"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_RELEASEDATE_BY_MONTH,
+   "Tietokanta - Suodatin: Julkaisukuukauden mukaan"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_RELEASEDATE_BY_YEAR,
+   "Tietokanta - Suodatin: Julkaisuvuoden mukaan"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DATABASE_CURSOR_LIST_ENTRY_EDGE_MAGAZINE_ISSUE,
    "Tietokanta - Suodatin: Edge Magazine julkaisu"
    )
@@ -13533,6 +13609,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_BOTTOM_ASSETS_DIRECTORY,
    "Alemman näytön resurssien kansio. Kansioon on sisällytettävä \"bottom_menu.png\"."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_ENABLE,
+   "Kirjasimet"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_BOTTOM_FONT_COLOR_RED,

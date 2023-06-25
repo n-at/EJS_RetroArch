@@ -47,6 +47,10 @@
 #include "common/win32_common.h"
 #endif
 
+#ifdef __WINRT__
+#include "../uwp/uwp_func.h"
+#endif
+
 #include "../audio/audio_driver.h"
 #include "../frontend/frontend_driver.h"
 #include "../record/record_driver.h"
@@ -543,7 +547,7 @@ void video_driver_set_gpu_api_devices(
 {
    int i;
 
-   for (i = 0; i < ARRAY_SIZE(gpu_map); i++)
+   for (i = 0; i < (int)ARRAY_SIZE(gpu_map); i++)
    {
       if (api == gpu_map[i].api)
       {
@@ -557,7 +561,7 @@ struct string_list* video_driver_get_gpu_api_devices(enum gfx_ctx_api api)
 {
    int i;
 
-   for (i = 0; i < ARRAY_SIZE(gpu_map); i++)
+   for (i = 0; i < (int)ARRAY_SIZE(gpu_map); i++)
    {
       if (api == gpu_map[i].api)
          return gpu_map[i].list;
@@ -664,7 +668,7 @@ void video_monitor_set_refresh_rate(float hz)
    /* Avoid message spamming if there is no change. */
    if (settings->floats.video_refresh_rate == hz)
       return;
-   
+
    snprintf(rate, sizeof(rate), "%.3f", hz);
    snprintf(msg, sizeof(msg),
       msg_hash_to_str(MSG_VIDEO_REFRESH_RATE_CHANGED), rate);
@@ -699,7 +703,7 @@ void video_driver_force_fallback(const char *driver)
 
    if (msg_window)
    {
-      char text[PATH_MAX_LENGTH];
+      char text[128];
       ui_msg_window_state window_state;
       char *title          = strdup(msg_hash_to_str(MSG_ERROR));
 
@@ -1123,7 +1127,7 @@ void video_switch_refresh_rate_maybe(
       bool *video_switch_refresh_rate)
 {
    settings_t *settings               = config_get_ptr();
-   video_driver_state_t *video_st     = video_state_get_ptr();
+   video_driver_state_t *video_st     = &video_driver_st;
 
    float refresh_rate                 = *refresh_rate_suggest;
    float video_refresh_rate           = settings->floats.video_refresh_rate;
@@ -1980,17 +1984,17 @@ void video_driver_update_viewport(
             vp->width  = vp->full_width;
             delta      = (device_aspect / desired_aspect - 1.0f)
                / 2.0f + 0.5f;
-#if defined(RARCH_MOBILE)
-            /* In portrait mode, we want viewport to gravitate to top of screen. */
-            if (device_aspect < 1.0f)
-                vp->y = 0;
-            else
-#endif
             vp->y      = (int)roundf(vp->full_height * (0.5f - delta));
             vp->height = (unsigned)roundf(2.0f * vp->full_height * delta);
          }
       }
    }
+
+#if defined(RARCH_MOBILE)
+   /* In portrait mode, we want viewport to gravitate to top of screen. */
+   if (device_aspect < 1.0f)
+      vp->y = 0;
+#endif
 }
 
 void video_driver_restore_cached(void *settings_data)
@@ -2525,8 +2529,20 @@ void video_driver_build_info(video_frame_info_t *video_info)
    video_info->runloop_is_slowmotion       = runloop_st->flags & RUNLOOP_FLAG_SLOWMOTION;
    video_info->fastforward_frameskip       = settings->bools.fastforward_frameskip;
 
-   video_info->input_driver_nonblock_state = input_st
-         ? (input_st->flags & INP_FLAG_NONBLOCKING) : false;
+#ifdef _WIN32
+#ifdef HAVE_VULKAN
+   /* Vulkan in Windows does mailbox emulation
+    * in fullscreen with vsync, effectively
+    * discarding frames that can't be shown,
+    * therefore do not do it twice. */
+   if (     video_info->fullscreen
+         && settings->bools.video_vsync
+         && string_is_equal(video_driver_get_ident(), "vulkan"))
+      video_info->fastforward_frameskip    = false;
+#endif
+#endif
+
+   video_info->input_driver_nonblock_state   = input_st ? (input_st->flags & INP_FLAG_NONBLOCKING) : false;
    video_info->input_driver_grab_mouse_state = (input_st->flags & INP_FLAG_GRAB_MOUSE_STATE);
    video_info->disp_userdata                 = disp_get_ptr();
 
@@ -3359,30 +3375,31 @@ void video_driver_frame(const void *data, unsigned width,
 
       if (video_info.fps_show)
       {
-         status_text[0] = 'F';
-         status_text[1] = 'P';
-         status_text[2] = 'S';
-         status_text[3] = ':';
-         status_text[4] = ' ';
-         status_text[5] = '\0';
-         buf_pos        = snprintf(
-               status_text + 5, sizeof(status_text) - 5,
-               "%6.2f", last_fps) + 5;
+         status_text[  buf_pos] = 'F';
+         status_text[++buf_pos] = 'P';
+         status_text[++buf_pos] = 'S';
+         status_text[++buf_pos] = ':';
+         status_text[++buf_pos] = ' ';
+         status_text[++buf_pos] = '\0';
+         buf_pos               += snprintf(
+               status_text         + buf_pos,
+               sizeof(status_text) - buf_pos,
+               "%6.2f", last_fps);
       }
 
       if (video_info.framecount_show)
       {
          if (status_text[buf_pos-1] != '\0')
          {
-            status_text[buf_pos  ] = ' ';
-            status_text[buf_pos+1] = '|';
-            status_text[buf_pos+2] = '|';
-            status_text[buf_pos+3] = ' ';
-            status_text[buf_pos+4] = '\0';
+            status_text[  buf_pos] = ' ';
+            status_text[++buf_pos] = '|';
+            status_text[++buf_pos] = '|';
+            status_text[++buf_pos] = ' ';
+            status_text[++buf_pos] = '\0';
          }
-         buf_pos                   = strlcat(status_text,
+         buf_pos += strlcpy(status_text + buf_pos,
                msg_hash_to_str(MSG_FRAMES),
-               sizeof(status_text));
+               sizeof(status_text)      - buf_pos);
          status_text[buf_pos  ]    = ':';
          status_text[++buf_pos]    = ' ';
          status_text[++buf_pos]    = '\0';
@@ -3423,25 +3440,29 @@ void video_driver_frame(const void *data, unsigned width,
 
       if ((video_st->frame_count % fps_update_interval) == 0)
       {
+         size_t new_len;
          last_fps = TIME_TO_FPS(curr_time, new_time,
                fps_update_interval);
 
-         video_st->window_title_len = strlcpy(video_st->window_title,
-               video_st->title_buf, sizeof(video_st->window_title));
+         new_len = strlcpy(video_st->window_title, video_st->title_buf, 
+               sizeof(video_st->window_title));
 
          if (!string_is_empty(status_text))
          {
-            video_st->window_title[video_st->window_title_len  ] = ' ';
-            video_st->window_title[video_st->window_title_len+1] = '|';
-            video_st->window_title[video_st->window_title_len+2] = '|';
-            video_st->window_title[video_st->window_title_len+3] = ' ';
-            video_st->window_title[video_st->window_title_len+4] = '\0';
-            video_st->window_title_len = strlcat(video_st->window_title,
-                  status_text, sizeof(video_st->window_title));
+            video_st->window_title[  new_len  ] = ' ';
+            video_st->window_title[++new_len  ] = '|';
+            video_st->window_title[++new_len  ] = '|';
+            video_st->window_title[++new_len  ] = ' ';
+            video_st->window_title[++new_len  ] = '\0';
+            new_len += strlcpy(
+                  video_st->window_title         + new_len,
+                  status_text,
+                  sizeof(video_st->window_title) - new_len);
          }
 
-         curr_time        = new_time;
-         video_st->flags |= VIDEO_FLAG_WINDOW_TITLE_UPDATE;
+         curr_time                  = new_time;
+         video_st->window_title_len = new_len;
+         video_st->flags           |= VIDEO_FLAG_WINDOW_TITLE_UPDATE;
       }
    }
    else
@@ -3491,14 +3512,15 @@ void video_driver_frame(const void *data, unsigned width,
           * message at the end */
          if (!string_is_empty(status_text))
          {
-            status_text[buf_pos  ] = ' ';
-            status_text[buf_pos+1] = '|';
-            status_text[buf_pos+2] = '|';
-            status_text[buf_pos+3] = ' ';
-            status_text[buf_pos+4] = '\0';
-            buf_pos                = strlcat(status_text,
+            status_text[buf_pos    ] = ' ';
+            status_text[++buf_pos  ] = '|';
+            status_text[++buf_pos  ] = '|';
+            status_text[++buf_pos  ] = ' ';
+            status_text[++buf_pos  ] = '\0';
+            buf_pos                 += strlcpy(
+                  status_text         + buf_pos,
                   runloop_st->core_status_msg.str,
-                  sizeof(status_text));
+                  sizeof(status_text) - buf_pos);
          }
          else
             buf_pos                = strlcpy(status_text,
@@ -3695,8 +3717,8 @@ void video_driver_frame(const void *data, unsigned width,
       if (len)
       {
 	      /* TODO/FIXME - localize */
-	      strlcpy(latency_stats, "LATENCY\n", sizeof(latency_stats));
-	      strlcat(latency_stats, tmp, sizeof(latency_stats));
+	      size_t _len = strlcpy(latency_stats, "LATENCY\n", sizeof(latency_stats));
+	      strlcpy(latency_stats + _len, tmp, sizeof(latency_stats) - _len);
       }
 
       /* TODO/FIXME - localize */
@@ -3817,7 +3839,7 @@ void video_driver_frame(const void *data, unsigned width,
             native_width, width,
             height,
             video_st->core_hz,
-            video_st->av_info.geometry.aspect_ratio < 1.0 ? true : false,
+            retroarch_get_rotation() & 1,
             video_info.crt_switch_resolution,
             video_info.crt_switch_center_adjust,
             video_info.crt_switch_porch_adjust,
@@ -3843,12 +3865,12 @@ static void video_driver_reinit_context(settings_t *settings, int flags)
       video_st->hw_render_context_negotiation;
    memcpy(&hwr_copy, hwr, sizeof(hwr_copy));
 
-   driver_uninit(flags);
+   driver_uninit(flags, DRIVER_LIFETIME_RESET);
 
    memcpy(hwr, &hwr_copy, sizeof(*hwr));
    video_st->hw_render_context_negotiation = iface;
 
-   drivers_init(settings, flags, verbosity_is_enabled());
+   drivers_init(settings, flags, DRIVER_LIFETIME_RESET, verbosity_is_enabled());
 }
 
 void video_driver_reinit(int flags)

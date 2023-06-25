@@ -623,13 +623,12 @@ static void task_save_handler_finished(retro_task_t *task,
 
 static size_t content_get_rastate_size(rastate_size_info_t* size, bool rewind)
 {
-   retro_ctx_size_info_t info;
-   core_serialize_size(&info);
-   if (!info.size)
+   size_t info_size = core_serialize_size();
+   if (!info_size)
       return 0;
-   size->coremem_size = info.size;
+   size->coremem_size = info_size;
    /* 8-byte identifier, 8-byte block header, content, 8-byte terminator */
-   size->total_size   = 8 + 8 + CONTENT_ALIGN_SIZE(info.size) + 8;
+   size->total_size   = 8 + 8 + CONTENT_ALIGN_SIZE(info_size) + 8;
 #ifdef HAVE_CHEEVOS
    /* 8-byte block header + content */
    if ((size->cheevos_size = rcheevos_get_serialize_size()) > 0)
@@ -826,8 +825,8 @@ static void task_save_handler(retro_task_t *task)
          size_t _len = strlcpy(err,
                msg_hash_to_str(MSG_FAILED_TO_SAVE_STATE_TO),
                err_size - 1);
-         err[_len  ] = ' ';
-         err[_len+1] = '\0';
+         err[  _len] = ' ';
+         err[++_len] = '\0';
          strlcat(err, state->path, err_size - 1);
       }
 
@@ -1648,7 +1647,6 @@ char* get_state_info(void) {
 bool content_save_state(const char *path, bool save_to_disk, bool autosave)
 {
    size_t serial_size;
-   retro_ctx_size_info_t info;
    void *data  = NULL;
 
    if (!core_info_current_supports_savestate())
@@ -1658,11 +1656,10 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
       return false;
    }
 
-   core_serialize_size(&info);
+   serial_size = core_serialize_size();
 
-   if (info.size == 0)
+   if (serial_size == 0)
       return false;
-   serial_size = info.size;
 
    if (!save_state_in_background)
    {
@@ -1992,47 +1989,46 @@ bool content_load_ram_file(unsigned slot)
 static bool dump_to_file_desperate(const void *data,
       size_t size, unsigned type)
 {
-   time_t time_;
-   struct tm tm_;
-   char timebuf[256];
    char path[PATH_MAX_LENGTH + 256 + 32];
-   char application_data[PATH_MAX_LENGTH];
-
-   application_data[0]    = '\0';
    path            [0]    = '\0';
-   timebuf         [0]    = '\0';
 
-   if (!fill_pathname_application_data(application_data,
-            sizeof(application_data)))
-      return false;
+   if (fill_pathname_application_data(path,
+            sizeof(path)))
+   {
+      size_t _len;
+      time_t time_;
+      struct tm tm_;
+      char timebuf[256];
+      timebuf         [0] = '\0';
+      time(&time_);
 
-   time(&time_);
+      rtime_localtime(&time_, &tm_);
 
-   rtime_localtime(&time_, &tm_);
+      strftime(timebuf, 256 * sizeof(char),
+            "%Y-%m-%d-%H-%M-%S", &tm_);
 
-   strftime(timebuf,
-         256 * sizeof(char),
-         "%Y-%m-%d-%H-%M-%S", &tm_);
+      _len = strlcat(path, "/RetroArch-recovery-", sizeof(path));
 
-   snprintf(path, sizeof(path),
-         "%s/RetroArch-recovery-%u%s",
-         application_data, type,
-         timebuf);
+      snprintf(path + _len, sizeof(path) - _len,
+            "%u%s", type, timebuf);
 
-   /* Fallback (emergency) saves are always
-    * uncompressed
-    * > If a regular save fails, then the host
-    *   system is experiencing serious technical
-    *   difficulties (most likely some kind of
-    *   hardware failure)
-    * > In this case, we don't want to further
-    *   complicate matters by introducing zlib
-    *   compression overheads */
-   if (!filestream_write_file(path, data, size))
-      return false;
+      /* Fallback (emergency) saves are always
+       * uncompressed
+       * > If a regular save fails, then the host
+       *   system is experiencing serious technical
+       *   difficulties (most likely some kind of
+       *   hardware failure)
+       * > In this case, we don't want to further
+       *   complicate matters by introducing zlib
+       *   compression overheads */
+      if (filestream_write_file(path, data, size))
+      {
+         RARCH_WARN("[SRAM]: Succeeded in saving RAM data to \"%s\".\n", path);
+         return true;
+      }
+   }
 
-   RARCH_WARN("[SRAM]: Succeeded in saving RAM data to \"%s\".\n", path);
-   return true;
+   return false;
 }
 
 /**
@@ -2095,7 +2091,6 @@ bool content_load_state_from_ram(void)
  **/
 bool content_save_state_to_ram(void)
 {
-   retro_ctx_size_info_t info;
    void *data  = NULL;
    size_t serial_size;
 
@@ -2106,11 +2101,10 @@ bool content_save_state_to_ram(void)
       return false;
    }
 
-   core_serialize_size(&info);
+   serial_size = core_serialize_size();
 
-   if (info.size == 0)
+   if (serial_size == 0)
       return false;
-   serial_size = info.size;
 
    if (!save_state_in_background)
    {

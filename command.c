@@ -417,11 +417,11 @@ bool command_get_config_param(command_t *cmd, const char* arg)
    #endif
    /* TODO: query any string */
 
-   strlcpy(reply, "GET_CONFIG_PARAM ", sizeof(reply));
-   _len          = strlcat(reply, arg, sizeof(reply));
-   reply[_len  ] = ' ';
-   reply[_len+1] = '\0';
-   strlcat(reply, value, sizeof(reply));
+   _len  = strlcpy(reply, "GET_CONFIG_PARAM ", sizeof(reply));
+   _len += strlcpy(reply + _len, arg, sizeof(reply)  - _len);
+   reply[  _len] = ' ';
+   reply[++_len] = '\0';
+   _len = strlcpy(reply + _len, value, sizeof(reply) - _len);
    cmd->replier(cmd, reply, strlen(reply));
    return true;
 }
@@ -688,7 +688,6 @@ bool command_show_osd_msg(command_t *cmd, const char* arg)
 bool command_load_state_slot(command_t *cmd, const char *arg)
 {
    char state_path[16384];
-   retro_ctx_size_info_t info;
    char reply[128]              = "";
    unsigned int slot            = (unsigned int)strtoul(arg, NULL, 10);
    bool savestates_enabled      = core_info_current_supports_savestate();
@@ -697,10 +696,11 @@ bool command_load_state_slot(command_t *cmd, const char *arg)
    snprintf(reply, sizeof(reply) - 1, "LOAD_STATE_SLOT %d", slot);
    if (savestates_enabled)
    {
+      size_t info_size;
       runloop_get_savestate_path(state_path, sizeof(state_path), slot);
 
-      core_serialize_size(&info);
-      savestates_enabled = (info.size > 0);
+      info_size          = core_serialize_size();
+      savestates_enabled = (info_size > 0);
    }
    if (savestates_enabled)
    {
@@ -718,7 +718,6 @@ bool command_play_replay_slot(command_t *cmd, const char *arg)
 {
 #ifdef HAVE_BSV_MOVIE
    char replay_path[16384];
-   retro_ctx_size_info_t info;
    char reply[128]              = "";
    unsigned int slot            = (unsigned int)strtoul(arg, NULL, 10);
    bool savestates_enabled      = core_info_current_supports_savestate();
@@ -726,15 +725,17 @@ bool command_play_replay_slot(command_t *cmd, const char *arg)
    replay_path[0]               = '\0';
    if (savestates_enabled)
    {
+      size_t info_size;
       runloop_get_replay_path(replay_path, sizeof(replay_path), slot);
 
-      core_serialize_size(&info);
-      savestates_enabled = (info.size > 0);
+      info_size          = core_serialize_size();
+      savestates_enabled = (info_size > 0);
    }
    if (savestates_enabled)
    {
       ret = movie_start_playback(input_state_get_ptr(), replay_path);
-      if (ret) {
+      if (ret)
+      {
          input_driver_state_t *input_st = input_state_get_ptr();
          task_queue_wait(NULL,NULL);
          if(input_st->bsv_movie_state_handle)
@@ -819,9 +820,9 @@ bool command_write_ram(command_t *cmd, const char *arg)
 bool command_version(command_t *cmd, const char* arg)
 {
    char reply[256];
-   size_t _len   = strlcpy(reply, PACKAGE_VERSION, sizeof(reply));
-   reply[_len  ] = '\n';
-   reply[_len+1] = '\0';
+   size_t  _len  = strlcpy(reply, PACKAGE_VERSION, sizeof(reply));
+   reply[  _len] = '\n';
+   reply[++_len] = '\0';
    cmd->replier(cmd, reply, strlen(reply));
 
    return true;
@@ -1263,6 +1264,7 @@ bool command_event_save_auto_state(
       bool savestate_auto_save,
       const enum rarch_core_type current_core_type)
 {
+   size_t _len;
    runloop_state_t *runloop_st = runloop_state_get_ptr();
    char savestate_name_auto[PATH_MAX_LENGTH];
 
@@ -1277,12 +1279,12 @@ bool command_event_save_auto_state(
    if (string_is_empty(path_basename(path_get(RARCH_PATH_BASENAME))))
       return false;
 
-   strlcpy(savestate_name_auto,
+   _len = strlcpy(savestate_name_auto,
          runloop_st->name.savestate,
          sizeof(savestate_name_auto));
-   strlcat(savestate_name_auto,
+   strlcpy(savestate_name_auto + _len,
          ".auto",
-         sizeof(savestate_name_auto));
+         sizeof(savestate_name_auto) - _len);
 
    if (content_save_state((const char*)savestate_name_auto, true, true))
 	   RARCH_LOG("%s \"%s\" %s.\n",
@@ -1373,6 +1375,7 @@ bool command_event_load_entry_state(settings_t *settings)
 
 void command_event_load_auto_state(void)
 {
+   size_t _len;
    char savestate_name_auto[PATH_MAX_LENGTH];
    runloop_state_t *runloop_st     = runloop_state_get_ptr();
 
@@ -1388,12 +1391,12 @@ void command_event_load_auto_state(void)
       return;
 #endif
 
-   strlcpy(savestate_name_auto,
+   _len = strlcpy(savestate_name_auto,
          runloop_st->name.savestate,
          sizeof(savestate_name_auto));
-   strlcat(savestate_name_auto,
+   strlcpy(savestate_name_auto + _len,
          ".auto",
-         sizeof(savestate_name_auto));
+         sizeof(savestate_name_auto) - _len);
 
    if (!path_is_valid(savestate_name_auto))
       return;
@@ -1784,8 +1787,8 @@ bool command_event_save_core_config(
       {
          size_t _len = strlcpy(tmp, config_path, sizeof(tmp));
          if (i)
-            snprintf(tmp + _len, sizeof(tmp) - _len, "-%u", i);
-         strlcat(tmp, ".cfg", sizeof(tmp));
+            _len += snprintf(tmp + _len, sizeof(tmp) - _len, "-%u", i);
+         strlcpy(tmp + _len, ".cfg", sizeof(tmp) - _len);
 
          if (!path_is_valid(tmp))
          {
@@ -1940,7 +1943,6 @@ void command_event_remove_current_config(enum override_type type)
 
 bool command_event_main_state(unsigned cmd)
 {
-   retro_ctx_size_info_t info;
    char msg[128];
    char state_path[16384];
    settings_t *settings        = config_get_ptr();
@@ -1952,11 +1954,12 @@ bool command_event_main_state(unsigned cmd)
 
    if (savestates_enabled)
    {
+      size_t info_size;
       runloop_get_current_savestate_path(state_path,
             sizeof(state_path));
 
-      core_serialize_size(&info);
-      savestates_enabled = (info.size > 0);
+      info_size          = core_serialize_size();
+      savestates_enabled = (info_size > 0);
    }
 
   /* TODO: Load state should act in one of three ways:

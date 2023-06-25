@@ -29,6 +29,10 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY,
    "Join or host a net-play session."
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_QUIT_RETROARCH,
+   "Quit RetroArch. Killing the program in any hard way (SIGKILL, etc.) will terminate RetroArch without saving the configuration, etc. On Unix-likes, SIGINT/SIGTERM allows a clean deinitialisation."
+   )
 
 /* Main Menu > Load Core */
 
@@ -132,6 +136,8 @@ MSG_HASH(
 
 /* Settings > Drivers */
 
+#ifdef HAVE_MICROPHONE
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_DRIVER,
    "Audio Re-sampler"
@@ -365,6 +371,8 @@ MSG_HASH(
 
 /* Settings > Audio */
 
+#ifdef HAVE_MICROPHONE
+#endif
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
    "Re-sampler"
@@ -404,6 +412,22 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_LATENCY,
    "Desired audio latency in milliseconds. Might not be honoured if the audio driver cannot provide the given latency."
    )
+
+#ifdef HAVE_MICROPHONE
+/* Settings > Audio > Input */
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+   "Re-sampler Quality"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_RESAMPLER_QUALITY,
+   "Lower this value to favour performance/lower latency over audio quality, increase for better audio quality at the expense of performance/lower latency."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_MICROPHONE_LATENCY,
+   "Desired audio input latency in milliseconds. Might not be honoured if the microphone driver can't provide given latency."
+   )
+#endif
 
 /* Settings > Audio > Resampler */
 
@@ -1451,6 +1475,10 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_SHADER_APPLY_CHANGES,
    "Changes to the shader configuration will take effect immediately. Use this if you've changed the amount of shader passes, filtering, FBO scale, etc."
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_SHADER_APPLY_CHANGES,
+   "After changing shader settings such as the amount of shader passes, filtering, FBO scale, use this to apply changes.\nChanging these shader settings is a somewhat expensive operation so it has to be done explicitly.\nWhen you apply shaders, the shader settings are saved to a temporary file (retroarch.slangp/.cgp/.glslp) and loaded. The file persists after RetroArch exits and is saved to the Shader Directory."
+   )
 
 /* Quick Menu > Shaders > Save */
 
@@ -2143,6 +2171,10 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_VALUE_CPU_PERF_MODE_MIN_POWER,
    "Use the lowest frequency available to save power. Useful on battery powered devices, but performance will be significantly reduced."
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_GAMEMODE_ENABLE,
+   "Enabling Linux GameMode can improve latency, fix audio crackling issues and maximise overall performance by automatically configuring your CPU and GPU for best performance.\nThe GameMode software needs to be installed for this to work. See https://github.com/FeralInteractive/gamemode for information on how to install GameMode."
+   )
 
 #ifdef HAVE_LAKKA_SWITCH
 MSG_HASH(
@@ -2165,6 +2197,10 @@ MSG_HASH(
    )
 #endif
 #ifdef HAVE_LAKKA
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_TIMEZONE,
+   "Displays a list of available time zones. After selecting a time zone, time and date is adjusted to the selected time zone. It assumes, that system/hardware clock is set to UTC."
+   )
 #endif
 #ifdef GEKKO
 MSG_HASH(
@@ -2173,6 +2209,10 @@ MSG_HASH(
    )
 #endif
 #ifdef UDEV_TOUCH_SUPPORT
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_TOUCH_VMOUSE_TRACKBALL,
+   "Enable along with Mouse to utilise the touch screen as a trackball, adding inertia to the pointer."
+   )
 #endif
 #ifdef HAVE_ODROIDGO2
 MSG_HASH(

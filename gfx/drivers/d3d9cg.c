@@ -802,10 +802,6 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
 {
    unsigned i;
    float texture_size[2];
-   char attr_texture[64];
-   char attr_input_size[64];
-   char attr_tex_size[64];
-   char attr_coord[64];
    static const char *prev_names[] = {
       "PREV",
       "PREV1",
@@ -821,44 +817,20 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
 
    for (i = 0; i < TEXTURES - 1; i++)
    {
-      char prev_name[32];
+      char attr[64];
       CGparameter param;
       float video_size[2];
       CGprogram fprg = (CGprogram)pass->fprg;
       CGprogram vprg = (CGprogram)pass->vprg;
-
-      strlcpy(prev_name, prev_names[i], sizeof(prev_name));
-      strlcpy(attr_texture,    prev_name,       sizeof(attr_texture));
-      strlcat(attr_texture,    ".texture",      sizeof(attr_texture));
-      strlcpy(attr_input_size, prev_name,       sizeof(attr_input_size));
-      strlcat(attr_input_size, ".video_size",   sizeof(attr_input_size));
-      strlcpy(attr_tex_size,   prev_name,       sizeof(attr_tex_size));
-      strlcat(attr_tex_size,   ".texture_size", sizeof(attr_tex_size));
-      strlcpy(attr_coord,      prev_name,       sizeof(attr_coord));
-      strlcat(attr_coord,      ".tex_coord",    sizeof(attr_coord));
+      size_t _len    = strlcpy(attr, prev_names[i], sizeof(attr));
 
       video_size[0]  = chain->prev.last_width[
          (chain->prev.ptr - (i + 1)) & TEXTURESMASK];
       video_size[1]  = chain->prev.last_height[
          (chain->prev.ptr - (i + 1)) & TEXTURESMASK];
 
-      /* Vertex program */
-      param = cgGetNamedParameter(vprg, attr_input_size);
-      if (param)
-         cgD3D9SetUniform(param, &video_size);
-      param = cgGetNamedParameter(vprg, attr_tex_size);
-      if (param)
-         cgD3D9SetUniform(param, &texture_size);
-
-      /* Fragment program */
-      param = cgGetNamedParameter(fprg, attr_input_size);
-      if (param)
-         cgD3D9SetUniform(param, &video_size);
-      param = cgGetNamedParameter(fprg, attr_tex_size);
-      if (param)
-         cgD3D9SetUniform(param, &texture_size);
-
-      param = cgGetNamedParameter(fprg, attr_texture);
+      strlcpy(attr + _len, ".texture", sizeof(attr) - _len);
+      param = cgGetNamedParameter(fprg, attr);
       if (param)
       {
          unsigned         index = cgGetParameterResourceIndex(param);
@@ -877,7 +849,8 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
          IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
       }
 
-      param = cgGetNamedParameter(vprg, attr_coord);
+      strlcpy(attr + _len, ".tex_coord", sizeof(attr) - _len);
+      param = cgGetNamedParameter(vprg, attr);
       if (param)
       {
          LPDIRECT3DVERTEXBUFFER9 vert_buf = (LPDIRECT3DVERTEXBUFFER9)
@@ -890,6 +863,24 @@ static void d3d9_cg_renderchain_bind_prev(d3d9_renderchain_t *chain,
                sizeof(struct D3D9CGVertex));
          unsigned_vector_list_append(chain->bound_vert, index);
       }
+
+      strlcpy(attr + _len, ".video_size",   sizeof(attr) - _len);
+
+      param = cgGetNamedParameter(vprg, attr);
+      if (param)
+         cgD3D9SetUniform(param, &video_size);
+      param = cgGetNamedParameter(fprg, attr);
+      if (param)
+         cgD3D9SetUniform(param, &video_size);
+
+      strlcpy(attr + _len, ".texture_size", sizeof(attr) - _len);
+      param = cgGetNamedParameter(vprg, attr);
+      if (param)
+         cgD3D9SetUniform(param, &texture_size);
+      param = cgGetNamedParameter(fprg, attr);
+      if (param)
+         cgD3D9SetUniform(param, &texture_size);
+
    }
 }
 
@@ -908,44 +899,16 @@ static void d3d9_cg_renderchain_bind_pass(
       float video_size[2];
       float texture_size[2];
       char pass_base[64];
-      char attr_texture[64];
-      char attr_input_size[64];
-      char attr_tex_size[64];
-      char attr_coord[64];
       struct shader_pass *curr_pass = (struct shader_pass*)&chain->passes->data[i];
-
-      snprintf(pass_base, sizeof(pass_base), "PASS%u", i);
-      strlcpy(attr_texture,    pass_base,       sizeof(attr_texture));
-      strlcat(attr_texture,    ".texture",      sizeof(attr_texture));
-      strlcpy(attr_input_size, pass_base,       sizeof(attr_input_size));
-      strlcat(attr_input_size, ".video_size",   sizeof(attr_input_size));
-      strlcpy(attr_tex_size,   pass_base,       sizeof(attr_tex_size));
-      strlcat(attr_tex_size,   ".texture_size", sizeof(attr_tex_size));
-      strlcpy(attr_coord,      pass_base,       sizeof(attr_coord));
-      strlcat(attr_coord,      ".tex_coord",    sizeof(attr_coord));
+      size_t _len = snprintf(pass_base, sizeof(pass_base), "PASS%u", i);
 
       video_size[0]   = curr_pass->last_width;
       video_size[1]   = curr_pass->last_height;
       texture_size[0] = curr_pass->info.tex_w;
       texture_size[1] = curr_pass->info.tex_h;
 
-      /* Vertex program */
-      param           = cgGetNamedParameter(vprg, attr_input_size);
-      if (param)
-         cgD3D9SetUniform(param, &video_size);
-      param           = cgGetNamedParameter(vprg, attr_tex_size);
-      if (param)
-         cgD3D9SetUniform(param, &texture_size);
-
-      /* Fragment program */
-      param           = cgGetNamedParameter(fprg, attr_input_size);
-      if (param)
-         cgD3D9SetUniform(param, &video_size);
-      param           = cgGetNamedParameter(fprg, attr_tex_size);
-      if (param)
-         cgD3D9SetUniform(param, &texture_size);
-
-      param = cgGetNamedParameter(fprg, attr_texture);
+      strlcpy(pass_base + _len, ".texture",  sizeof(pass_base) - _len);
+      param = cgGetNamedParameter(fprg, pass_base);
       if (param)
       {
          unsigned index = cgGetParameterResourceIndex(param);
@@ -960,7 +923,8 @@ static void d3d9_cg_renderchain_bind_pass(
          IDirect3DDevice9_SetSamplerState(chain->dev, index, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
       }
 
-      param = cgGetNamedParameter(vprg, attr_coord);
+      strlcpy(pass_base + _len, ".tex_coord", sizeof(pass_base) - _len);
+      param = cgGetNamedParameter(vprg, pass_base);
       if (param)
       {
          struct unsigned_vector_list *attrib_map =
@@ -972,6 +936,23 @@ static void d3d9_cg_renderchain_bind_pass(
                sizeof(struct D3D9CGVertex));
          unsigned_vector_list_append(chain->bound_vert, index);
       }
+
+      strlcpy(pass_base + _len, ".video_size",   sizeof(pass_base) - _len);
+      param           = cgGetNamedParameter(vprg, pass_base);
+      if (param)
+         cgD3D9SetUniform(param, &video_size);
+      param           = cgGetNamedParameter(fprg, pass_base);
+      if (param)
+         cgD3D9SetUniform(param, &video_size);
+
+      strlcpy(pass_base + _len, ".texture_size", sizeof(pass_base) - _len);
+      param           = cgGetNamedParameter(vprg, pass_base);
+      if (param)
+         cgD3D9SetUniform(param, &texture_size);
+      param           = cgGetNamedParameter(fprg, pass_base);
+      if (param)
+         cgD3D9SetUniform(param, &texture_size);
+
    }
 }
 
@@ -2195,12 +2176,12 @@ static const video_poke_interface_t d3d9_cg_poke_interface = {
    d3d9_unload_texture,
    d3d9_set_video_mode,
 #if defined(__WINRT__)
-   NULL,
+   NULL, /* get_refresh_rate */
 #else
    /* UWP does not expose this information easily */
    win32_get_refresh_rate,
 #endif
-   NULL,
+   NULL, /* set_filtering */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */
@@ -2211,16 +2192,15 @@ static const video_poke_interface_t d3d9_cg_poke_interface = {
    d3d9_set_menu_texture_frame,
    d3d9_set_menu_texture_enable,
    d3d9_set_osd_msg,
-
    win32_show_cursor,
-   NULL,                         /* grab_mouse_toggle */
-   NULL,                         /* get_current_shader */
-   NULL,                         /* get_current_software_framebuffer */
-   NULL,                         /* get_hw_render_interface */
-   NULL,                         /* set_hdr_max_nits */
-   NULL,                         /* set_hdr_paper_white_nits */
-   NULL,                         /* set_hdr_contrast */
-   NULL                          /* set_hdr_expand_gamut */
+   NULL, /* grab_mouse_toggle */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
+   NULL, /* set_hdr_max_nits */
+   NULL, /* set_hdr_paper_white_nits */
+   NULL, /* set_hdr_contrast */
+   NULL  /* set_hdr_expand_gamut */
 };
 
 static void d3d9_cg_get_poke_interface(void *data,
@@ -2301,8 +2281,8 @@ video_driver_t video_d3d9_cg = {
    d3d9_cg_frame,
    d3d9_cg_set_nonblock_state,
    d3d9_cg_alive,
-   NULL,                      /* focus */
-   win32_suppress_screensaver,
+   NULL, /* focus */
+   win32_suspend_screensaver,
    d3d9_has_windowed,
    d3d9_cg_set_shader,
    d3d9_cg_free,
@@ -2311,7 +2291,7 @@ video_driver_t video_d3d9_cg = {
    d3d9_set_rotation,
    d3d9_viewport_info,
    d3d9_read_viewport,
-   NULL,                      /* read_frame_raw */
+   NULL, /* read_frame_raw */
 #ifdef HAVE_OVERLAY
    d3d9_get_overlay_interface,
 #endif

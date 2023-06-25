@@ -1646,7 +1646,7 @@ void MainWindow::onFileBrowserTableDirLoaded(const QString &path)
 
 QVector<QPair<QString, QString> > MainWindow::getPlaylists()
 {
-   int i;
+   size_t i;
    QVector<QPair<QString, QString> > playlists;
    size_t size  = m_listWidget->count();
 
@@ -1742,13 +1742,15 @@ void MainWindow::showWelcomeScreen()
       "but this Desktop Menu should be functional for launching content and managing playlists.<br>\n"
       "<br>\n"
       "Some useful hotkeys for interacting with the Big Picture menu include:\n"
-      "<ul><li>F1 - Bring up the Big Picture menu</li>\n"
-      "<li>F - Switch between fullscreen and windowed modes</li>\n"
-      "<li>F5 - Bring the Desktop Menu back if closed</li>\n"
-      "<li>Esc - Exit RetroArch</li></ul>\n"
+      "<ul>\n"
+      "<li>F1  - Bring up the Big Picture menu</li>\n"
+      "<li>F5  - Bring the Desktop Menu back if closed</li>\n"
+      "<li>F   - Switch between fullscreen and windowed modes</li>\n"
+      "<li>Esc - Exit RetroArch</li>\n"
+      "</ul>\n"
       "\n"
       "For more hotkeys and their assignments, see:<br>\n"
-      "Settings -> Input -> Input Hotkey Binds<br>\n"
+      "Settings -> Input -> Hotkeys<br>\n"
       "<br>\n"
       "Documentation for RetroArch, libretro and cores:<br>\n"
       "<a href=\"https://docs.libretro.com/\">https://docs.libretro.com/</a>");
@@ -2243,7 +2245,7 @@ void MainWindow::onThumbnailDropped(const QImage &image,
 
 QVector<QHash<QString, QString> > MainWindow::getCoreInfo()
 {
-   int i;
+   size_t i;
    QVector<QHash<QString, QString> > infoList;
    runloop_state_t *runloop_st         = runloop_state_get_ptr();
    QHash<QString, QString> currentCore = getSelectedCore();
@@ -2709,13 +2711,13 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
    QByteArray contentLabelArray;
    QByteArray contentDbNameArray;
    QByteArray contentCrc32Array;
-   char contentDbNameFull[PATH_MAX_LENGTH];
-   char corePathCached[PATH_MAX_LENGTH];
-   const char *corePath         = NULL;
-   const char *contentPath      = NULL;
-   const char *contentLabel     = NULL;
-   const char *contentDbName    = NULL;
-   const char *contentCrc32     = NULL;
+   char content_db_name_full[PATH_MAX_LENGTH];
+   char core_path_cached[PATH_MAX_LENGTH];
+   const char *core_path        = NULL;
+   const char *content_path     = NULL;
+   const char *content_label    = NULL;
+   const char *content_db_name  = NULL;
+   const char *content_crc32    = NULL;
 #ifdef HAVE_MENU
    struct menu_state *menu_st   = menu_state_get_ptr();
 #endif
@@ -2723,8 +2725,8 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
    core_selection coreSelection = static_cast<core_selection>(coreMap.value("core_selection").toInt());
    core_info_t *coreInfo        = NULL;
 
-   contentDbNameFull[0]         = '\0';
-   corePathCached[0]            = '\0';
+   content_db_name_full[0]      = '\0';
+   core_path_cached[0]          = '\0';
 
    if (m_pendingRun)
       coreSelection             = CORE_SELECTION_CURRENT;
@@ -2753,7 +2755,7 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
             {
                if (list->size > 0)
                {
-                  int i;
+                  size_t i;
                   for (i = 0; i < list->size; i++)
                   {
                      const char *filePath = list->elems[i].data;
@@ -2796,8 +2798,8 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
 
          if (!defaultCorePath.isEmpty())
          {
-            corePathArray = defaultCorePath.toUtf8();
-            contentPathArray = contentHash["path"].toUtf8();
+            corePathArray     = defaultCorePath.toUtf8();
+            contentPathArray  = contentHash["path"].toUtf8();
             contentLabelArray = contentHash["label_noext"].toUtf8();
          }
 
@@ -2810,41 +2812,41 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
    contentDbNameArray                  = contentHash["db_name"].toUtf8();
    contentCrc32Array                   = contentHash["crc32"].toUtf8();
 
-   corePath                            = corePathArray.constData();
-   contentPath                         = contentPathArray.constData();
-   contentLabel                        = contentLabelArray.constData();
-   contentDbName                       = contentDbNameArray.constData();
-   contentCrc32                        = contentCrc32Array.constData();
+   core_path                           = corePathArray.constData();
+   content_path                        = contentPathArray.constData();
+   content_label                       = contentLabelArray.constData();
+   content_db_name                     = contentDbNameArray.constData();
+   content_crc32                       = contentCrc32Array.constData();
 
    /* Search for specified core - ensures path
     * is 'sanitised' */
-   if (core_info_find(corePath, &coreInfo) &&
-       !string_is_empty(coreInfo->path))
-      corePath = coreInfo->path;
+   if (    core_info_find(core_path, &coreInfo)
+       && !string_is_empty(coreInfo->path))
+      core_path = coreInfo->path;
 
    /* If a core is currently running, the following
     * call of 'command_event(CMD_EVENT_UNLOAD_CORE, NULL)'
     * will free the global core_info struct, which will
     * in turn free the pointer referenced by coreInfo->path.
-    * This will invalidate corePath, so we have to cache
+    * This will invalidate core_path, so we have to cache
     * its current value here. */
-   if (!string_is_empty(corePath))
-      strlcpy(corePathCached, corePath, sizeof(corePathCached));
+   if (!string_is_empty(core_path))
+      strlcpy(core_path_cached, core_path, sizeof(core_path_cached));
 
    /* Add lpl extension to db_name, if required */
-   if (!string_is_empty(contentDbName))
+   if (!string_is_empty(content_db_name))
    {
-      const char *extension = NULL;
+      size_t _len     = strlcpy(content_db_name_full, content_db_name,
+             sizeof(content_db_name_full));
+      const char *ext = path_get_extension(content_db_name_full);
 
-      strlcpy(contentDbNameFull, contentDbName, sizeof(contentDbNameFull));
-      extension = path_get_extension(contentDbNameFull);
-
-      if (      string_is_empty(extension) 
-            || !string_is_equal_noncase(
-            extension, FILE_PATH_LPL_EXTENSION_NO_DOT))
-         strlcat(
-               contentDbNameFull, FILE_PATH_LPL_EXTENSION,
-                     sizeof(contentDbNameFull));
+      if (      string_is_empty(ext) 
+            || !string_is_equal_noncase(ext,
+                FILE_PATH_LPL_EXTENSION_NO_DOT))
+         strlcpy(
+               content_db_name_full         + _len,
+               FILE_PATH_LPL_EXTENSION,
+               sizeof(content_db_name_full) - _len);
    }
 
    content_info.argc                   = 0;
@@ -2859,7 +2861,11 @@ void MainWindow::loadContent(const QHash<QString, QString> &contentHash)
    command_event(CMD_EVENT_UNLOAD_CORE, NULL);
 
    if (!task_push_load_content_with_new_core_from_companion_ui(
-         corePathCached, contentPath, contentLabel, contentDbNameFull, contentCrc32,
+         core_path_cached,
+         content_path,
+         content_label,
+         content_db_name_full,
+         content_crc32,
          &content_info, NULL, NULL))
    {
       QMessageBox::critical(this, msg_hash_to_str(MSG_ERROR),
@@ -3724,10 +3730,10 @@ void MainWindow::initContentTableWidget()
 
    if (path == ALL_PLAYLISTS_TOKEN)
    {
-      int i;
+      size_t i;
+      QStringList playlists;
       settings_t *settings = config_get_ptr();
       QDir playlistDir(settings->paths.directory_playlist);
-      QStringList playlists;
       size_t list_size = (size_t)m_playlistFiles.count();
 
       for (i = 0; i < list_size; i++)
@@ -3910,7 +3916,7 @@ void MainWindow::onShowInfoMessage(QString msg)
 
 int MainWindow::onExtractArchive(QString path, QString extractionDir, QString tempExtension, retro_task_callback_t cb)
 {
-   int i;
+   size_t i;
    file_archive_transfer_t state;
    struct archive_extract_userdata userdata;
    QByteArray pathArray          = path.toUtf8();
@@ -5090,18 +5096,19 @@ void LoadCoreWindow::onCoreEnterPressed()
 
 void LoadCoreWindow::onLoadCustomCoreClicked()
 {
+   size_t _len;
    QString path;
    QByteArray pathArray;
+   char filters[128];
    char core_ext[255]            = {0};
-   char filters[PATH_MAX_LENGTH] = {0};
    const char *pathData          = NULL;
    settings_t *settings          = config_get_ptr();
    const char *path_dir_libretro = settings->paths.directory_libretro;
 
    frontend_driver_get_core_extension(core_ext, sizeof(core_ext));
 
-   strlcpy(filters, "Cores (*.", sizeof(filters));
-   strlcat(filters, core_ext, sizeof(filters));
+   _len = strlcpy(filters, "Cores (*.", sizeof(filters));
+   strlcpy(filters + _len, core_ext, sizeof(filters) - _len);
    strlcat(filters, ");;All Files (*.*)", sizeof(filters));
 
    path                          = QFileDialog::getOpenFileName(

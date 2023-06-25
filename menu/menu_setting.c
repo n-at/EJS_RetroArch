@@ -85,6 +85,9 @@
 #include "../dynamic.h"
 #include "../list_special.h"
 #include "../audio/audio_driver.h"
+#ifdef HAVE_MICROPHONE
+#include "../audio/microphone_driver.h"
+#endif
 #ifdef HAVE_BLUETOOTH
 #include "../bluetooth/bluetooth_driver.h"
 #endif
@@ -279,6 +282,9 @@ enum settings_list_type
    SETTINGS_LIST_VIDEO,
    SETTINGS_LIST_CRT_SWITCHRES,
    SETTINGS_LIST_AUDIO,
+#ifdef HAVE_MICROPHONE
+   SETTINGS_LIST_MICROPHONE,
+#endif
    SETTINGS_LIST_INPUT,
    SETTINGS_LIST_INPUT_TURBO_FIRE,
    SETTINGS_LIST_INPUT_HOTKEY,
@@ -347,6 +353,132 @@ typedef struct rarch_setting_info
 
 /* SETTINGS LIST */
 
+/**
+ * setting_set_with_string_representation:
+ * @setting            : pointer to setting
+ * @value              : value for the setting (string)
+ *
+ * Set a settings' value with a string. It is assumed
+ * that the string has been properly formatted.
+ **/
+static int setting_set_with_string_representation(rarch_setting_t* setting,
+      const char* value)
+{
+   switch (setting->type)
+   {
+      case ST_INT:
+         {
+            char *ptr;
+            uint32_t flags                 = setting->flags;
+            *setting->value.target.integer = (int)strtol(value, &ptr, 10);
+            if (flags & SD_FLAG_HAS_RANGE)
+            {
+               float min   = setting->min;
+               float max   = setting->max;
+               if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.integer < min)
+                  *setting->value.target.integer = min;
+               if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.integer > max)
+               {
+                  settings_t *settings = config_get_ptr();
+                  if (settings && settings->bools.menu_navigation_wraparound_enable)
+                     *setting->value.target.integer = min;
+                  else
+                     *setting->value.target.integer = max;
+               }
+            }
+         }
+         break;
+      case ST_UINT:
+         {
+            char *ptr;
+            uint32_t flags = setting->flags;
+            *setting->value.target.unsigned_integer = (unsigned int)strtoul(value, &ptr, 10);
+            if (flags & SD_FLAG_HAS_RANGE)
+            {
+               float min   = setting->min;
+               float max   = setting->max;
+               if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.unsigned_integer < min)
+                  *setting->value.target.unsigned_integer = min;
+               if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.unsigned_integer > max)
+               {
+                  settings_t *settings = config_get_ptr();
+                  if (settings && settings->bools.menu_navigation_wraparound_enable)
+                     *setting->value.target.unsigned_integer = min;
+                  else
+                     *setting->value.target.unsigned_integer = max;
+               }
+            }
+         }
+         break;
+      case ST_SIZE:
+         {
+            uint32_t flags = setting->flags;
+            sscanf(value, "%" PRI_SIZET, setting->value.target.sizet);
+            if (flags & SD_FLAG_HAS_RANGE)
+            {
+               float min   = setting->min;
+               float max   = setting->max;
+               if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.sizet < min)
+                  *setting->value.target.sizet = min;
+               if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.sizet > max)
+               {
+                  settings_t *settings = config_get_ptr();
+                  if (settings && settings->bools.menu_navigation_wraparound_enable)
+                     *setting->value.target.sizet = min;
+                  else
+                     *setting->value.target.sizet = max;
+               }
+            }
+         }
+         break;
+      case ST_FLOAT:
+         {
+            char *ptr;
+            uint32_t flags = setting->flags;
+            /* strtof() is C99/POSIX. Just use the more portable kind. */
+            *setting->value.target.fraction = (float)strtod(value, &ptr);
+            if (flags & SD_FLAG_HAS_RANGE)
+            {
+               float min   = setting->min;
+               float max   = setting->max;
+               if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.fraction < min)
+                  *setting->value.target.fraction = min;
+               if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.fraction > max)
+               {
+                  settings_t *settings = config_get_ptr();
+                  if (settings && settings->bools.menu_navigation_wraparound_enable)
+                     *setting->value.target.fraction = min;
+                  else
+                     *setting->value.target.fraction = max;
+               }
+            }
+         }
+         break;
+      case ST_PATH:
+      case ST_DIR:
+      case ST_STRING:
+      case ST_STRING_OPTIONS:
+      case ST_ACTION:
+         if (setting->value.target.string)
+            strlcpy(setting->value.target.string, value, setting->size);
+         break;
+      case ST_BOOL:
+         if (string_is_equal(value, "true"))
+            *setting->value.target.boolean = true;
+         else if (string_is_equal(value, "false"))
+            *setting->value.target.boolean = false;
+         break;
+      default:
+         break;
+   }
+
+   if (setting->change_handler)
+      setting->change_handler(setting);
+
+   return 0;
+}
+
+
 static void menu_input_st_uint_cb(void *userdata, const char *str)
 {
    if (str && *str)
@@ -376,8 +508,13 @@ static void menu_input_st_uint_cb(void *userdata, const char *str)
       {
          struct menu_state *menu_st  = menu_state_get_ptr();
          const char *label           = menu_st->input_dialog_kb_label_setting;
-         rarch_setting_t *setting    = menu_setting_find(label);
-         setting_set_with_string_representation(setting, str);
+
+         if (!string_is_empty(label))
+         {
+            rarch_setting_t *setting = NULL;
+            if ((setting = menu_setting_find(label)))
+               setting_set_with_string_representation(setting, str);
+         }
       }
    }
 
@@ -398,8 +535,13 @@ static void menu_input_st_int_cb(void *userdata, const char *str)
       {
          struct menu_state *menu_st  = menu_state_get_ptr();
          const char *label           = menu_st->input_dialog_kb_label_setting;
-         rarch_setting_t  *setting   = menu_setting_find(label);
-         setting_set_with_string_representation(setting, str);
+
+         if (!string_is_empty(label))
+         {
+            rarch_setting_t *setting = NULL;
+            if ((setting = menu_setting_find(label)))
+               setting_set_with_string_representation(setting, str);
+         }
       }
    }
 
@@ -420,8 +562,13 @@ static void menu_input_st_float_cb(void *userdata, const char *str)
       {
          struct menu_state *menu_st  = menu_state_get_ptr();
          const char *label           = menu_st->input_dialog_kb_label_setting;
-         rarch_setting_t  *setting   = menu_setting_find(label);
-         setting_set_with_string_representation(setting, str);
+
+         if (!string_is_empty(label))
+         {
+            rarch_setting_t *setting = NULL;
+            if ((setting = menu_setting_find(label)))
+               setting_set_with_string_representation(setting, str);
+         }
       }
    }
 
@@ -440,7 +587,10 @@ static void menu_input_st_string_cb(void *userdata, const char *str)
          rarch_setting_t *setting = NULL;
          if ((setting = menu_setting_find(label)))
          {
-            setting_set_with_string_representation(setting, str);
+            if (setting->value.target.string)
+               strlcpy(setting->value.target.string, str, setting->size);
+            if (setting->change_handler)
+               setting->change_handler(setting);
             menu_setting_generic(setting, 0, false);
          }
       }
@@ -493,6 +643,16 @@ static int setting_generic_action_ok_linefeed(
    return 0;
 }
 
+static int setting_string_action_start_generic(rarch_setting_t *setting)
+{
+   if (!setting)
+      return -1;
+
+   setting->value.target.string[0] = '\0';
+
+   return 0;
+}
+
 static void setting_add_special_callbacks(
       rarch_setting_t **list,
       rarch_setting_info_t *list_info,
@@ -536,13 +696,6 @@ static bool SETTINGS_LIST_APPEND_internal(
    *list                          = list_settings;
 
    return true;
-}
-
-unsigned setting_get_bind_type(rarch_setting_t *setting)
-{
-   if (!setting)
-      return 0;
-   return setting->bind_type;
 }
 
 static int setting_bind_action_ok(
@@ -601,7 +754,7 @@ static int setting_bind_action_start(rarch_setting_t *setting)
    if (setting->index_offset)
       def_binds     = (struct retro_keybind*)retro_keybinds_rest;
 
-   bind_type        = setting_get_bind_type(setting);
+   bind_type        = setting->bind_type;
    keybind->key     = def_binds[bind_type - MENU_SETTINGS_BIND_BEGIN].key;
 
    keybind->mbutton = NO_BTN;
@@ -612,7 +765,7 @@ static int setting_bind_action_start(rarch_setting_t *setting)
    return 0;
 }
 
-void setting_get_string_representation_hex_and_uint(
+static void setting_get_string_representation_hex_and_uint(
       rarch_setting_t *setting, char *s, size_t len)
 {
    if (setting)
@@ -621,7 +774,7 @@ void setting_get_string_representation_hex_and_uint(
             *setting->value.target.unsigned_integer);
 }
 
-void setting_get_string_representation_uint(rarch_setting_t *setting,
+static void setting_get_string_representation_uint(rarch_setting_t *setting,
       char *s, size_t len)
 {
    if (setting)
@@ -629,7 +782,7 @@ void setting_get_string_representation_uint(rarch_setting_t *setting,
             *setting->value.target.unsigned_integer);
 }
 
-void setting_get_string_representation_color_rgb(rarch_setting_t *setting,
+static void setting_get_string_representation_color_rgb(rarch_setting_t *setting,
       char *s, size_t len)
 {
    if (setting)
@@ -637,20 +790,12 @@ void setting_get_string_representation_color_rgb(rarch_setting_t *setting,
          *setting->value.target.unsigned_integer & 0xFFFFFF);
 }
 
-void setting_get_string_representation_size(
+static void setting_get_string_representation_size_in_mb(
       rarch_setting_t *setting, char *s, size_t len)
 {
    if (setting)
       snprintf(s, len, "%" PRI_SIZET,
-            *setting->value.target.sizet);
-}
-
-void setting_get_string_representation_size_in_mb(
-      rarch_setting_t *setting, char *s, size_t len)
-{
-   if (setting)
-      snprintf(s, len, "%" PRI_SIZET,
-            (*setting->value.target.sizet)/(1024*1024));
+            (*setting->value.target.sizet) / (1024 * 1024));
 }
 
 #ifdef HAVE_CHEATS
@@ -687,7 +832,7 @@ static float recalc_step_based_on_length_of_action(rarch_setting_t *setting)
    return step;
 }
 
-int setting_uint_action_left_default(
+static int setting_uint_action_left_default(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    bool                 overflowed = false;
@@ -725,7 +870,7 @@ int setting_uint_action_left_default(
    return 0;
 }
 
-int setting_uint_action_right_default(
+static int setting_uint_action_right_default(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    float                step = 0.0f;
@@ -757,18 +902,22 @@ int setting_uint_action_right_default(
    return 0;
 }
 
-int setting_bool_action_right_with_refresh(
+static int setting_bool_action_right_with_refresh(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
-   setting_set_with_string_representation(setting,
-         *setting->value.target.boolean ? "false" : "true");
+   if (*setting->value.target.boolean)
+      *setting->value.target.boolean = false;
+   else
+      *setting->value.target.boolean = true;
+   if (setting->change_handler)
+      setting->change_handler(setting);
    menu_st->flags            |=  MENU_ST_FLAG_PREVENT_POPULATE
                               |  MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
    return 0;
 }
 
-int setting_uint_action_right_with_refresh(
+static int setting_uint_action_right_with_refresh(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    int retval                 = setting_uint_action_right_default(setting, idx, wraparound);
@@ -782,8 +931,12 @@ int setting_bool_action_left_with_refresh(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
-   setting_set_with_string_representation(setting,
-         *setting->value.target.boolean ? "false" : "true");
+   if (*setting->value.target.boolean)
+      *setting->value.target.boolean = false;
+   else
+      *setting->value.target.boolean = true;
+   if (setting->change_handler)
+      setting->change_handler(setting);
    menu_st->flags            |=  MENU_ST_FLAG_PREVENT_POPULATE
                               |  MENU_ST_FLAG_ENTRIES_NEED_REFRESH;
    return 0;
@@ -863,7 +1016,7 @@ static int setting_size_action_right_default(
    return 0;
 }
 
-int setting_generic_action_ok_default(
+static int setting_generic_action_ok_default(
       rarch_setting_t *setting, size_t idx, bool wraparound)
 {
    if (!setting)
@@ -895,12 +1048,14 @@ static void setting_get_string_representation_int_gpu_index(rarch_setting_t *set
    if (setting)
    {
       struct string_list *list = video_driver_get_gpu_api_devices(video_context_driver_get_api());
-
-      snprintf(s, len, "%d", *setting->value.target.integer);
+      size_t _len = snprintf(s, len, "%d", *setting->value.target.integer);
       if (list && (*setting->value.target.integer < (int)list->size) && !string_is_empty(list->elems[*setting->value.target.integer].data))
       {
-         strlcat(s, " - ", len);
-         strlcat(s, list->elems[*setting->value.target.integer].data, len);
+         s[  _len] = ' ';
+         s[++_len] = '-';
+         s[++_len] = ' ';
+         s[++_len] = '\0';
+         strlcpy(s + _len, list->elems[*setting->value.target.integer].data, len - _len);
       }
    }
 }
@@ -911,118 +1066,6 @@ static void setting_get_string_representation_int(
 {
    if (setting)
       snprintf(s, len, "%d", *setting->value.target.integer);
-}
-
-/**
- * setting_set_with_string_representation:
- * @setting            : pointer to setting
- * @value              : value for the setting (string)
- *
- * Set a settings' value with a string. It is assumed
- * that the string has been properly formatted.
- **/
-int setting_set_with_string_representation(rarch_setting_t* setting,
-      const char* value)
-{
-   char *ptr;
-   float min, max;
-   uint32_t flags;
-   if (!setting || !value)
-      return -1;
-
-   min          = setting->min;
-   max          = setting->max;
-   flags        = setting->flags;
-
-   switch (setting->type)
-   {
-      case ST_INT:
-         *setting->value.target.integer = (int)strtol(value, &ptr, 10);
-         if (flags & SD_FLAG_HAS_RANGE)
-         {
-            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.integer < min)
-               *setting->value.target.integer = min;
-            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.integer > max)
-            {
-               settings_t *settings = config_get_ptr();
-               if (settings && settings->bools.menu_navigation_wraparound_enable)
-                  *setting->value.target.integer = min;
-               else
-                  *setting->value.target.integer = max;
-            }
-         }
-         break;
-      case ST_UINT:
-         *setting->value.target.unsigned_integer = (unsigned int)strtoul(value, &ptr, 10);
-         if (flags & SD_FLAG_HAS_RANGE)
-         {
-            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.unsigned_integer < min)
-               *setting->value.target.unsigned_integer = min;
-            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.unsigned_integer > max)
-            {
-               settings_t *settings = config_get_ptr();
-               if (settings && settings->bools.menu_navigation_wraparound_enable)
-                  *setting->value.target.unsigned_integer = min;
-               else
-                  *setting->value.target.unsigned_integer = max;
-            }
-         }
-         break;
-      case ST_SIZE:
-         sscanf(value, "%" PRI_SIZET, setting->value.target.sizet);
-         if (flags & SD_FLAG_HAS_RANGE)
-         {
-            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.sizet < min)
-               *setting->value.target.sizet = min;
-            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.sizet > max)
-            {
-               settings_t *settings = config_get_ptr();
-               if (settings && settings->bools.menu_navigation_wraparound_enable)
-                  *setting->value.target.sizet = min;
-               else
-                  *setting->value.target.sizet = max;
-            }
-         }
-         break;
-      case ST_FLOAT:
-         /* strtof() is C99/POSIX. Just use the more portable kind. */
-         *setting->value.target.fraction = (float)strtod(value, &ptr);
-         if (flags & SD_FLAG_HAS_RANGE)
-         {
-            if (flags & SD_FLAG_ENFORCE_MINRANGE && *setting->value.target.fraction < min)
-               *setting->value.target.fraction = min;
-            if (flags & SD_FLAG_ENFORCE_MAXRANGE && *setting->value.target.fraction > max)
-            {
-               settings_t *settings = config_get_ptr();
-               if (settings && settings->bools.menu_navigation_wraparound_enable)
-                  *setting->value.target.fraction = min;
-               else
-                  *setting->value.target.fraction = max;
-            }
-         }
-         break;
-      case ST_PATH:
-      case ST_DIR:
-      case ST_STRING:
-      case ST_STRING_OPTIONS:
-      case ST_ACTION:
-         if (setting->value.target.string)
-            strlcpy(setting->value.target.string, value, setting->size);
-         break;
-      case ST_BOOL:
-         if (string_is_equal(value, "true"))
-            *setting->value.target.boolean = true;
-         else if (string_is_equal(value, "false"))
-            *setting->value.target.boolean = false;
-         break;
-      default:
-         break;
-   }
-
-   if (setting->change_handler)
-      setting->change_handler(setting);
-
-   return 0;
 }
 
 static int setting_fraction_action_left_default(
@@ -1117,7 +1160,14 @@ static void setting_reset_setting(rarch_setting_t* setting)
          if (setting->default_value.string)
          {
             if (setting->type == ST_STRING)
-               setting_set_with_string_representation(setting, setting->default_value.string);
+            {
+               if (setting->value.target.string)
+                  strlcpy(setting->value.target.string,
+                        setting->default_value.string,
+                        setting->size);
+               if (setting->change_handler)
+                  setting->change_handler(setting);
+            }
             else
                fill_pathname_expand_special(setting->value.target.string,
                      setting->default_value.string, setting->size);
@@ -1131,7 +1181,7 @@ static void setting_reset_setting(rarch_setting_t* setting)
       setting->change_handler(setting);
 }
 
-int setting_generic_action_start_default(rarch_setting_t *setting)
+static int setting_generic_action_start_default(rarch_setting_t *setting)
 {
    struct menu_state *menu_st = menu_state_get_ptr();
    if (!setting)
@@ -1501,16 +1551,16 @@ static rarch_setting_t setting_uint_setting(const char* name,
    result.action_select             = setting_generic_action_ok_default;
    result.get_string_representation = &setting_get_string_representation_uint;
 
-   result.bind_type                 = 0;
-   result.browser_selection_type    = ST_NONE;
-   result.step                      = 0.0f;
-   result.rounding_fraction         = NULL;
+   result.bind_type                       = 0;
+   result.browser_selection_type          = ST_NONE;
+   result.step                            = 0.0f;
+   result.rounding_fraction               = NULL;
 
    result.value.target.unsigned_integer   = target;
    result.original_value.unsigned_integer = *target;
    result.default_value.unsigned_integer  = default_value;
 
-   result.cmd_trigger_idx                  = CMD_EVENT_NONE;
+   result.cmd_trigger_idx                 = CMD_EVENT_NONE;
 
    if (dont_use_enum_idx)
       result.flags |= SD_FLAG_DONT_USE_ENUM_IDX_REPRESENTATION;
@@ -1703,20 +1753,12 @@ static int setting_bool_action_ok_default(
    if (!setting)
       return -1;
 
-   setting_set_with_string_representation(setting,
-          *setting->value.target.boolean 
-         ? "false" 
-         : "true");
-
-   return 0;
-}
-
-int setting_string_action_start_generic(rarch_setting_t *setting)
-{
-   if (!setting)
-      return -1;
-
-   setting->value.target.string[0] = '\0';
+   if (*setting->value.target.boolean)
+      *setting->value.target.boolean = false;
+   else
+      *setting->value.target.boolean = true;
+   if (setting->change_handler)
+      setting->change_handler(setting);
 
    return 0;
 }
@@ -2701,6 +2743,35 @@ static int setting_string_action_start_audio_device(rarch_setting_t *setting)
    command_event(CMD_EVENT_AUDIO_REINIT, NULL);
    return 0;
 }
+
+#ifdef HAVE_MICROPHONE
+static int setting_string_action_start_microphone_device(rarch_setting_t *setting)
+{
+   if (!setting)
+      return -1;
+
+   strlcpy(setting->value.target.string, "", setting->size);
+
+   command_event(CMD_EVENT_MICROPHONE_REINIT, NULL);
+   return 0;
+}
+
+static int setting_string_action_ok_microphone_device(
+      rarch_setting_t *setting, size_t idx, bool wraparound)
+{
+   char enum_idx[16];
+   if (!setting)
+      return -1;
+
+   snprintf(enum_idx, sizeof(enum_idx), "%d", setting->enum_idx);
+
+   generic_action_ok_displaylist_push(
+         enum_idx, /* we will pass the enumeration index of the string as a path */
+         NULL, NULL, 0, idx, 0,
+         ACTION_OK_DL_DROPDOWN_BOX_LIST_MICROPHONE_DEVICE);
+   return 0;
+}
+#endif
 #endif
 
 static void setting_get_string_representation_streaming_mode(
@@ -4759,6 +4830,7 @@ static void setting_get_string_representation_uint_video_monitor_index(rarch_set
 static void setting_get_string_representation_uint_custom_viewport_width(rarch_setting_t *setting,
       char *s, size_t len)
 {
+   size_t _len;
    struct retro_game_geometry  *geom    = NULL;
    video_driver_state_t *video_st       = video_state_get_ptr();
    struct retro_system_av_info *av_info = &video_st->av_info;
@@ -4767,23 +4839,21 @@ static void setting_get_string_representation_uint_custom_viewport_width(rarch_s
       return;
 
    geom    = (struct retro_game_geometry*)&av_info->geometry;
+   _len    = snprintf(s, len, "%u",
+            *setting->value.target.unsigned_integer);
 
    if (!(rotation % 2) && (*setting->value.target.unsigned_integer % geom->base_width == 0))
-      snprintf(s, len, "%u (%ux)",
-            *setting->value.target.unsigned_integer,
+      snprintf(s + _len, len - _len, " (%ux)",
             *setting->value.target.unsigned_integer / geom->base_width);
    else if ((rotation % 2) && (*setting->value.target.unsigned_integer % geom->base_height == 0))
-      snprintf(s, len, "%u (%ux)",
-            *setting->value.target.unsigned_integer,
+      snprintf(s + _len, len - _len, " (%ux)",
             *setting->value.target.unsigned_integer / geom->base_height);
-   else
-      snprintf(s, len, "%u",
-            *setting->value.target.unsigned_integer);
 }
 
 static void setting_get_string_representation_uint_custom_viewport_height(rarch_setting_t *setting,
       char *s, size_t len)
 {
+   size_t _len;
    struct retro_game_geometry  *geom    = NULL;
    video_driver_state_t *video_st       = video_state_get_ptr();
    struct retro_system_av_info *av_info = &video_st->av_info;
@@ -4792,18 +4862,15 @@ static void setting_get_string_representation_uint_custom_viewport_height(rarch_
       return;
 
    geom    = (struct retro_game_geometry*)&av_info->geometry;
+   _len    = snprintf(s, len, "%u",
+            *setting->value.target.unsigned_integer);
 
    if (!(rotation % 2) && (*setting->value.target.unsigned_integer % geom->base_height == 0))
-      snprintf(s, len, "%u (%ux)",
-            *setting->value.target.unsigned_integer,
+      snprintf(s + _len, len - _len, " (%ux)",
             *setting->value.target.unsigned_integer / geom->base_height);
    else  if ((rotation % 2) && (*setting->value.target.unsigned_integer % geom->base_width == 0))
-      snprintf(s, len, "%u (%ux)",
-            *setting->value.target.unsigned_integer,
+      snprintf(s + _len, len - _len, " (%ux)",
             *setting->value.target.unsigned_integer / geom->base_width);
-   else
-      snprintf(s, len, "%u",
-            *setting->value.target.unsigned_integer);
 }
 
 #ifdef HAVE_WASAPI
@@ -4820,6 +4887,20 @@ static void setting_get_string_representation_int_audio_wasapi_sh_buffer_length(
    else
       strlcpy(s, "Auto", len);
 }
+
+#ifdef HAVE_MICROPHONE
+static void setting_get_string_representation_uint_microphone_wasapi_sh_buffer_length(rarch_setting_t *setting,
+      char *s, size_t len)
+{
+   if (!setting)
+      return;
+
+   if (*setting->value.target.unsigned_integer > 0)
+      snprintf(s, len, "%u", *setting->value.target.unsigned_integer);
+   else
+      strlcpy(s, "Auto", len);
+}
+#endif
 #endif
 
 #if !defined(RARCH_CONSOLE)
@@ -5608,6 +5689,40 @@ static int setting_string_action_left_audio_device(
    command_event(CMD_EVENT_AUDIO_REINIT, NULL);
    return 0;
 }
+
+#ifdef HAVE_MICROPHONE
+static int setting_string_action_left_microphone_device(
+      rarch_setting_t *setting, size_t idx, bool wraparound)
+{
+   int mic_device_index;
+   struct string_list *ptr  = NULL;
+
+   if (!microphone_driver_get_devices_list((void**)&ptr))
+      return -1;
+
+   if (!ptr)
+      return -1;
+
+   /* Get index in the string list */
+   mic_device_index = string_list_find_elem(
+         ptr, setting->value.target.string) - 1;
+   mic_device_index--;
+
+   /* Reset index if needed */
+   if (mic_device_index < -1)
+      mic_device_index = (int)(ptr->size - 1);
+
+   if (mic_device_index < 0)
+      strlcpy(setting->value.target.string,
+            "", setting->size);
+   else
+      strlcpy(setting->value.target.string,
+            ptr->elems[mic_device_index].data, setting->size);
+
+   command_event(CMD_EVENT_MICROPHONE_REINIT, NULL);
+   return 0;
+}
+#endif
 #endif
 
 static int setting_string_action_left_driver(
@@ -5898,6 +6013,39 @@ static int setting_string_action_right_audio_device(
    command_event(CMD_EVENT_AUDIO_REINIT, NULL);
    return 0;
 }
+
+#ifdef HAVE_MICROPHONE
+static int setting_string_action_right_microphone_device(
+      rarch_setting_t *setting, size_t idx, bool wraparound)
+{
+   int mic_device_index;
+   struct string_list *ptr  = NULL;
+
+   if (!microphone_driver_get_devices_list((void**)&ptr))
+      return -1;
+
+   if (!ptr)
+      return -1;
+
+   /* Get index in the string list */
+   mic_device_index = string_list_find_elem(ptr,setting->value.target.string) - 1;
+   mic_device_index++;
+
+   /* Reset index if needed */
+   if (mic_device_index == (signed)ptr->size)
+      mic_device_index = -1;
+
+   if (mic_device_index < 0)
+      strlcpy(setting->value.target.string,
+            "", setting->size);
+   else
+      strlcpy(setting->value.target.string,
+            ptr->elems[mic_device_index].data, setting->size);
+
+   command_event(CMD_EVENT_MICROPHONE_REINIT, NULL);
+   return 0;
+}
+#endif
 #endif
 
 static int setting_string_action_right_driver(
@@ -6402,8 +6550,8 @@ static void setting_get_string_representation_uint_autosave_interval(
 
    if (*setting->value.target.unsigned_integer)
    {
-      snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
-      strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len);
+      size_t _len = snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
+      strlcpy(s + _len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len - _len);
    }
    else
       strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF), len);
@@ -6420,8 +6568,8 @@ static void setting_get_string_representation_uint_replay_checkpoint_interval(
 
    if (*setting->value.target.unsigned_integer)
    {
-      snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
-      strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len);
+      size_t _len = snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
+      strlcpy(s + _len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len - _len);
    }
    else
       strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF), len);
@@ -6714,7 +6862,7 @@ static void setting_get_string_representation_uint_user_language(
    LANG_DATA(HUNGARIAN)
 
    if (*msg_hash_get_uint(MSG_HASH_USER_LANGUAGE) == RETRO_LANGUAGE_ENGLISH)
-      snprintf(s, len, "%s", modes[*msg_hash_get_uint(MSG_HASH_USER_LANGUAGE)]);
+      strlcpy(s, modes[*msg_hash_get_uint(MSG_HASH_USER_LANGUAGE)], len);
    else
    {
       const char *rating = msg_hash_to_str(
@@ -6806,8 +6954,8 @@ static void setting_get_string_representation_uint_menu_screensaver_timeout(
       strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF), len);
    else
    {
-      snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
-      strlcat(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len);
+      size_t _len = snprintf(s, len, "%u ", *setting->value.target.unsigned_integer);
+      strlcpy(s + _len, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SECONDS), len - _len);
    }
 }
 
@@ -7614,10 +7762,12 @@ static void get_string_representation_input_mouse_index(
       if (!string_is_empty(device_name))
          strlcpy(s, device_name, len);
       else if (map > 0)
-         snprintf(s, len,
-               "%s (#%u)",
+      {
+         size_t _len = strlcpy(s,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
-               map + 1);
+               len);
+         snprintf(s + _len, len - _len, " (#%u)", map + 1);
+      }
       else
          strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DONT_CARE), len);
    }
@@ -7849,7 +7999,9 @@ static void general_write_handler(rarch_setting_t *setting)
             if (menu_displaylist_ctl(DISPLAYLIST_GENERIC, &info, settings))
                menu_displaylist_process(&info);
             menu_displaylist_info_free(&info);
-            setting_set_with_string_representation(setting, "false");
+            *setting->value.target.boolean = false;
+            if (setting->change_handler)
+               setting->change_handler(setting);
          }
          break;
       case MENU_ENUM_LABEL_AUDIO_MAX_TIMING_SKEW:
@@ -8097,11 +8249,21 @@ static void general_write_handler(rarch_setting_t *setting)
       case MENU_ENUM_LABEL_AUDIO_WASAPI_SH_BUFFER_LENGTH:
          rarch_cmd = CMD_EVENT_AUDIO_REINIT;
          break;
+#ifdef HAVE_MICROPHONE
+      case MENU_ENUM_LABEL_MICROPHONE_LATENCY:
+      case MENU_ENUM_LABEL_MICROPHONE_INPUT_RATE:
+         rarch_cmd = CMD_EVENT_MICROPHONE_REINIT;
+         break;
+#endif
       case MENU_ENUM_LABEL_PAL60_ENABLE:
          if (*setting->value.target.boolean && global_get_ptr()->console.screen.pal_enable)
             rarch_cmd = CMD_EVENT_REINIT;
          else
-            setting_set_with_string_representation(setting, "false");
+         {
+            *setting->value.target.boolean = false;
+            if (setting->change_handler)
+               setting->change_handler(setting);
+         }
          break;
       case MENU_ENUM_LABEL_SYSTEM_BGM_ENABLE:
          if (*setting->value.target.boolean)
@@ -8129,6 +8291,7 @@ static void general_write_handler(rarch_setting_t *setting)
 #ifdef HAVE_AUDIOMIXER
          if (settings->bools.audio_enable_menu)
          {
+            audio_driver_load_system_sounds();
             if (settings->bools.audio_enable_menu_bgm)
                audio_driver_mixer_play_menu_sound_looped(AUDIO_MIXER_SYSTEM_SLOT_BGM);
             else
@@ -8769,7 +8932,7 @@ static bool setting_append_list_input_player_options(
          parent_group);
 
    {
-      char tmp_string[PATH_MAX_LENGTH];
+      char tmp_string[32];
 
       static char device_index[MAX_USERS][64];
       static char mouse_index[MAX_USERS][64];
@@ -8789,10 +8952,8 @@ static bool setting_append_list_input_player_options(
       static char split_joycon[MAX_USERS][64];
       static char label_split_joycon[MAX_USERS][64];
 #endif
-
-      tmp_string[0] = '\0';
-
-      snprintf(tmp_string, sizeof(tmp_string), "input_player%u", user + 1);
+      size_t _len = strlcpy(tmp_string, "input_player", sizeof(tmp_string));
+      snprintf(tmp_string + _len, sizeof(tmp_string) - _len, "%u", user + 1);
 
       snprintf(analog_to_digital[user], sizeof(analog_to_digital[user]),
             msg_hash_to_str(MENU_ENUM_LABEL_INPUT_PLAYER_ANALOG_DPAD_MODE), user + 1);
@@ -8978,8 +9139,8 @@ static bool setting_append_list_input_player_options(
       {
          char label[NAME_MAX_LENGTH];
          char name[NAME_MAX_LENGTH];
-
-         i =  (j < RARCH_ANALOG_BIND_LIST_END) 
+         size_t _len = 0;
+         i           =  (j < RARCH_ANALOG_BIND_LIST_END) 
             ? input_config_bind_order[j] 
             : j;
 
@@ -8990,12 +9151,12 @@ static bool setting_append_list_input_player_options(
 
          if (!string_is_empty(buffer[user]))
          {
-            size_t _len   = strlcpy(label, buffer[user], sizeof(label));
-            label[_len  ] = ' ';
-            label[_len+1] = '\0';
+            _len          = strlcpy(label, buffer[user], sizeof(label));
+            label[  _len] = ' ';
+            label[++_len] = '\0';
          }
          else
-            label[0] = '\0';
+            label[0]      = '\0';
 
          if (
                settings->bools.input_descriptor_label_show
@@ -9005,18 +9166,20 @@ static bool setting_append_list_input_player_options(
             )
          {
             if (system->input_desc_btn[user][i])
-               strlcat(label,
+               strlcpy(label       + _len,
                      system->input_desc_btn[user][i],
-                     sizeof(label));
+                     sizeof(label) - _len);
             else
             {
-               strlcat(label, value_na, sizeof(label));
+               strlcpy(label + _len, value_na, sizeof(label) - _len);
                if (settings->bools.input_descriptor_hide_unbound)
                   continue;
             }
          }
          else
-            strlcat(label, input_config_bind_map_get_desc(i), sizeof(label));
+            strlcpy(label       + _len,
+                  input_config_bind_map_get_desc(i),
+                  sizeof(label) - _len);
 
          snprintf(name, sizeof(name), "p%u_%s", user + 1, input_config_bind_map_get_base(i));
 
@@ -9190,8 +9353,12 @@ static int directory_action_start_generic(rarch_setting_t *setting)
    if (!setting)
       return -1;
 
-   setting_set_with_string_representation(setting,
-         setting->default_value.string);
+   if (setting->value.target.string)
+      strlcpy(setting->value.target.string,
+            setting->default_value.string,
+            setting->size);
+   if (setting->change_handler)
+      setting->change_handler(setting);
 
    return 0;
 }
@@ -10080,19 +10247,21 @@ static bool setting_append_list(
 
          CONFIG_ACTION(
                list, list_info,
-               MENU_ENUM_LABEL_AUDIO_RESAMPLER_SETTINGS,
-               MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_SETTINGS,
-               &group_info,
-               &subgroup_info,
-               parent_group);
-
-         CONFIG_ACTION(
-               list, list_info,
                MENU_ENUM_LABEL_AUDIO_OUTPUT_SETTINGS,
                MENU_ENUM_LABEL_VALUE_AUDIO_OUTPUT_SETTINGS,
                &group_info,
                &subgroup_info,
                parent_group);
+
+#ifdef HAVE_MICROPHONE
+         CONFIG_ACTION(
+               list, list_info,
+               MENU_ENUM_LABEL_MICROPHONE_SETTINGS,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS,
+               &group_info,
+               &subgroup_info,
+               parent_group);
+#endif
 
          CONFIG_ACTION(
                list, list_info,
@@ -10136,7 +10305,7 @@ static bool setting_append_list(
       case SETTINGS_LIST_DRIVERS:
          {
             unsigned i, j = 0;
-            struct string_options_entry string_options_entries[12] = {{0}};
+            struct string_options_entry string_options_entries[13] = {{0}};
 
             START_GROUP(list, list_info, &group_info, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DRIVER_SETTINGS), parent_group);
             MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_IDX_PTR(list, list_info, MENU_ENUM_LABEL_DRIVER_SETTINGS);
@@ -10182,6 +10351,17 @@ static bool setting_append_list(
 
             j++;
 
+#ifdef HAVE_MICROPHONE
+            string_options_entries[j].target         = settings->arrays.microphone_driver;
+            string_options_entries[j].len            = sizeof(settings->arrays.microphone_driver);
+            string_options_entries[j].name_enum_idx  = MENU_ENUM_LABEL_MICROPHONE_DRIVER;
+            string_options_entries[j].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_MICROPHONE_DRIVER;
+            string_options_entries[j].default_value  = config_get_default_microphone();
+            string_options_entries[j].values         = config_get_microphone_driver_options();
+
+            j++;
+#endif
+
             string_options_entries[j].target         = settings->arrays.audio_resampler;
             string_options_entries[j].len            = sizeof(settings->arrays.audio_resampler);
             string_options_entries[j].name_enum_idx  = MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER;
@@ -10190,6 +10370,17 @@ static bool setting_append_list(
             string_options_entries[j].values         = config_get_audio_resampler_driver_options();
 
             j++;
+
+#ifdef HAVE_MICROPHONE
+            string_options_entries[j].target         = settings->arrays.microphone_resampler;
+            string_options_entries[j].len            = sizeof(settings->arrays.microphone_resampler);
+            string_options_entries[j].name_enum_idx  = MENU_ENUM_LABEL_MICROPHONE_RESAMPLER_DRIVER;
+            string_options_entries[j].SHORT_enum_idx = MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_DRIVER;
+            string_options_entries[j].default_value  = config_get_default_audio_resampler();
+            string_options_entries[j].values         = config_get_audio_resampler_driver_options();
+
+            j++;
+#endif
 
             string_options_entries[j].target         = settings->arrays.camera_driver;
             string_options_entries[j].len            = sizeof(settings->arrays.camera_driver);
@@ -11030,8 +11221,14 @@ static bool setting_append_list(
                   parent_group,
                   general_write_handler,
                   general_read_handler,
-				  &setting_get_string_representation_size_in_mb);
-            menu_settings_list_current_add_range(list, list_info, 1024*1024, 1024*1024*1024, settings->uints.rewind_buffer_size_step*1024*1024, true, true);
+                  &setting_get_string_representation_size_in_mb);
+            menu_settings_list_current_add_range(list,
+			    list_info,
+			    1024 * 1024,
+			    1024 * 1024 * 1024,
+			    settings->uints.rewind_buffer_size_step * 1024 * 1024,
+			    true,
+			    true);
 
             CONFIG_UINT(
                   list, list_info,
@@ -11191,20 +11388,36 @@ static bool setting_append_list(
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
             CONFIG_UINT_CBS(cheat_manager_state.working_cheat.value, CHEAT_VALUE,
-                  setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,
-                  0,cheat_manager_get_state_search_size(cheat_manager_state.working_cheat.memory_search_size),1);
+                  setting_uint_action_left_default,
+                  setting_uint_action_right_default,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  cheat_manager_get_state_search_size(cheat_manager_state.working_cheat.memory_search_size),
+                  1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.address, CHEAT_ADDRESS,
-                  setting_uint_action_left_with_refresh,setting_uint_action_right_with_refresh,
-                  0,&setting_get_string_representation_hex_and_uint,
-                  0,cheat_manager_state.total_memory_size==0?0:cheat_manager_state.total_memory_size-1,1);
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.address,
+                  CHEAT_ADDRESS,
+                  setting_uint_action_left_with_refresh,
+                  setting_uint_action_right_with_refresh,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  (cheat_manager_state.total_memory_size == 0)
+                  ? 0 
+                  : (cheat_manager_state.total_memory_size - 1),
+                  1);
 
-            max_bit_position = cheat_manager_state.working_cheat.memory_search_size<3 ? 255 : 0;
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.address_mask, CHEAT_ADDRESS_BIT_POSITION,
+            max_bit_position = (cheat_manager_state.working_cheat.memory_search_size < 3) ? 255 : 0;
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.address_mask,
+                  CHEAT_ADDRESS_BIT_POSITION,
                   setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,0,max_bit_position,1);
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  max_bit_position,
+                  1);
 
             CONFIG_BOOL(
                   list, list_info,
@@ -11221,19 +11434,36 @@ static bool setting_append_list(
                   general_read_handler,
                   SD_FLAG_NONE);
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_count, CHEAT_REPEAT_COUNT,
-                  setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,1,2048,1);
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_count,
+                  CHEAT_REPEAT_COUNT,
+                  setting_uint_action_left_default,
+                  setting_uint_action_right_default,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  1,
+                  2048,
+                  1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_add_to_address, CHEAT_REPEAT_ADD_TO_ADDRESS,
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_add_to_address,
+                  CHEAT_REPEAT_ADD_TO_ADDRESS,
                   setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,1,2048,1);
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  1,
+                  2048,
+                  1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_add_to_value, CHEAT_REPEAT_ADD_TO_VALUE,
-                  setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,0,0xFFFF,1);
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.repeat_add_to_value,
+                  CHEAT_REPEAT_ADD_TO_VALUE,
+                  setting_uint_action_left_default,
+                  setting_uint_action_right_default,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  0xFFFF,
+                  1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
             CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_type, CHEAT_RUMBLE_TYPE,
@@ -11243,10 +11473,15 @@ static bool setting_append_list(
                   RUMBLE_TYPE_DISABLED,RUMBLE_TYPE_END_LIST-1,1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_value, CHEAT_RUMBLE_VALUE,
-                  setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,
-                  0,cheat_manager_get_state_search_size(cheat_manager_state.working_cheat.memory_search_size),1);
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_value,
+                  CHEAT_RUMBLE_VALUE,
+                  setting_uint_action_left_default,
+                  setting_uint_action_right_default,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  cheat_manager_get_state_search_size(cheat_manager_state.working_cheat.memory_search_size),
+                  1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
             CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_port, CHEAT_RUMBLE_PORT,
@@ -11256,18 +11491,29 @@ static bool setting_append_list(
                   0,16,1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_primary_strength, CHEAT_RUMBLE_PRIMARY_STRENGTH,
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_primary_strength,
+                  CHEAT_RUMBLE_PRIMARY_STRENGTH,
                   setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,0,65535,1);
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  65535,
+                  1);
 
             CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_primary_duration, CHEAT_RUMBLE_PRIMARY_DURATION,
                   setting_uint_action_left_default,setting_uint_action_right_default,
                   0,&setting_get_string_representation_uint,0,5000,1);
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
 
-            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_secondary_strength, CHEAT_RUMBLE_SECONDARY_STRENGTH,
-                  setting_uint_action_left_default,setting_uint_action_right_default,
-                  0,&setting_get_string_representation_hex_and_uint,0,65535,1);
+            CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_secondary_strength,
+                  CHEAT_RUMBLE_SECONDARY_STRENGTH,
+                  setting_uint_action_left_default,
+                  setting_uint_action_right_default,
+                  0,
+                  &setting_get_string_representation_hex_and_uint,
+                  0,
+                  65535,
+                  1);
 
             CONFIG_UINT_CBS(cheat_manager_state.working_cheat.rumble_secondary_duration, CHEAT_RUMBLE_SECONDARY_DURATION,
                   setting_uint_action_left_default,setting_uint_action_right_default,
@@ -11290,8 +11536,10 @@ static bool setting_append_list(
 
          START_SUB_GROUP(list, list_info, "State", &group_info, &subgroup_info, parent_group);
 
-         CONFIG_UINT_CBS(cheat_manager_state.search_bit_size, CHEAT_START_OR_RESTART,
-               setting_uint_action_left_with_refresh,setting_uint_action_right_with_refresh,
+         CONFIG_UINT_CBS(cheat_manager_state.search_bit_size,
+               CHEAT_START_OR_RESTART,
+               setting_uint_action_left_with_refresh,
+               setting_uint_action_right_with_refresh,
                MENU_ENUM_LABEL_CHEAT_MEMORY_SIZE_1,
                &setting_get_string_representation_uint_as_enum,
                0,5,1);
@@ -11456,9 +11704,9 @@ static bool setting_append_list(
                general_write_handler,
                general_read_handler);
          menu_settings_list_current_add_range(list, list_info, 0, cheat_manager_state.num_matches-1, 1, true, true);
-         (*list)[list_info->index - 1].action_left = &setting_uint_action_left_with_refresh;
+         (*list)[list_info->index - 1].action_left  = &setting_uint_action_left_with_refresh;
          (*list)[list_info->index - 1].action_right = &setting_uint_action_right_with_refresh;
-         (*list)[list_info->index - 1].action_ok = &cheat_manager_delete_match;
+         (*list)[list_info->index - 1].action_ok    = &cheat_manager_delete_match;
 
          CONFIG_UINT(
                list, list_info,
@@ -11472,9 +11720,9 @@ static bool setting_append_list(
                general_write_handler,
                general_read_handler);
          menu_settings_list_current_add_range(list, list_info, 0, cheat_manager_state.num_matches-1, 1, true, true);
-         (*list)[list_info->index - 1].action_left = &setting_uint_action_left_with_refresh;
+         (*list)[list_info->index - 1].action_left  = &setting_uint_action_left_with_refresh;
          (*list)[list_info->index - 1].action_right = &setting_uint_action_right_with_refresh;
-         (*list)[list_info->index - 1].action_ok = &cheat_manager_copy_match;
+         (*list)[list_info->index - 1].action_ok    = &cheat_manager_copy_match;
 
          CONFIG_UINT(
                list, list_info,
@@ -11487,9 +11735,15 @@ static bool setting_append_list(
                parent_group,
                general_write_handler,
                general_read_handler);
-         menu_settings_list_current_add_range(list, list_info, 0, cheat_manager_state.total_memory_size>0?cheat_manager_state.total_memory_size-1:0, 1, true, true);
-         (*list)[list_info->index - 1].action_left = &setting_uint_action_left_with_refresh;
-         (*list)[list_info->index - 1].action_right = &setting_uint_action_right_with_refresh;
+         menu_settings_list_current_add_range(list, list_info, 0,
+               (cheat_manager_state.total_memory_size > 0)
+               ? (cheat_manager_state.total_memory_size - 1)
+               : 0,
+               1,
+               true,
+               true);
+         (*list)[list_info->index - 1].action_left               = &setting_uint_action_left_with_refresh;
+         (*list)[list_info->index - 1].action_right              = &setting_uint_action_right_with_refresh;
          (*list)[list_info->index - 1].get_string_representation = &setting_get_string_representation_uint_cheat_browse_address;
 
          END_SUB_GROUP(list, list_info, parent_group);
@@ -12453,7 +12707,6 @@ static bool setting_append_list(
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
             (*list)[list_info->index - 1].get_string_representation =
                &setting_get_string_representation_uint_video_rotation;
-            SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
 
             CONFIG_UINT(
                   list, list_info,
@@ -12470,7 +12723,6 @@ static bool setting_append_list(
             (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
             (*list)[list_info->index - 1].get_string_representation =
                &setting_get_string_representation_uint_screen_orientation;
-            SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
 
             END_SUB_GROUP(list, list_info, parent_group);
 
@@ -13351,6 +13603,24 @@ static bool setting_append_list(
          menu_settings_list_current_add_range(list, list_info, 0, 512, 1.0, true, true);
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
 
+#ifdef HAVE_MICROPHONE
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_latency,
+               MENU_ENUM_LABEL_MICROPHONE_LATENCY,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+               g_defaults.settings_in_latency ?
+               g_defaults.settings_in_latency : DEFAULT_IN_LATENCY,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint;
+         menu_settings_list_current_add_range(list, list_info, 0, 512, 1.0, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+#endif
+
          CONFIG_UINT(
                list, list_info,
                &settings->uints.audio_resampler_quality,
@@ -13426,6 +13696,20 @@ static bool setting_append_list(
                general_write_handler,
                general_read_handler);
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+#ifdef HAVE_MICROPHONE
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_block_frames,
+               MENU_ENUM_LABEL_MICROPHONE_BLOCK_FRAMES,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_BLOCK_FRAMES,
+               0,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+#endif
 #endif
 
          END_SUB_GROUP(list, list_info, parent_group);
@@ -13459,6 +13743,29 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].action_ok     = &setting_string_action_ok_audio_device;
          (*list)[list_info->index - 1].get_string_representation =
                &setting_get_string_representation_string_audio_device;
+
+#ifdef HAVE_MICROPHONE
+         CONFIG_STRING(
+               list, list_info,
+               settings->arrays.microphone_device,
+               sizeof(settings->arrays.microphone_device),
+               MENU_ENUM_LABEL_MICROPHONE_DEVICE,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+               "",
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ALLOW_INPUT);
+         (*list)[list_info->index - 1].ui_type       = ST_UI_TYPE_STRING_LINE_EDIT;
+         (*list)[list_info->index - 1].action_start  = setting_string_action_start_microphone_device;
+         (*list)[list_info->index - 1].action_left   = &setting_string_action_left_microphone_device;
+         (*list)[list_info->index - 1].action_right  = &setting_string_action_right_microphone_device;
+         (*list)[list_info->index - 1].action_ok     = &setting_string_action_ok_microphone_device;
+         (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_string_audio_device;
+#endif
 #endif
 
          CONFIG_UINT(
@@ -13475,6 +13782,23 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint_special;
          menu_settings_list_current_add_range(list, list_info, 1000, 192000, 100.0, true, true);
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+
+#ifdef HAVE_MICROPHONE
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_sample_rate,
+               MENU_ENUM_LABEL_MICROPHONE_INPUT_RATE,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_INPUT_RATE,
+               DEFAULT_INPUT_RATE,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint_special;
+         menu_settings_list_current_add_range(list, list_info, 1000, 192000, 100.0, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+#endif
 
          CONFIG_PATH(
                list, list_info,
@@ -13548,6 +13872,191 @@ static bool setting_append_list(
          END_SUB_GROUP(list, list_info, parent_group);
          END_GROUP(list, list_info, parent_group);
          break;
+#ifdef HAVE_MICROPHONE
+      case SETTINGS_LIST_MICROPHONE:
+         START_GROUP(list, list_info, &group_info,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MICROPHONE_SETTINGS), parent_group);
+         MENU_SETTINGS_LIST_CURRENT_ADD_ENUM_IDX_PTR(list, list_info, MENU_ENUM_LABEL_MICROPHONE_SETTINGS);
+
+         parent_group = msg_hash_to_str(MENU_ENUM_LABEL_SETTINGS);
+
+         START_SUB_GROUP(list, list_info, "State", &group_info, &subgroup_info, parent_group);
+
+         CONFIG_BOOL(
+               list, list_info,
+               &settings->bools.microphone_enable,
+               MENU_ENUM_LABEL_MICROPHONE_ENABLE,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_ENABLE,
+               DEFAULT_AUDIO_ENABLE,
+               MENU_ENUM_LABEL_VALUE_OFF,
+               MENU_ENUM_LABEL_VALUE_ON,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler,
+               SD_FLAG_NONE
+               );
+
+         END_SUB_GROUP(list, list_info, parent_group);
+
+         parent_group = msg_hash_to_str(MENU_ENUM_LABEL_SETTINGS);
+
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_latency,
+               MENU_ENUM_LABEL_MICROPHONE_LATENCY,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_LATENCY,
+               g_defaults.settings_in_latency ?
+               g_defaults.settings_in_latency : DEFAULT_IN_LATENCY,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint;
+         menu_settings_list_current_add_range(list, list_info, 0, 512, 1.0, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
+
+#ifdef RARCH_MOBILE
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_block_frames,
+               MENU_ENUM_LABEL_MICROPHONE_BLOCK_FRAMES,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_BLOCK_FRAMES,
+               0,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+#endif
+
+         END_SUB_GROUP(list, list_info, parent_group);
+
+         parent_group = msg_hash_to_str(MENU_ENUM_LABEL_SETTINGS);
+
+         START_SUB_GROUP(
+               list,
+               list_info,
+               "Miscellaneous",
+               &group_info,
+               &subgroup_info,
+               parent_group);
+
+#if !defined(RARCH_CONSOLE)
+         CONFIG_STRING(
+               list, list_info,
+               settings->arrays.microphone_device,
+               sizeof(settings->arrays.microphone_device),
+               MENU_ENUM_LABEL_MICROPHONE_DEVICE,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_DEVICE,
+               "",
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ALLOW_INPUT);
+         (*list)[list_info->index - 1].ui_type       = ST_UI_TYPE_STRING_LINE_EDIT;
+         (*list)[list_info->index - 1].action_start  = setting_generic_action_start_default;
+         (*list)[list_info->index - 1].action_left   = &setting_string_action_left_microphone_device;
+         (*list)[list_info->index - 1].action_right  = &setting_string_action_right_microphone_device;
+         (*list)[list_info->index - 1].action_ok     = &setting_string_action_ok_microphone_device;
+         (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_string_audio_device;
+#endif
+
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_sample_rate,
+               MENU_ENUM_LABEL_MICROPHONE_INPUT_RATE,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_INPUT_RATE,
+               DEFAULT_INPUT_RATE,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint_special;
+         menu_settings_list_current_add_range(list, list_info, 1000, 192000, 100.0, true, true);
+         SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+
+         CONFIG_UINT(
+               list, list_info,
+               &settings->uints.microphone_resampler_quality,
+               MENU_ENUM_LABEL_MICROPHONE_RESAMPLER_QUALITY,
+               MENU_ENUM_LABEL_VALUE_MICROPHONE_RESAMPLER_QUALITY,
+               DEFAULT_AUDIO_RESAMPLER_QUALITY_LEVEL,
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+         (*list)[list_info->index - 1].ui_type   = ST_UI_TYPE_UINT_COMBOBOX;
+         (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
+         (*list)[list_info->index - 1].get_string_representation =
+            &setting_get_string_representation_uint_audio_resampler_quality;
+         menu_settings_list_current_add_range(list, list_info, RESAMPLER_QUALITY_DONTCARE, RESAMPLER_QUALITY_HIGHEST, 1.0, true, true);
+
+#ifdef HAVE_WASAPI
+         if (string_is_equal(settings->arrays.microphone_driver, "wasapi"))
+         {
+            CONFIG_BOOL(
+                  list, list_info,
+                  &settings->bools.microphone_wasapi_exclusive_mode,
+                  MENU_ENUM_LABEL_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+                  MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_EXCLUSIVE_MODE,
+                  DEFAULT_WASAPI_EXCLUSIVE_MODE,
+                  MENU_ENUM_LABEL_VALUE_OFF,
+                  MENU_ENUM_LABEL_VALUE_ON,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler,
+                  SD_FLAG_NONE
+                  );
+
+            CONFIG_BOOL(
+                  list, list_info,
+                  &settings->bools.microphone_wasapi_float_format,
+                  MENU_ENUM_LABEL_MICROPHONE_WASAPI_FLOAT_FORMAT,
+                  MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_FLOAT_FORMAT,
+                  DEFAULT_WASAPI_FLOAT_FORMAT,
+                  MENU_ENUM_LABEL_VALUE_OFF,
+                  MENU_ENUM_LABEL_VALUE_ON,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler,
+                  SD_FLAG_NONE
+                  );
+
+            CONFIG_UINT(
+                  list, list_info,
+                  &settings->uints.microphone_wasapi_sh_buffer_length,
+                  MENU_ENUM_LABEL_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+                  MENU_ENUM_LABEL_VALUE_MICROPHONE_WASAPI_SH_BUFFER_LENGTH,
+                  DEFAULT_WASAPI_MICROPHONE_SH_BUFFER_LENGTH,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group,
+                  general_write_handler,
+                  general_read_handler);
+            menu_settings_list_current_add_range(list, list_info, 0.0f, 0.0f, 16.0f, true, false);
+            SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
+            (*list)[list_info->index - 1].get_string_representation =
+                  &setting_get_string_representation_uint_microphone_wasapi_sh_buffer_length;
+            }
+#endif
+
+         END_SUB_GROUP(list, list_info, parent_group);
+         END_GROUP(list, list_info, parent_group);
+         break;
+#endif
       case SETTINGS_LIST_INPUT:
          {
             unsigned user;
@@ -14318,8 +14827,8 @@ static bool setting_append_list(
                   static char binds_list[MAX_USERS][255];
                   static char binds_label[MAX_USERS][255];
                   unsigned user_value = user + 1;
-
-                  snprintf(binds_list[user],  sizeof(binds_list[user]), "%d_input_binds_list", user_value);
+                  size_t _len = snprintf(binds_list[user],  sizeof(binds_list[user]), "%d", user_value);
+                  strlcpy(binds_list[user] + _len, "_input_binds_list", sizeof(binds_list[user]) - _len);
                   snprintf(binds_label[user], sizeof(binds_label[user]),
                         val_input_user_binds, user_value);
 
@@ -16116,7 +16625,6 @@ static bool setting_append_list(
                SD_FLAG_CMD_APPLY_AUTO
                );
          MENU_SETTINGS_LIST_CURRENT_ADD_CMD(list, list_info, CMD_EVENT_MENU_PAUSE_LIBRETRO);
-            SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_LAKKA_ADVANCED);
 
          CONFIG_BOOL(
                list, list_info,
@@ -21012,9 +21520,8 @@ static bool setting_append_list(
                for (user = 0; user < max_users; user++)
                {
                   char s1[64], s2[64];
-
-                  snprintf(s1, sizeof(s1), "%s_user_p%d",
-                        lbl_network_remote_enable, user + 1);
+                  size_t _len = strlcpy(s1, lbl_network_remote_enable, sizeof(s1));
+                  snprintf(s1 + _len, sizeof(s1) - _len, "_user_p%d", user + 1);
                   snprintf(s2, sizeof(s2), val_network_remote_enable, user + 1);
 
                   CONFIG_BOOL_ALT(
@@ -22338,6 +22845,9 @@ static rarch_setting_t *menu_setting_new_internal(rarch_setting_info_t *list_inf
       SETTINGS_LIST_VIDEO,
       SETTINGS_LIST_CRT_SWITCHRES,
       SETTINGS_LIST_AUDIO,
+#ifdef HAVE_MICROPHONE
+      SETTINGS_LIST_MICROPHONE,
+#endif
       SETTINGS_LIST_INPUT,
       SETTINGS_LIST_INPUT_TURBO_FIRE,
       SETTINGS_LIST_INPUT_HOTKEY,

@@ -80,7 +80,7 @@
 #define DEFAULT_MAX_PADS 4
 #elif defined(HAVE_ODROIDGO2)
 #define DEFAULT_MAX_PADS 8
-#elif defined(__linux__) || (defined(BSD) && !defined(__MACH__))
+#elif (defined(BSD) && !defined(__MACH__))
 #define DEFAULT_MAX_PADS 8
 #elif defined(__QNX__)
 #define DEFAULT_MAX_PADS 8
@@ -962,9 +962,6 @@ void input_config_get_bind_string_joykey(
       bool input_descriptor_label_show,
       char *buf, const char *prefix,
       const struct retro_keybind *bind, size_t size);
-
-int16_t input_state_internal(unsigned port, unsigned device,
-      unsigned idx, unsigned id);
 
 bool input_key_pressed(int key, bool keyboard_pressed);
 

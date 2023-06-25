@@ -97,6 +97,7 @@ static void menu_action_setting_audio_mixer_stream_volume(
       const char *path,
       char *s2, size_t len2)
 {
+   size_t _len;
    unsigned offset = (type - MENU_SETTINGS_AUDIO_MIXER_STREAM_ACTIONS_VOLUME_BEGIN);
    *w              = 19;
    strlcpy(s2, path, len2);
@@ -104,8 +105,8 @@ static void menu_action_setting_audio_mixer_stream_volume(
    if (offset >= AUDIO_MIXER_MAX_SYSTEM_STREAMS)
       return;
 
-   snprintf(s, len, "%.2f", audio_driver_mixer_get_stream_volume(offset));
-   strlcat(s, " dB", len);
+   _len = snprintf(s, len, "%.2f", audio_driver_mixer_get_stream_volume(offset));
+   strlcpy(s + _len, " dB", len - _len);
 }
 #endif
 
@@ -654,20 +655,24 @@ static void menu_action_setting_disp_set_label_cpu_policy(
       const char *path,
       char *s2, size_t len2)
 {
+   size_t _len;
    unsigned policyid              = atoi(path);
    cpu_scaling_driver_t **drivers = get_cpu_scaling_drivers(false);
    cpu_scaling_driver_t *d        = drivers[policyid];
+   size_t _len                    = snprintf(s2, len2, "%s %d",
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CPU_POLICY_ENTRY),
+         policyid);
 
-   *s = '\0';
-   *w = 0;
+   *s   = '\0';
+   *w   = 0;
 
    if (d->affected_cpus)
-      snprintf(s2, len2, "%s %d [CPU(s) %s]", msg_hash_to_str(
-         MENU_ENUM_LABEL_VALUE_CPU_POLICY_ENTRY), policyid,
-         d->affected_cpus);
-   else
-      snprintf(s2, len2, "%s %d", msg_hash_to_str(
-         MENU_ENUM_LABEL_VALUE_CPU_POLICY_ENTRY), policyid);
+   {
+      _len += strlcpy(s2 + _len, " [CPU(s) ",      len2 - _len);
+      _len += strlcpy(s2 + _len, d->affected_cpus, len2 - _len);
+      s2[  _len] = ']' ;
+      s2[++_len] = '\0';
+   }
 }
 
 static void menu_action_cpu_managed_freq_label(
@@ -697,21 +702,9 @@ static void menu_action_cpu_managed_freq_label(
    };
 
    if (freq == 1)
-   {
-      s[0] = 'M';
-      s[1] = 'i';
-      s[2] = 'n';
-      s[3] = '.';
-      s[4] = '\0';
-   }
+      strlcpy(s, "Min.", len);
    else if (freq == ~0U)
-   {
-      s[0] = 'M';
-      s[1] = 'a';
-      s[2] = 'x';
-      s[3] = '.';
-      s[4] = '\0';
-   }
+      strlcpy(s, "Max.", len);
    else
       snprintf(s, len, "%u MHz", freq / 1000);
 }
@@ -858,15 +851,15 @@ static void menu_action_setting_disp_set_label_input_desc(
          if (remap_idx < RARCH_FIRST_CUSTOM_BIND) { }
          else if (remap_idx % 2 == 0)
          {
-            s[_len  ] = ' ';
-            s[_len+1] = '+';
-            s[_len+2] = '\0';
+            s[  _len] = ' ';
+            s[++_len] = '+';
+            s[++_len] = '\0';
          }
          else
          {
-            s[_len  ] = ' ';
-            s[_len+1] = '-';
-            s[_len+2] = '\0';
+            s[  _len] = ' ';
+            s[++_len] = '-';
+            s[++_len] = '\0';
          }
          return;
       }
@@ -908,8 +901,8 @@ static void menu_action_setting_disp_set_label_input_desc_kbd(
    if (key_descriptors[key_id].key != RETROK_FIRST)
    {
       /* TODO/FIXME - Localize */
-      strlcpy(s, "Keyboard ", len);
-      strlcat(s, key_descriptors[key_id].desc, len);
+      size_t _len = strlcpy(s, "Keyboard ", len);
+      strlcpy(s + _len, key_descriptors[key_id].desc, len - _len);
    }
    else
    {
@@ -936,22 +929,24 @@ static void menu_action_setting_disp_set_label_cheat(
 
    if (cheat_index < cheat_manager_get_buf_size())
    {
+      size_t _len = 
+         snprintf(s, len, "(%s) : ",
+                 cheat_manager_get_code_state(cheat_index)
+               ? msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON)
+               : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF));
+
       if (cheat_manager_state.cheats[cheat_index].handler == CHEAT_HANDLER_TYPE_EMU)
-         snprintf(s, len, "(%s) : %s",
-               cheat_manager_get_code_state(cheat_index) ?
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON) :
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF),
-               cheat_manager_get_code(cheat_index)
-               ? cheat_manager_get_code(cheat_index) :
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)
-               );
+      {
+         const char *code = cheat_manager_get_code(cheat_index);
+         strlcpy(s + _len, 
+                 code 
+               ? code
+               : msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
+               len - _len);
+      }
       else
-         snprintf(s, len, "(%s) : %08X",
-               cheat_manager_get_code_state(cheat_index) ?
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON) :
-               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF),
-               cheat_manager_state.cheats[cheat_index].address
-               );
+         snprintf(s + _len, len - _len, "%08X",
+               cheat_manager_state.cheats[cheat_index].address);
    }
    *w = 19;
    strlcpy(s2, path, len2);
@@ -1854,6 +1849,10 @@ static int menu_cbs_init_bind_get_string_representation_compare_label(
       {
          case MENU_ENUM_LABEL_VIDEO_DRIVER:
          case MENU_ENUM_LABEL_AUDIO_DRIVER:
+#ifdef HAVE_MICROPHONE
+         case MENU_ENUM_LABEL_MICROPHONE_DRIVER:
+         case MENU_ENUM_LABEL_MICROPHONE_RESAMPLER_DRIVER:
+#endif
          case MENU_ENUM_LABEL_INPUT_DRIVER:
          case MENU_ENUM_LABEL_JOYPAD_DRIVER:
          case MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER:

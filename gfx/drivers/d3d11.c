@@ -678,7 +678,7 @@ static void d3d11_font_free(void* data, bool is_threaded)
 
 static int d3d11_font_get_message_width(void* data, const char* msg, size_t msg_len, float scale)
 {
-   int i;
+   size_t i;
    int delta_x                      = 0;
    const struct font_glyph* glyph_q = NULL;
    d3d11_font_t* font               = (d3d11_font_t*)data;
@@ -724,7 +724,7 @@ static void d3d11_font_render_line(
       unsigned            height,
       unsigned            text_align)
 {
-   int i;
+   size_t i;
    unsigned count;
    D3D11_MAPPED_SUBRESOURCE mapped_vbo;
    d3d11_sprite_t *v                = NULL;
@@ -846,7 +846,7 @@ static void d3d11_font_render_message(
    for (;;)
    {
       const char* delim = strchr(msg, '\n');
-      size_t msg_len    = delim ? (delim - msg) : strlen(msg);
+      size_t msg_len    = delim ? (size_t)(delim - msg) : strlen(msg);
 
       /* Draw the line */
       if (msg_len <= (unsigned)d3d11->sprites.capacity)
@@ -1550,25 +1550,23 @@ static bool d3d11_gfx_set_shader(void* data, enum rarch_shader_type type, const 
             { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(d3d11_vertex_t, texcoord),
                D3D11_INPUT_PER_VERTEX_DATA, 0 },
          };
-         char vs_path[PATH_MAX_LENGTH];
-         char ps_path[PATH_MAX_LENGTH];
+         char _path[PATH_MAX_LENGTH];
          const char *slang_path = d3d11->shader_preset->pass[i].source.path;
          const char *vs_src     = d3d11->shader_preset->pass[i].source.string.vertex;
          const char *ps_src     = d3d11->shader_preset->pass[i].source.string.fragment;
-
-         strlcpy(vs_path, slang_path, sizeof(vs_path));
-         strlcpy(ps_path, slang_path, sizeof(ps_path));
-         strlcat(vs_path, ".vs.hlsl", sizeof(vs_path));
-         strlcat(ps_path, ".ps.hlsl", sizeof(ps_path));
+         size_t _len            = strlcpy(_path, slang_path, sizeof(_path));
+         strlcpy(_path + _len, ".vs.hlsl", sizeof(_path) - _len);
 
          if (!d3d11_init_shader(
-                  d3d11->device, vs_src, 0, vs_path, "main", NULL, NULL, desc, countof(desc),
+                  d3d11->device, vs_src, 0, _path, "main", NULL, NULL, desc, countof(desc),
                   &d3d11->pass[i].shader,
                   feat_level_hint
                   )) { }
 
+         strlcpy(_path + _len, ".ps.hlsl", sizeof(_path) - _len);
+
          if (!d3d11_init_shader(
-                  d3d11->device, ps_src, 0, ps_path, NULL, "main", NULL, NULL, 0,
+                  d3d11->device, ps_src, 0, _path, NULL, "main", NULL, NULL, 0,
                   &d3d11->pass[i].shader,
                   feat_level_hint
                   )) { }
@@ -2668,9 +2666,9 @@ static void d3d11_init_history(d3d11_video_t* d3d11, unsigned width, unsigned he
 
 static void d3d11_init_render_targets(d3d11_video_t* d3d11, unsigned width, unsigned height)
 {
-   int i;
+   size_t i;
 
-   for (i = 0; i < (int)d3d11->shader_preset->passes; i++)
+   for (i = 0; i < d3d11->shader_preset->passes; i++)
    {
       struct video_shader_pass* pass = &d3d11->shader_preset->pass[i];
 
@@ -3587,12 +3585,6 @@ static bool d3d11_get_hw_render_interface(
 }
 
 #ifndef __WINRT__
-static void d3d11_get_video_output_size(void *data,
-      unsigned *width, unsigned *height, char *desc, size_t desc_len)
-{
-   win32_get_video_output_size(width, height, desc, desc_len);
-}
-
 static void d3d11_get_video_output_prev(void *data)
 {
    unsigned width  = 0;
@@ -3613,19 +3605,19 @@ static const video_poke_interface_t d3d11_poke_interface = {
    d3d11_gfx_load_texture,
    d3d11_gfx_unload_texture,
    NULL, /* set_video_mode */
-#ifndef __WINRT__
-   win32_get_refresh_rate,
-#else
+#ifdef __WINRT__
    /* UWP does not expose this information easily */
-   NULL,
+   NULL, /* get_refresh_rate */
+#else
+   win32_get_refresh_rate,
 #endif
    d3d11_set_filtering,
 #ifdef __WINRT__
-   NULL,                               /* get_video_output_size */
-   NULL,                               /* get_video_output_prev */
-   NULL,                               /* get_video_output_next */
+   NULL, /* get_video_output_size */
+   NULL, /* get_video_output_prev */
+   NULL, /* get_video_output_next */
 #else
-   d3d11_get_video_output_size,
+   win32_get_video_output_size,
    d3d11_get_video_output_prev,
    d3d11_get_video_output_next,
 #endif
@@ -3680,12 +3672,11 @@ video_driver_t video_d3d11 = {
    d3d11_gfx_viewport_info,
    NULL, /* read_viewport  */
    NULL, /* read_frame_raw */
-
 #ifdef HAVE_OVERLAY
    d3d11_get_overlay_interface,
 #endif
    d3d11_gfx_get_poke_interface,
-   NULL, /* d3d11_wrap_type_to_enum */
+   NULL, /* wrap_type_to_enum */
 #if defined(HAVE_GFX_WIDGETS)
    d3d11_gfx_widgets_enabled
 #endif

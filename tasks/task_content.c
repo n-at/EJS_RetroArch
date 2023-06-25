@@ -874,7 +874,8 @@ static void content_file_get_path(
                   content_path, sizeof(info_path));
             info_path[_len  ] = '#';
             info_path[_len+1] = '\0';
-            strlcat(info_path, archive_file, sizeof(info_path));
+            _len             += 1;
+            strlcpy(info_path + _len, archive_file, sizeof(info_path) - _len);
 
             /* Update 'content' string_list */
             string_list_set(content, (unsigned)idx, info_path);
@@ -1046,16 +1047,19 @@ static bool content_file_load(
                   else
                      new_basedir[0] = '\0';
 
-                  if (string_is_empty(new_basedir) ||
-                     !path_is_directory(new_basedir) ||
-                     !is_path_accessible_using_standard_io(new_basedir))
+                  if (   string_is_empty  (new_basedir)
+                     || !path_is_directory(new_basedir)
+                     || !is_path_accessible_using_standard_io(new_basedir))
                   {
+                     size_t _len;
                      DWORD basedir_attribs;
                      RARCH_WARN("[Content]: Tried copying to cache directory, "
                         "but cache directory was not set or found. "
                         "Setting cache directory to root of writable app directory...\n");
-                     strlcpy(new_basedir, uwp_dir_data, sizeof(new_basedir));
-                     strlcat(new_basedir, "VFSCACHE\\", sizeof(new_basedir));
+                     _len = strlcpy(new_basedir, uwp_dir_data, sizeof(new_basedir));
+                     strlcpy(new_basedir + _len,
+                           "VFSCACHE\\",
+                           sizeof(new_basedir) - _len);
                      basedir_attribs = GetFileAttributes(new_basedir);
                      if (       (basedir_attribs == INVALID_FILE_ATTRIBUTES) 
                            || (!(basedir_attribs & FILE_ATTRIBUTE_DIRECTORY)))
@@ -2143,7 +2147,6 @@ end:
 
 bool task_push_start_current_core(content_ctx_info_t *content_info)
 {
-   uint16_t rarch_flags;
    content_information_ctx_t content_ctx;
    bool ret                           = true;
    content_state_t *p_content         = content_state_get_ptr();
@@ -2155,20 +2158,22 @@ bool task_push_start_current_core(content_ctx_info_t *content_info)
    if (!content_info)
       return false;
 
-   rarch_flags                        = retroarch_get_flags();
    content_ctx.flags                  = 0;
 
    if (check_firmware_before_loading)
       content_ctx.flags |= CONTENT_INFO_FLAG_CHECK_FW_BEFORE_LOADING;
 #ifdef HAVE_PATCH
-   if (rarch_flags & RARCH_FLAGS_IPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_IPS_PREF;
-   if (rarch_flags & RARCH_FLAGS_BPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_BPS_PREF;
-   if (rarch_flags & RARCH_FLAGS_UPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_UPS_PREF;
-   if (runloop_st->flags & RUNLOOP_FLAG_PATCH_BLOCKED)
-      content_ctx.flags |= CONTENT_INFO_FLAG_PATCH_IS_BLOCKED;
+   {
+      uint16_t rarch_flags = retroarch_get_flags();
+      if (rarch_flags & RARCH_FLAGS_IPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_IPS_PREF;
+      if (rarch_flags & RARCH_FLAGS_BPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_BPS_PREF;
+      if (rarch_flags & RARCH_FLAGS_UPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_UPS_PREF;
+      if (runloop_st->flags & RUNLOOP_FLAG_PATCH_BLOCKED)
+         content_ctx.flags |= CONTENT_INFO_FLAG_PATCH_IS_BLOCKED;
+   }
 #endif
    if (runloop_st->missing_bios)
       content_ctx.flags |= CONTENT_INFO_FLAG_BIOS_IS_MISSING;
@@ -2366,7 +2371,6 @@ bool task_push_load_content_with_new_core_from_menu(
       retro_task_callback_t cb,
       void *user_data)
 {
-   uint16_t rarch_flags;
    content_information_ctx_t content_ctx;
    content_state_t                 *p_content = content_state_get_ptr();
    bool ret                                   = true;
@@ -2388,20 +2392,22 @@ bool task_push_load_content_with_new_core_from_menu(
             type, cb, user_data);
 #endif
 
-   rarch_flags                        = retroarch_get_flags();
    content_ctx.flags                  = 0;
 
    if (check_firmware_before_loading)
       content_ctx.flags |= CONTENT_INFO_FLAG_CHECK_FW_BEFORE_LOADING;
 #ifdef HAVE_PATCH
-   if (rarch_flags & RARCH_FLAGS_IPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_IPS_PREF;
-   if (rarch_flags & RARCH_FLAGS_BPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_BPS_PREF;
-   if (rarch_flags & RARCH_FLAGS_UPS_PREF)
-      content_ctx.flags |= CONTENT_INFO_FLAG_IS_UPS_PREF;
-   if (runloop_st->flags & RUNLOOP_FLAG_PATCH_BLOCKED)
-      content_ctx.flags |= CONTENT_INFO_FLAG_PATCH_IS_BLOCKED;
+   {
+      uint16_t rarch_flags = retroarch_get_flags();
+      if (rarch_flags & RARCH_FLAGS_IPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_IPS_PREF;
+      if (rarch_flags & RARCH_FLAGS_BPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_BPS_PREF;
+      if (rarch_flags & RARCH_FLAGS_UPS_PREF)
+         content_ctx.flags |= CONTENT_INFO_FLAG_IS_UPS_PREF;
+      if (runloop_st->flags & RUNLOOP_FLAG_PATCH_BLOCKED)
+         content_ctx.flags |= CONTENT_INFO_FLAG_PATCH_IS_BLOCKED;
+   }
 #endif
    if (runloop_st->missing_bios)
       content_ctx.flags                      |= CONTENT_INFO_FLAG_BIOS_IS_MISSING;
