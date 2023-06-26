@@ -15,7 +15,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
 #include <string.h>
@@ -58,18 +57,29 @@ void cmd_savefiles(void)
 
 void cmd_save_state(void)
 {
-   command_event(CMD_EVENT_SAVE_STATE, NULL);//done
+   command_event(CMD_EVENT_SAVE_STATE, NULL);
 }
 
+#ifdef EMULATORJS
 void set_cheat(unsigned index, bool enabled, const char *code)
 {
-    retro_cheat_set(index, enabled, code);//done
+   command_event(CMD_EVENT_LOAD_STATE, NULL);
 }
-
 void reset_cheat(void)
 {
-    retro_cheat_reset();//done
+    retro_cheat_reset();
 }
+#else
+void cmd_load_state(void)
+{
+   command_event(CMD_EVENT_LOAD_STATE, NULL);
+}
+
+void cmd_take_screenshot(void)
+{
+   command_event(CMD_EVENT_TAKE_SCREENSHOT, NULL);
+}
+#endif
 
 
 static void frontend_emscripten_get_env(int *argc, char *argv[],
@@ -128,13 +138,18 @@ static void frontend_emscripten_get_env(int *argc, char *argv[],
          "playlists", sizeof(g_defaults.dirs[DEFAULT_DIR_PLAYLIST]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_REMAP], g_defaults.dirs[DEFAULT_DIR_MENU_CONFIG],
          "remaps", sizeof(g_defaults.dirs[DEFAULT_DIR_REMAP]));
-   fill_pathname_join("/data/saves", user_path,
-         "saves", sizeof("/data/saves"));
+   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SRAM], user_path,
+         "saves", sizeof(g_defaults.dirs[DEFAULT_DIR_SRAM]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SCREENSHOT], user_path,
          "screenshots", sizeof(g_defaults.dirs[DEFAULT_DIR_SCREENSHOT]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SAVESTATE], user_path,
          "states", sizeof(g_defaults.dirs[DEFAULT_DIR_SAVESTATE]));
+#ifdef EMULATORJS
    fill_pathname_join("/", user_path, "system", sizeof("/"));
+#else
+   fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SYSTEM], user_path,
+         "system", sizeof(g_defaults.dirs[DEFAULT_DIR_SYSTEM]));
+#endif
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_THUMBNAILS], user_path,
          "thumbnails", sizeof(g_defaults.dirs[DEFAULT_DIR_THUMBNAILS]));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_LOGS], user_path,
@@ -158,8 +173,12 @@ static void frontend_emscripten_get_env(int *argc, char *argv[],
 int main(int argc, char *argv[])
 {
    dummyErrnoCodes();
+   printf("Built for EmulatorJS Version 4.0\nDownload a copy from https://github.com/EmulatorJS/EmulatorJS\nView the licence here: https://github.com/EmulatorJS/EmulatorJS/blob/main/LICENSE\n");
 
-   printf("Built for EmulatorJS Version 2.2.6\nDownload a copy from https://github.com/ethanaobrien/emulatorjs\nView the licence here: https://github.com/ethanaobrien/emulatorjs/blob/main/LICENSE\n");
+#ifndef NO_INITIAL_CANVAS_RESIZE
+   emscripten_set_canvas_element_size("#canvas", 800, 600);
+   emscripten_set_element_css_size("#canvas", 800.0, 600.0);
+#endif
    emscripten_set_main_loop(emscripten_mainloop, 0, 0);
    rarch_main(argc, argv, NULL);
 

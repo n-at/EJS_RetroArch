@@ -1065,12 +1065,12 @@ void command_event_set_volume(
    audio_set_float(AUDIO_ACTION_VOLUME_GAIN, new_volume);
 }
 
+#ifdef EMULATORJS
 void set_volume(float new_volume)
 {
     audio_set_float(AUDIO_ACTION_VOLUME_GAIN, new_volume);
 }
-
-
+#endif
 
 /**
  * event_set_mixer_volume:
@@ -1728,7 +1728,9 @@ bool command_set_shader(command_t *cmd, const char *arg)
 
    return video_shader_apply_shader(settings, type, arg, true);
 }
+#endif
 
+#ifdef EMULATORJS
 void shader_enable(int enabled)
 {
     if (enabled) {
@@ -1738,6 +1740,7 @@ void shader_enable(int enabled)
     }
 }
 #endif
+
 
 #ifdef HAVE_CONFIGFILE
 bool command_event_save_core_config(
@@ -1987,7 +1990,7 @@ bool command_event_main_state(unsigned cmd)
                      settings->bools.frame_time_counter_reset_after_save_state;
 
                if (cmd == CMD_EVENT_SAVE_STATE)
-                  content_save_state("/save.state", true, false);
+                  content_save_state(state_path, true, false);
                else
                   content_save_state_to_ram();
 
@@ -2010,7 +2013,7 @@ bool command_event_main_state(unsigned cmd)
             {
                bool res = false;
                if (cmd == CMD_EVENT_LOAD_STATE)
-                  res = content_load_state("/game.state", false, false);
+                  res = content_load_state(state_path, false, false);
                else
                   res = content_load_state_from_ram();
 

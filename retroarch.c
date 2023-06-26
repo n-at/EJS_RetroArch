@@ -17,7 +17,6 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifdef _WIN32
 #ifdef _XBOX
 #include <xtl.h>
@@ -4875,13 +4874,12 @@ int rarch_main(int argc, char *argv[], void *data)
 #if defined(EMSCRIPTEN)
 #include "gfx/common/gl_common.h"
 
-static unsigned emscripten_frame_count = 0;
-
 void RWebAudioRecalibrateTime(void);
 
 void emscripten_mainloop(void)
 {
    int ret;
+   static unsigned emscripten_frame_count = 0;
    video_driver_state_t *video_st         = video_state_get_ptr();
    settings_t        *settings            = config_get_ptr();
    input_driver_state_t *input_st         = input_state_get_ptr();
@@ -4893,10 +4891,8 @@ void emscripten_mainloop(void)
    bool runloop_is_paused                 = runloop_flags & RUNLOOP_FLAG_PAUSED;
 
    RWebAudioRecalibrateTime();
-   
-   if (!runloop_is_paused) {
-       emscripten_frame_count++;
-   }
+
+   emscripten_frame_count++;
 
    /* Disable BFI during fast forward, slow-motion,
     * and pause to prevent flicker. */
@@ -4927,10 +4923,7 @@ void emscripten_mainloop(void)
    emscripten_force_exit(0);
 }
 
-unsigned get_current_frame_count(void)
-{
-    return emscripten_frame_count;
-}
+#ifdef EMULATORJS
 
 char* save_file_path() {
    runloop_state_t *runloop_st     = runloop_state_get_ptr();
@@ -4948,7 +4941,6 @@ void toggleMainLoop(int running) {
 
 void cmd_load_state(void)
 {
-   emscripten_frame_count = 0;
    command_event(CMD_EVENT_LOAD_STATE, NULL);//done
 }
 
@@ -4961,18 +4953,19 @@ int load_state(char *path, int rv)
 void system_restart(void)
 {
     command_event(CMD_EVENT_RESET, NULL);//done
-    emscripten_frame_count = 0;
 }
 
 void cmd_take_screenshot(void)
 {
-    const char *path = "screenshot.png";
+    const char *path = "/screenshot.png";
     video_driver_state_t *video_st = video_state_get_ptr();
     if (!take_screenshot(NULL,
              path, true,
              video_st->frame_cache_data && (video_st->frame_cache_data == RETRO_HW_FRAME_BUFFER_VALID), true, false))
        printf("Error taking screenshot");
 }
+
+#endif
 
 #endif
 

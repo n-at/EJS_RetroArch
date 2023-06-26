@@ -65,6 +65,7 @@
 #if defined(HAVE_LIBNX) || defined(_3DS)
 #define SAVE_STATE_CHUNK 4096 * 10
 #else
+//why so slow by default
 #define SAVE_STATE_CHUNK 4096 * 1000
 #endif
 
@@ -335,7 +336,6 @@ bool autosave_init(void)
 #else
    bool compress_files        = false;
 #endif
-   compress_files = false;
 
    if (autosave_interval < 1 || !task_save_files)
       return false;
@@ -520,7 +520,9 @@ bool content_undo_load_state(void)
 
    /* Swap the current state with the backup state. This way, we can undo
    what we're undoing */
-   //content_save_state("RAM", false, false);
+#ifndef EMULATORJS
+   content_save_state("RAM", false, false);
+#endif
 
    ret = content_deserialize_state(temp_data, temp_data_size);
 
@@ -902,7 +904,6 @@ static bool task_push_undo_save_state(const char *path, void *data, size_t size)
    if (settings->bools.savestate_file_compression)
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
-   
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -988,21 +989,19 @@ static void task_load_handler(retro_task_t *task)
 
    if (!state->file)
    {
-/*
 #if defined(HAVE_ZLIB)
-      * Always use RZIP interface when reading state
+      /* Always use RZIP interface when reading state
        * files - this will automatically handle uncompressed
-       * data *
+       * data */
       if (!(state->file = intfstream_open_rzip_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ)))
          goto not_found;
 #else
-    */
       if (!(state->file = intfstream_open_file(state->path,
                   RETRO_VFS_FILE_ACCESS_READ,
                   RETRO_VFS_FILE_ACCESS_HINT_NONE)))
          goto not_found;
-//#endif
+#endif
 
       if ((state->size = intfstream_get_size(state->file)) < 0)
          goto end;
@@ -1362,7 +1361,9 @@ static void content_load_state_cb(retro_task_t *task,
    }
 
    /* Backup the current state so we can undo this load */
-   //content_save_state("RAM", false, false);
+#ifndef EMULATORJS
+   content_save_state("RAM", false, false);
+#endif
 
    ret = content_deserialize_state(buf, size);
 
@@ -1469,7 +1470,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
    if (settings->bools.savestate_file_compression)
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
-   
+
    task->type                    = TASK_TYPE_BLOCKING;
    task->state                   = state;
    task->handler                 = task_save_handler;
@@ -1479,7 +1480,7 @@ static void task_push_save_state(const char *path, void *data, size_t size, bool
 
    if (!task_queue_push(task))
    {
-       /* Another blocking task is already active. */
+      /* Another blocking task is already active. */
       if (data)
          free(data);
       if (task->title)
@@ -1574,7 +1575,6 @@ static void task_push_load_and_save_state(const char *path, void *data,
       state->flags              |= SAVE_TASK_FLAG_COMPRESS_FILES;
 #endif
 
-   
    task->state                   = state;
    task->type                    = TASK_TYPE_BLOCKING;
    task->handler                 = task_load_handler;
@@ -1584,7 +1584,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
 
    if (!task_queue_push(task))
    {
-       /* Another blocking task is already active. */
+      /* Another blocking task is already active. */
       if (data)
          free(data);
       if (task->title)
@@ -1594,6 +1594,7 @@ static void task_push_load_and_save_state(const char *path, void *data,
    }
 }
 
+#ifdef EMULATORJS
 void* state_data;
 char myString[1000];
 
@@ -1623,6 +1624,13 @@ void save_state_info(void)
 char* get_state_info(void) {
     return myString;
 }
+
+bool supports_states(void)
+{
+    return core_info_current_supports_savestate();
+}
+#endif
+
 
 /**
  * content_save_state:
@@ -1670,6 +1678,9 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
    {
       if (path_is_valid(path) && !autosave)
       {
+         /* Before overwriting the savestate file, load it into a buffer
+         to allow undo_save_state() to work */
+         /* TODO/FIXME - Use msg_hash_to_str here */
          RARCH_LOG("[State]: %s ...\n",
                msg_hash_to_str(MSG_FILE_ALREADY_EXISTS_SAVING_TO_BACKUP_BUFFER));
          task_push_load_and_save_state(path, data, serial_size, true, autosave);
@@ -1830,11 +1841,6 @@ error:
    return false;
 }
 
-bool supports_states(void)
-{
-    return core_info_current_supports_savestate();
-}
-
 bool content_rename_state(const char *origin, const char *dest)
 {
    if (filestream_exists(dest))
@@ -1938,8 +1944,7 @@ bool content_load_ram_file(unsigned slot)
    /* Always use RZIP interface when reading SRAM
     * files - this will automatically handle uncompressed
     * data */
-   //if (!rzipstream_read_file(ram.path, &buf, &rc))
-   if (!filestream_read_file(ram.path, &buf, &rc))
+   if (!rzipstream_read_file(ram.path, &buf, &rc))
 #else
    if (!filestream_read_file(ram.path, &buf, &rc))
 #endif
@@ -2053,7 +2058,9 @@ bool content_load_state_from_ram(void)
 
    /* Swap the current state with the backup state. This way, we can undo
    what we're undoing */
-   //content_save_state("RAM", false, false);
+#ifndef EMULATORJS
+   content_save_state("RAM", false, false);
+#endif
 
    ret             = content_deserialize_state(temp_data, temp_data_size);
 
@@ -2154,7 +2161,6 @@ bool content_ram_state_to_file(const char *path)
          && ram_buf.state_buf.data
          && ram_buf.to_write_file)
    {
-       /*
 #if defined(HAVE_ZLIB)
       settings_t *settings = config_get_ptr();
       if (settings->bools.save_file_compression)
@@ -2165,7 +2171,6 @@ bool content_ram_state_to_file(const char *path)
       }
       else
 #endif
-*/
       {
          if (filestream_write_file(
                path, ram_buf.state_buf.data, ram_buf.state_buf.size))
@@ -2201,7 +2206,7 @@ bool content_save_ram_file(unsigned slot, bool compress)
          ram.type,
          msg_hash_to_str(MSG_TO),
          ram.path);
-/*
+
 #if defined(HAVE_ZLIB)
    if (compress)
    {
@@ -2211,7 +2216,6 @@ bool content_save_ram_file(unsigned slot, bool compress)
    }
    else
 #endif
-*/
    {
       if (!filestream_write_file(
             ram.path, mem_info.data, mem_info.size))
@@ -2248,7 +2252,6 @@ bool event_save_files(bool is_sram_used)
 #if defined(HAVE_ZLIB)
    bool compress_files             = settings->bools.save_file_compression;
 #endif
-   compress_files = false;
 
 #ifdef HAVE_CHEATS
    cheat_manager_save_game_specific_cheats(

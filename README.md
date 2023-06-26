@@ -1,15 +1,3 @@
-
-# RetroArch
-
-This is built to work with https://github.com/ethanaobrien/emulatorjs
-
-Changes: 
-- added emscripten linkers
-- changed save state method
-- new input driver specifically for my emulatorjs project
-- changed some default values
-
-
 [![Build Status](https://travis-ci.org/libretro/RetroArch.svg?branch=master)](https://travis-ci.org/libretro/RetroArch)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/8936/badge.svg)](https://scan.coverity.com/projects/retroarch)
 [![Crowdin](https://badges.crowdin.net/retroarch/localized.svg)](https://crowdin.com/project/retroarch)
@@ -351,4 +339,3 @@ The links below belong to our official channels. Links other than this may have 
 - [Teespring](https://teespring.com/stores/retroarch)
 - [Documentation](https://docs.libretro.com/)
 - [Forum](https://forums.libretro.com/)
-

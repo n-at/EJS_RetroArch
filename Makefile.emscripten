@@ -12,10 +12,8 @@ EOPTS = $(addprefix -s $(EMPTY), $(EOPT)) # Add '-s ' to each option
 
 OS = Emscripten
 OBJ :=
-
 DEFINES := -DRARCH_INTERNAL -DHAVE_MAIN
 DEFINES += -DHAVE_FILTERS_BUILTIN
-
 HAVE_PATCH = 1
 HAVE_DSP_FILTER = 1
 HAVE_VIDEO_FILTER = 1
@@ -26,6 +24,8 @@ HAVE_REWIND = 1
 HAVE_AUDIOMIXER = 1
 HAVE_CC_RESAMPLER = 1
 HAVE_EGL    = 1
+HAVE_OPENGLES = 1
+HAVE_OPENGLES = 1
 HAVE_RJPEG  = 0
 HAVE_RPNG   = 1
 HAVE_EMSCRIPTEN = 1
@@ -48,6 +48,7 @@ HAVE_CORE_INFO_CACHE = 1
 HAVE_7ZIP = 1
 HAVE_BSV_MOVIE = 1
 
+EMULATORJS = 1
 
 ASYNC ?= 0
 PTHREAD ?= 0
@@ -56,7 +57,7 @@ WASM ?= 1
 DEBUG ?= 0
 
 DEFINES := -DRARCH_INTERNAL -DHAVE_MAIN
-DEFINES += -DHAVE_FILTERS_BUILTIN -DNO_MISSING_ASSET_WARNING -DNO_AUTO_CANVAS_RESIZE -DWEB_SCALING -DNO_CANVAS_FULLSCREEN -DNO_INITIAL_CANVAS_RESIZE
+DEFINES += -DHAVE_FILTERS_BUILTIN -DNO_MISSING_ASSET_WARNING -DNO_AUTO_CANVAS_RESIZE -DWEB_SCALING -DNO_CANVAS_FULLSCREEN -DNO_INITIAL_CANVAS_RESIZE -DEMULATORJS
 
 HAVE_OPENGL = 0 # not supported
 EM_OPENGL ?= 0
@@ -84,9 +85,12 @@ HEAP_MEMORY ?= 536870912
 # 1073741824 -- 1 GiB
 # 1610612736 -- 1.5 GiB
 # 2147483648 -- 2 GiB
+
 ifeq ($(LIBRETRO), tyrquake)
    LTO = 0
 endif
+
+PTHREAD ?= 0
 
 MEMORY ?= 134217728
 
@@ -95,7 +99,6 @@ PRECISE_F32 = 1
 OBJDIR := obj-emscripten
 
 #if you compile with SDL2 flag add this Emscripten flag "-s USE_SDL=2" to LDFLAGS:
-
 ifeq ($(HAVE_SDL2), 1)
    LIBS += -s USE_SDL=2
    DEFINES += -DHAVE_SDL2
@@ -103,7 +106,7 @@ endif
 
 LIBS    := -s USE_ZLIB=1
 LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=0 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue', 'FS']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
-           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_get_current_frame_count','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop','_save_file_path'] \
+           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop','_save_file_path'] \
            -lidbfs.js \
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
            -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 \
@@ -111,8 +114,6 @@ LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_ME
            --js-library emscripten/library_rwebaudio.js \
            --js-library emscripten/library_rwebcam.js \
            --js-library emscripten/library_errno_codes.js
-
-
 
 ifeq ($(HAVE_OPENGLES), 1)
    ifeq ($(HAVE_OPENGLES3), 1)
@@ -138,6 +139,7 @@ endif
 ifeq ($(FS_DEBUG), 1)
    LDFLAGS += -s FS_DEBUG=1
 endif
+
 
 ifneq ($(PTHREAD), 0)
    LDFLAGS += -s WASM_MEM_MAX=1073741824 -pthread -s PTHREAD_POOL_SIZE=$(PTHREAD)
@@ -169,14 +171,15 @@ else
   libretro += libretro_emscripten.bc
 endif
 
-ifneq ($(V), 1)
-   Q := @
-endif
-
 ifeq ($(WASM), 1)
    LDFLAGS += -s WASM=1
 else
    LDFLAGS += -s WASM=0
+endif
+
+
+ifneq ($(V), 1)
+   Q := @
 endif
 
 ifeq ($(DEBUG), 1)
@@ -192,7 +195,7 @@ else
    CFLAGS += -O3
 endif
 
-CFLAGS += -Wall -I. -Ilibretro-common/include -std=gnu99 $(LIBS)
+CFLAGS += -Wall -Wunused-function -Wno-unused-command-line-argument -I. -Ilibretro-common/include -std=gnu99 $(LIBS)
 
 RARCH_OBJ := $(addprefix $(OBJDIR)/,$(OBJ))
 

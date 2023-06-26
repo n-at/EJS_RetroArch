@@ -47,7 +47,8 @@ typedef struct
 static void gfx_ctx_emscripten_swap_interval(void *data, int interval)
 {
    if (interval == 0)
-      emscripten_set_main_loop_timing(EM_TIMING_RAF, 1); //This breaks fastforward
+      emscripten_set_main_loop_timing(EM_TIMING_SETIMMEDIATE, 0); 
+      //Setting this to EM_TIMING_RAF breaks fast forward... but is it worth it?
    else
       emscripten_set_main_loop_timing(EM_TIMING_RAF, interval);
 }
@@ -72,8 +73,14 @@ static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
 
    if (!is_fullscreen)
    {
-     *width = 800;
-     *height = 600;
+      r = emscripten_get_canvas_element_size("#canvas", width, height);
+
+      if (r != EMSCRIPTEN_RESULT_SUCCESS)
+      {
+         *width  = 800;
+         *height = 600;
+         RARCH_ERR("[EMSCRIPTEN/EGL]: Could not get screen dimensions: %d\n",r);
+      }
    }
 }
 
@@ -97,7 +104,27 @@ static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
    *height                           = (unsigned)input_height;
    *resize                           = false;
 
+#ifndef NO_AUTO_CANVAS_RESIZE
+   if (  (input_width  != emscripten->fb_width)
+      || (input_height != emscripten->fb_height))
+   {
+      EMSCRIPTEN_RESULT r;
+      r = emscripten_set_canvas_element_size("#canvas",
+         input_width, input_height);
 
+      if (r != EMSCRIPTEN_RESULT_SUCCESS)
+         RARCH_ERR("[EMSCRIPTEN/EGL]: error resizing canvas: %d\n", r);
+
+      /* fix Module.requestFullscreen messing with the canvas size */
+      r = emscripten_set_element_css_size("#canvas",
+         (double)input_width, (double)input_height);
+
+      if (r != EMSCRIPTEN_RESULT_SUCCESS)
+         RARCH_ERR("[EMSCRIPTEN/EGL]: error resizing canvas css: %d\n", r);
+
+      *resize  = true;
+   }
+#endif
 #ifdef WEB_SCALING
    double dpr = emscripten_get_device_pixel_ratio();
    emscripten->fb_width  = (unsigned)(input_width * dpr);
@@ -175,11 +202,11 @@ static void *gfx_ctx_emscripten_init(void *video_driver)
 
    /* TODO/FIXME - why is this conditional here - shouldn't these always
     * be grabbed? */
-   if (  emscripten->initial_width  == 0 || 
-         emscripten->initial_height == 0) {
-         emscripten->initial_height = 600;
-         emscripten->initial_width = 800;
-     }
+   if (     (emscripten->initial_width  == 0)
+         || (emscripten->initial_height == 0))
+      emscripten_get_canvas_element_size("#canvas",
+         &emscripten->initial_width,
+         &emscripten->initial_height);
 
 #ifdef HAVE_EGL
    if (g_egl_inited)
@@ -245,10 +272,15 @@ static void gfx_ctx_emscripten_input_driver(void *data,
       const char *name,
       input_driver_t **input, void **input_data)
 {
-   void *rwebinput = input_driver_init_wrap(&input_emulatorjs, name);
-
-   *input      = rwebinput ? &input_emulatorjs : NULL;
-   *input_data = rwebinput;
+#ifdef EMULATORJS
+   void *emulatorjs = input_driver_init_wrap(&input_emulatorjs, name);
+   *input          = emulatorjs ? &input_emulatorjs : NULL;
+   *input_data     = emulatorjs;
+#else
+   void *rwebinput = input_driver_init_wrap(&input_rwebinput, name);
+   *input          = rwebinput ? &input_rwebinput : NULL;
+   *input_data     = rwebinput;
+#endif
 }
 
 static bool gfx_ctx_emscripten_has_focus(void *data) { return g_egl_inited; }

@@ -200,8 +200,8 @@ for f in `ls -v *_${platform}.${EXT}`; do
    echo Buildbot: building ${name} for ${platform}
    name=`echo "$f" | sed "s/\(_libretro_${platform}\|\).${EXT}$//"`
    async=0
-   wasm=1
    pthread=${pthread:-0}
+   wasm=1
    lto=0
    whole_archive=
    big_stack=
@@ -275,6 +275,8 @@ for f in `ls -v *_${platform}.${EXT}`; do
       pthread=0
    elif [ $name = "yabasanshiro" ] ; then
       pthread=0
+   elif [ $name = "dosbox" ] ; then
+      async=0
    fi
    echo "-- Building core: $name --"
    if [ $PLATFORM = "unix" ]; then
@@ -374,7 +376,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       mv -f ../retrodos.exe ../pkg/${platform}/cores/${name}.exe
    elif [ $PLATFORM = "emscripten" ] ; then
       mkdir -p ../pkg/emscripten/
-
+      
       out_dir="../../EmulatorJS/data/cores"
 
       mkdir -p $out_dir
@@ -393,18 +395,17 @@ for f in `ls -v *_${platform}.${EXT}`; do
         7z a ${out_dir}/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
         rm ../${name}_libretro.wasm
       fi
+      
       rm ../${name}_libretro.js
       
+      
 #      mv -f ../${name}_libretro.js ../pkg/emscripten/${name}_libretro.js
-#      if [ $wasm = 0 ] ; then
-#         mv -f ../${name}_libretro.js.mem ../pkg/emscripten/${name}_libretro.js.mem
-#      else
-#         mv -f ../${name}_libretro.wasm ../pkg/emscripten/${name}_libretro.wasm
-#      fi
-#      
+#      mv -f ../${name}_libretro.wasm ../pkg/emscripten/${name}_libretro.wasm
 #      if [ $pthread != 0 ] ; then
 #         mv -f ../${name}_libretro.worker.js ../pkg/emscripten/${name}_libretro.worker.js
 #      fi
+      
+      
    fi
 
   # Do manual executable step

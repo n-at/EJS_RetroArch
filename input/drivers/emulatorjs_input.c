@@ -24,6 +24,10 @@
 #include <encodings/crc32.h>
 #include <encodings/utf.h>
 
+#ifdef WEB_SCALING
+#include <emscripten/emscripten.h>
+#endif
+
 #include <emscripten/html5.h>
 
 #include "../input_keymaps.h"
@@ -239,10 +243,18 @@ static EM_BOOL rwebinput_mouse_cb(int event_type,
 
    uint8_t mask                      = 1 << mouse_event->button;
 
+#ifdef WEB_SCALING
+   double dpr = emscripten_get_device_pixel_ratio();
+   rwebinput->mouse.x                = (long)(mouse_event->targetX * dpr);
+   rwebinput->mouse.y                = (long)(mouse_event->targetY * dpr);
+   rwebinput->mouse.pending_delta_x += (long)(mouse_event->movementX * dpr);
+   rwebinput->mouse.pending_delta_y += (long)(mouse_event->movementY * dpr);
+#else
    rwebinput->mouse.x                = mouse_event->targetX;
    rwebinput->mouse.y                = mouse_event->targetY;
    rwebinput->mouse.pending_delta_x += mouse_event->movementX;
    rwebinput->mouse.pending_delta_y += mouse_event->movementY;
+#endif
 
    if (event_type ==  EMSCRIPTEN_EVENT_MOUSEDOWN)
       rwebinput->mouse.buttons |= mask;
@@ -257,10 +269,16 @@ static EM_BOOL rwebinput_wheel_cb(int event_type,
 {
    rwebinput_input_t       *rwebinput = (rwebinput_input_t*)user_data;
 
+#ifdef WEB_SCALING
+   double dpr = emscripten_get_device_pixel_ratio();
+   rwebinput->mouse.pending_scroll_x += wheel_event->deltaX * dpr;
+   rwebinput->mouse.pending_scroll_y += wheel_event->deltaY * dpr;
+#else
    rwebinput->mouse.pending_scroll_x += wheel_event->deltaX;
    rwebinput->mouse.pending_scroll_y += wheel_event->deltaY;
+    #endif
 
-   return EM_FALSE;
+   return EM_TRUE;
 }
 
 static void *rwebinput_input_init(const char *joypad_driver)
@@ -501,7 +519,7 @@ static int16_t rwebinput_input_state(
             vp.full_height              = 0;
 
             if (!(video_driver_translate_coord_viewport_wrap(
-                        &vp, mouse->x, mouse->x,
+                        &vp, mouse->x, mouse->y,
                         &res_x, &res_y, &res_screen_x, &res_screen_y)))
                return 0;
 
