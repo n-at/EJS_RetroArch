@@ -91,6 +91,7 @@ static void task_queue_msg_push(retro_task_t *task,
 
 static void task_queue_push_progress(retro_task_t *task)
 {
+   task->mute = true;
 #ifdef HAVE_THREADS
    /* msg_push callback interacts directly with the task properties (particularly title).
     * make sure another thread doesn't modify them while rendering
@@ -978,7 +979,7 @@ retro_task_t *task_init(void)
    task->cleanup           = NULL;
    task->finished          = false;
    task->cancelled         = false;
-   task->mute              = false;
+   task->mute              = true;
    task->task_data         = NULL;
    task->user_data         = NULL;
    task->state             = NULL;
