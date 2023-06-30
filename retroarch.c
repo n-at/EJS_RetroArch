@@ -4965,6 +4965,40 @@ void cmd_take_screenshot(void)
        printf("Error taking screenshot");
 }
 
+int get_disk_count(void)
+{
+    runloop_state_t *runloop_st     = runloop_state_get_ptr();
+    rarch_system_info_t *sys_info = &runloop_st->system;
+    
+    if (!sys_info)
+       return -1;
+    
+    return (&sys_info->disk_control)->cb.get_num_images();
+}
+
+void set_current_disk(int index)
+{
+    runloop_state_t *runloop_st     = runloop_state_get_ptr();
+    rarch_system_info_t *sys_info = &runloop_st->system;
+    
+    if (!sys_info)
+       return;
+    
+    disk_control_set_eject_state(&sys_info->disk_control, true, false);
+    disk_control_set_index(&sys_info->disk_control, index, false);
+}
+
+int get_current_disk(void)
+{
+    runloop_state_t *runloop_st     = runloop_state_get_ptr();
+    rarch_system_info_t *sys_info = &runloop_st->system;
+    
+    if (!sys_info)
+       return -1;
+    
+    return (&sys_info->disk_control)->cb.get_image_index();
+}
+
 #endif
 
 #endif
