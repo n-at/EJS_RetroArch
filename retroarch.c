@@ -4981,6 +4981,8 @@ int get_disk_count(void)
     if (!sys_info)
        return -1;
     
+    if (!disk_control_enabled(&sys_info->disk_control)) return -1;
+    
     return (&sys_info->disk_control)->cb.get_num_images();
 }
 
@@ -4991,6 +4993,8 @@ void set_current_disk(int index)
     
     if (!sys_info)
        return;
+    
+    if (!disk_control_enabled(&sys_info->disk_control)) return;
     
     if (!disk_control_get_eject_state(&sys_info->disk_control)) {
         disk_control_set_eject_state(&sys_info->disk_control, true, false);
@@ -5008,6 +5012,8 @@ int get_current_disk(void)
     
     if (!sys_info)
        return -1;
+    
+    if (!disk_control_enabled(&sys_info->disk_control)) return -1;
     
     return (&sys_info->disk_control)->cb.get_image_index();
 }
