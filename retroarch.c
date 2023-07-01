@@ -4984,8 +4984,13 @@ void set_current_disk(int index)
     if (!sys_info)
        return;
     
-    disk_control_set_eject_state(&sys_info->disk_control, true, false);
+    if (!disk_control_get_eject_state(&sys_info->disk_control)) {
+        disk_control_set_eject_state(&sys_info->disk_control, true, false);
+    }
     disk_control_set_index(&sys_info->disk_control, index, false);
+    if (disk_control_get_eject_state(&sys_info->disk_control)) {
+        disk_control_set_eject_state(&sys_info->disk_control, false, false);
+    }
 }
 
 int get_current_disk(void)
