@@ -6742,6 +6742,13 @@ unsigned menu_displaylist_build_list(
          {
             input_driver_t *current_input =
                   input_state_get_ptr()->current_driver;
+            const frontend_ctx_driver_t *frontend =
+                  frontend_get_ptr();
+            char os_ver[64] = {0};
+            int major, minor;
+
+            if (frontend && frontend->get_os)
+               frontend->get_os(os_ver, sizeof(os_ver), &major, &minor);
 
             if (current_input->keypress_vibrate)
                if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
@@ -6749,7 +6756,8 @@ unsigned menu_displaylist_build_list(
                         PARSE_ONLY_BOOL, false) == 0)
                   count++;
 
-            if (string_is_equal(current_input->ident, "android"))
+            if (string_is_equal(current_input->ident, "android") ||
+                (string_is_equal(current_input->ident, "cocoa") && string_is_equal(os_ver, "iOS")))
                if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
                         MENU_ENUM_LABEL_ENABLE_DEVICE_VIBRATION,
                         PARSE_ONLY_BOOL, false) == 0)
@@ -6759,6 +6767,19 @@ unsigned menu_displaylist_build_list(
                      MENU_ENUM_LABEL_INPUT_RUMBLE_GAIN,
                      PARSE_ONLY_UINT, false) == 0)
                count++;
+         }
+         break;
+      case DISPLAYLIST_INPUT_RETROPAD_BINDS_LIST:
+         {
+            unsigned user;
+            unsigned max_users          = settings->uints.input_max_users;
+            for (user = 0; user < max_users; user++)
+            {
+               if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
+                        (enum msg_hash_enums)(MENU_ENUM_LABEL_INPUT_USER_1_BINDS + user),
+                        PARSE_ACTION, false) != -1)
+                  count++;
+            }
          }
          break;
       case DISPLAYLIST_INPUT_HOTKEY_BINDS_LIST:
@@ -7605,6 +7626,7 @@ unsigned menu_displaylist_build_list(
                {MENU_ENUM_LABEL_INPUT_MENU_SETTINGS,                                               PARSE_ACTION,     true  },
                {MENU_ENUM_LABEL_INPUT_HOTKEY_BINDS,                                                PARSE_ACTION,     true  },
                {MENU_ENUM_LABEL_INPUT_TURBO_FIRE_SETTINGS,                                         PARSE_ACTION,     true  },
+               {MENU_ENUM_LABEL_INPUT_RETROPAD_BINDS,                                              PARSE_ACTION,     true  },
 #ifdef ANDROID
                {MENU_ENUM_LABEL_ANDROID_INPUT_DISCONNECT_WORKAROUND,                               PARSE_ONLY_BOOL,  true  },
 #endif
@@ -7649,19 +7671,6 @@ unsigned menu_displaylist_build_list(
             }
          }
 #endif
-
-         {
-            unsigned user;
-            unsigned max_users          = settings->uints.input_max_users;
-            for (user = 0; user < max_users; user++)
-            {
-               if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
-                        (enum msg_hash_enums)(MENU_ENUM_LABEL_INPUT_USER_1_BINDS + user),
-                        PARSE_ACTION, false) != -1)
-                  count++;
-            }
-
-         }
          break;
       case DISPLAYLIST_ACCESSIBILITY_SETTINGS_LIST:
          {
@@ -13664,6 +13673,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
          case DISPLAYLIST_NETPLAY_ROOM_LIST:
          case DISPLAYLIST_SHADER_PRESET_SAVE:
          case DISPLAYLIST_SHADER_PRESET_REMOVE:
+         case DISPLAYLIST_INPUT_RETROPAD_BINDS_LIST:
          case DISPLAYLIST_INPUT_HOTKEY_BINDS_LIST:
          case DISPLAYLIST_INPUT_TURBO_FIRE_SETTINGS_LIST:
          case DISPLAYLIST_INPUT_HAPTIC_FEEDBACK_SETTINGS_LIST:
