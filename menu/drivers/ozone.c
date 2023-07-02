@@ -1954,6 +1954,7 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_SETTINGS_SHOW_INPUT:
       case MENU_ENUM_LABEL_QUICK_MENU_SHOW_CONTROLS:
       case MENU_ENUM_LABEL_UPDATE_AUTOCONFIG_PROFILES:
+      case MENU_ENUM_LABEL_INPUT_RETROPAD_BINDS:
       case MENU_ENUM_LABEL_INPUT_USER_1_BINDS:
       case MENU_ENUM_LABEL_INPUT_USER_2_BINDS:
       case MENU_ENUM_LABEL_INPUT_USER_3_BINDS:
@@ -2785,7 +2786,7 @@ static unsigned ozone_get_sidebar_height(ozone_handle_t *ozone)
                : 0);
 }
 
-static unsigned ozone_get_selected_sidebar_y_position(ozone_handle_t *ozone)
+static size_t ozone_get_selected_sidebar_y_position(ozone_handle_t *ozone)
 {
    return ozone->categories_selection_ptr * ozone->dimensions.sidebar_entry_height
          + (ozone->categories_selection_ptr - 1) * ozone->dimensions.sidebar_entry_padding_vertical
