@@ -63,6 +63,14 @@ typedef struct rwebinput_keyboard_event_queue
    size_t max_size;
 } rwebinput_keyboard_event_queue_t;
 
+typedef struct rwebinput_touch
+{
+   long touch_id;
+   long last_canvasX;
+   long last_canvasY;
+   bool down;
+} rwebinput_touch_t;
+
 typedef struct rwebinput_mouse_states
 {
    double pending_scroll_x;
@@ -80,6 +88,7 @@ typedef struct rwebinput_mouse_states
 
 typedef struct rwebinput_input
 {
+   rwebinput_touch_t touch;
    rwebinput_mouse_state_t mouse;             /* double alignment */
    rwebinput_keyboard_event_queue_t keyboard; /* ptr alignment */
    bool keys[RETROK_LAST];
@@ -276,8 +285,60 @@ static EM_BOOL rwebinput_wheel_cb(int event_type,
 #else
    rwebinput->mouse.pending_scroll_x += wheel_event->deltaX;
    rwebinput->mouse.pending_scroll_y += wheel_event->deltaY;
-    #endif
+#endif
 
+   return EM_TRUE;
+}
+
+static EM_BOOL rwebinput_touch_cb(int event_type,
+   const EmscriptenTouchEvent *touch_event, void *user_data)
+{
+   rwebinput_input_t       *rwebinput = (rwebinput_input_t*)user_data;
+   rwebinput_touch_t       *touch_handler = &rwebinput->touch;
+   
+   EmscriptenTouchPoint changed_touch;
+   bool touch_changed = false;
+   for (int i=0; i<touch_event->numTouches; i++) {
+      if (touch_event->touches[i].isChanged) {
+         changed_touch = touch_event->touches[i];
+         touch_changed = true;
+      }
+   }
+   if (!touch_changed) return EM_TRUE;
+   
+   if ((event_type == EMSCRIPTEN_EVENT_TOUCHCANCEL || event_type == EMSCRIPTEN_EVENT_TOUCHEND) && changed_touch.identifier == touch_handler->touch_id) {
+       touch_handler->down = false;
+       return EM_TRUE;
+   } else if (touch_handler->down && changed_touch.identifier != touch_handler->touch_id) {
+       return EM_TRUE; //I am not supporting multi touch
+   }
+   if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART) {
+       touch_handler->down = true;
+       touch_handler->touch_id = changed_touch.identifier;
+       touch_handler->last_canvasX = changed_touch.canvasX;
+       touch_handler->last_canvasY = changed_touch.canvasY;
+   } else if (event_type == EMSCRIPTEN_EVENT_TOUCHMOVE) {
+       long diffX = changed_touch.canvasX - touch_handler->last_canvasX;
+       long diffY = changed_touch.canvasY - touch_handler->last_canvasY;
+       touch_handler->last_canvasX = changed_touch.canvasX;
+       touch_handler->last_canvasY = changed_touch.canvasY;
+       
+#ifdef WEB_SCALING
+          double dpr = emscripten_get_device_pixel_ratio();
+          rwebinput->mouse.x                = (long)(changed_touch.canvasX * dpr);
+          rwebinput->mouse.y                = (long)(changed_touch.canvasY * dpr);
+          rwebinput->mouse.pending_delta_x += (long)(diffX * dpr);
+          rwebinput->mouse.pending_delta_y += (long)(diffY * dpr);
+#else
+          rwebinput->mouse.x                = changed_touch.canvasX;
+          rwebinput->mouse.y                = changed_touch.canvasY;
+          rwebinput->mouse.pending_delta_x += diffX;
+          rwebinput->mouse.pending_delta_y += diffY;
+#endif
+       
+       //printf("diff: %li\n", diffX);
+   }
+   
    return EM_TRUE;
 }
 
@@ -314,6 +375,34 @@ static void *rwebinput_input_init(const char *joypad_driver)
    }
 
    r = emscripten_set_wheel_callback("#canvas", rwebinput, false, rwebinput_wheel_cb);
+   if (r != EMSCRIPTEN_RESULT_SUCCESS)
+   {
+      RARCH_ERR(
+         "[EMSCRIPTEN/INPUT] failed to create wheel callback: %d\n", r);
+   }
+
+   r = emscripten_set_touchstart_callback("#canvas", rwebinput, false, rwebinput_touch_cb);
+   if (r != EMSCRIPTEN_RESULT_SUCCESS)
+   {
+      RARCH_ERR(
+         "[EMSCRIPTEN/INPUT] failed to create wheel callback: %d\n", r);
+   }
+   
+   r = emscripten_set_touchend_callback("#canvas", rwebinput, false, rwebinput_touch_cb);
+   if (r != EMSCRIPTEN_RESULT_SUCCESS)
+   {
+      RARCH_ERR(
+         "[EMSCRIPTEN/INPUT] failed to create wheel callback: %d\n", r);
+   }
+   
+   r = emscripten_set_touchmove_callback("#canvas", rwebinput, false, rwebinput_touch_cb);
+   if (r != EMSCRIPTEN_RESULT_SUCCESS)
+   {
+      RARCH_ERR(
+         "[EMSCRIPTEN/INPUT] failed to create wheel callback: %d\n", r);
+   }
+   
+   r = emscripten_set_touchcancel_callback("#canvas", rwebinput, false, rwebinput_touch_cb);
    if (r != EMSCRIPTEN_RESULT_SUCCESS)
    {
       RARCH_ERR(
