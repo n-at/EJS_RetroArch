@@ -69,6 +69,8 @@ typedef struct rwebinput_touch
    long last_canvasX;
    long last_canvasY;
    bool down;
+   long last_touchdown_id;
+   bool clicked_yet;
 } rwebinput_touch_t;
 
 typedef struct rwebinput_mouse_states
@@ -305,38 +307,57 @@ static EM_BOOL rwebinput_touch_cb(int event_type,
       }
    }
    if (!touch_changed) return EM_TRUE;
+   if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART && touch_handler->last_touchdown_id != changed_touch.identifier) {
+      touch_handler->clicked_yet = false;
+      touch_handler->last_touchdown_id = changed_touch.identifier;
+   }
+   if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART && touch_handler->clicked_yet) {
+      rwebinput->mouse.buttons |= 1 << 0;
+   }
+   if (event_type == EMSCRIPTEN_EVENT_TOUCHMOVE && touch_handler->last_touchdown_id == changed_touch.identifier) {
+      touch_handler->last_touchdown_id = -1;
+   }
    
-   if ((event_type == EMSCRIPTEN_EVENT_TOUCHCANCEL || event_type == EMSCRIPTEN_EVENT_TOUCHEND) && changed_touch.identifier == touch_handler->touch_id) {
-       touch_handler->down = false;
-       return EM_TRUE;
+   if (event_type == EMSCRIPTEN_EVENT_TOUCHCANCEL || event_type == EMSCRIPTEN_EVENT_TOUCHEND) {
+      if (changed_touch.identifier == touch_handler->touch_id) {
+         touch_handler->down = false;
+      }
+      if (touch_handler->last_touchdown_id == changed_touch.identifier && !touch_handler->clicked_yet) {
+         touch_handler->clicked_yet = true;
+      } else if (touch_handler->clicked_yet) {
+         rwebinput->mouse.buttons &= ~(1 << 0);
+         touch_handler->clicked_yet = false;
+         touch_handler->last_touchdown_id = -1;
+      }
+      return EM_TRUE;
    } else if (touch_handler->down && changed_touch.identifier != touch_handler->touch_id) {
-       return EM_TRUE; //I am not supporting multi touch
+      return EM_TRUE; //I am not supporting multi touch
    }
    if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART) {
-       touch_handler->down = true;
-       touch_handler->touch_id = changed_touch.identifier;
-       touch_handler->last_canvasX = changed_touch.canvasX;
-       touch_handler->last_canvasY = changed_touch.canvasY;
+      touch_handler->down = true;
+      touch_handler->touch_id = changed_touch.identifier;
+      touch_handler->last_canvasX = changed_touch.canvasX;
+      touch_handler->last_canvasY = changed_touch.canvasY;
    } else if (event_type == EMSCRIPTEN_EVENT_TOUCHMOVE) {
-       long diffX = changed_touch.canvasX - touch_handler->last_canvasX;
-       long diffY = changed_touch.canvasY - touch_handler->last_canvasY;
-       touch_handler->last_canvasX = changed_touch.canvasX;
-       touch_handler->last_canvasY = changed_touch.canvasY;
+      long diffX = changed_touch.canvasX - touch_handler->last_canvasX;
+      long diffY = changed_touch.canvasY - touch_handler->last_canvasY;
+      touch_handler->last_canvasX = changed_touch.canvasX;
+      touch_handler->last_canvasY = changed_touch.canvasY;
        
 #ifdef WEB_SCALING
-          double dpr = emscripten_get_device_pixel_ratio();
-          rwebinput->mouse.x                = (long)(changed_touch.canvasX * dpr);
-          rwebinput->mouse.y                = (long)(changed_touch.canvasY * dpr);
-          rwebinput->mouse.pending_delta_x += (long)(diffX * dpr);
-          rwebinput->mouse.pending_delta_y += (long)(diffY * dpr);
+      double dpr = emscripten_get_device_pixel_ratio();
+      rwebinput->mouse.x                = (long)(changed_touch.canvasX * dpr);
+      rwebinput->mouse.y                = (long)(changed_touch.canvasY * dpr);
+      rwebinput->mouse.pending_delta_x += (long)(diffX * dpr);
+      rwebinput->mouse.pending_delta_y += (long)(diffY * dpr);
 #else
-          rwebinput->mouse.x                = changed_touch.canvasX;
-          rwebinput->mouse.y                = changed_touch.canvasY;
-          rwebinput->mouse.pending_delta_x += diffX;
-          rwebinput->mouse.pending_delta_y += diffY;
+      rwebinput->mouse.x                = changed_touch.canvasX;
+      rwebinput->mouse.y                = changed_touch.canvasY;
+      rwebinput->mouse.pending_delta_x += diffX;
+      rwebinput->mouse.pending_delta_y += diffY;
 #endif
        
-       //printf("diff: %li\n", diffX);
+      //printf("diff: %li\n", diffX);
    }
    
    return EM_TRUE;
