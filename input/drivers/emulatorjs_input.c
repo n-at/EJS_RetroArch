@@ -70,6 +70,7 @@ typedef struct rwebinput_touch
    long last_canvasY;
    bool down;
    long last_touchdown_id;
+   long last_touchdown_location;
    bool clicked_yet;
 } rwebinput_touch_t;
 
@@ -310,12 +311,17 @@ static EM_BOOL rwebinput_touch_cb(int event_type,
    if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART && touch_handler->last_touchdown_id != changed_touch.identifier) {
       touch_handler->clicked_yet = false;
       touch_handler->last_touchdown_id = changed_touch.identifier;
+      touch_handler->last_touchdown_location = (changed_touch.canvasX + changed_touch.canvasY);
    }
    if (event_type == EMSCRIPTEN_EVENT_TOUCHSTART && touch_handler->clicked_yet) {
       rwebinput->mouse.buttons |= 1 << 0;
    }
    if (event_type == EMSCRIPTEN_EVENT_TOUCHMOVE && touch_handler->last_touchdown_id == changed_touch.identifier) {
-      touch_handler->last_touchdown_id = -1;
+      long u = touch_handler->last_touchdown_location - (changed_touch.canvasX + changed_touch.canvasY);
+      //15 may be too much of an offset...
+      if (((u<0)?-u:u) > 15) {
+         touch_handler->last_touchdown_id = -1;
+      }
    }
    
    if (event_type == EMSCRIPTEN_EVENT_TOUCHCANCEL || event_type == EMSCRIPTEN_EVENT_TOUCHEND) {
