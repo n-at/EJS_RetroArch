@@ -1629,6 +1629,11 @@ bool supports_states(void)
 {
     return core_info_current_supports_savestate();
 }
+void refresh_save_files(void)
+{
+    event_load_save_files(false);
+}
+
 #endif
 
 

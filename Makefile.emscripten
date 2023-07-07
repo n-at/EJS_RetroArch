@@ -106,7 +106,7 @@ endif
 
 LIBS    := -s USE_ZLIB=1
 LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=0 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue', 'FS']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
-           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop','_save_file_path','_get_disk_count','_set_current_disk','_get_current_disk'] \
+           -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop','_save_file_path','_get_disk_count','_set_current_disk','_get_current_disk','_refresh_save_files'] \
            -lidbfs.js \
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
            -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 \
@@ -216,7 +216,7 @@ $(OBJDIR)/%.o: %.cpp
 	$(Q)$(CXX) $(CXXFLAGS) $(DEFINES) $(EOPTS) -c -o $@ $<
 
 clean:
-	rm -rf $(OBJDIR)
+	#rm -rf $(OBJDIR)
 	rm -f $(TARGET)
 
 .PHONY: all clean
