@@ -3,7 +3,7 @@
 var LibraryRWebAudio = {
    $RA__deps: ['$Browser'],
    $RA: {
-      BUFFER_SIZE: 2048,
+      BUFFER_SIZE: 4096,
 
       context: null,
       buffers: [],
@@ -88,7 +88,7 @@ var LibraryRWebAudio = {
       RA.context = new ac();
 
       RA.numBuffers = ((latency * RA.context.sampleRate) / (1000 * RA.BUFFER_SIZE))|0;
-      if (RA.numBuffers < 2) RA.numBuffers = 2;
+      if (RA.numBuffers < 3) RA.numBuffers = 3;
 
       for (var i = 0; i < RA.numBuffers; i++) {
          RA.buffers[i] = RA.context.createBuffer(2, RA.BUFFER_SIZE, RA.context.sampleRate);
