@@ -47,7 +47,7 @@ typedef struct
 static void gfx_ctx_emscripten_swap_interval(void *data, int interval)
 {
    if (interval == 0)
-      emscripten_set_main_loop_timing(EM_TIMING_RAF, 0); 
+      emscripten_set_main_loop_timing(EM_TIMING_SETIMMEDIATE, 0); 
       //Setting this to EM_TIMING_RAF breaks fast forward... but is it worth it?
    else
       emscripten_set_main_loop_timing(EM_TIMING_RAF, interval);
