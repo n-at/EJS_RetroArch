@@ -391,6 +391,7 @@ const struct input_bind_map input_config_bind_map[RARCH_BIND_LIST_END_NULL] = {
 
    /* Hidden in displaylist */
    DECLARE_META_BIND(2, overlay_next,          RARCH_OVERLAY_NEXT,           MENU_ENUM_LABEL_VALUE_INPUT_META_OVERLAY_NEXT),
+
    DECLARE_META_BIND(2, osk_toggle,            RARCH_OSK,                    MENU_ENUM_LABEL_VALUE_INPUT_META_OSK),
 #if 0
    /* Deprecated */
@@ -1445,33 +1446,32 @@ const char *config_get_all_timezones(void)
    return char_list_new_special(STRING_LIST_TIMEZONES, NULL);
 }
 
-static void load_timezone(char *setting)
+static void load_timezone(char *s)
 {
    char haystack[TIMEZONE_LENGTH+32];
-   static char *needle = "TIMEZONE=";
-   size_t needle_len   = strlen(needle);
-   RFILE *tzfp         = filestream_open(LAKKA_TIMEZONE_PATH,
+   static char *needle     = "TIMEZONE=";
+   RFILE *tzfp             = filestream_open(LAKKA_TIMEZONE_PATH,
                        RETRO_VFS_FILE_ACCESS_READ,
                        RETRO_VFS_FILE_ACCESS_HINT_NONE);
-
    if (tzfp)
    {
-      char *start = NULL;
+      char *start          = NULL;
 
       filestream_gets(tzfp, haystack, sizeof(haystack)-1);
       filestream_close(tzfp);
 
-      start = strstr(haystack, needle);
-
-      if (start)
-         strlcpy(setting, start + needle_len, TIMEZONE_LENGTH);
+      if ((start = strstr(haystack, needle)))
+      {
+         size_t needle_len = STRLEN_CONST("TIMEZONE=");
+         strlcpy(s, start + needle_len, TIMEZONE_LENGTH);
+      }
       else
-         strlcpy(setting, DEFAULT_TIMEZONE,   TIMEZONE_LENGTH);
+         strlcpy(s, DEFAULT_TIMEZONE,   TIMEZONE_LENGTH);
    }
    else
-      strlcpy(setting, DEFAULT_TIMEZONE, TIMEZONE_LENGTH);
+      strlcpy(s, DEFAULT_TIMEZONE, TIMEZONE_LENGTH);
 
-   config_set_timezone(setting);
+   config_set_timezone(s);
 }
 #endif
 
@@ -1600,6 +1600,8 @@ static struct config_path_setting *populate_settings_path(
 #ifdef HAVE_OVERLAY
    SETTING_PATH("input_overlay",
          settings->paths.path_overlay, false, NULL, true);
+   SETTING_PATH("input_osk_overlay",
+         settings->paths.path_osk_overlay, false, NULL, true);
 #endif
    SETTING_PATH("video_record_config",
          settings->paths.path_record_config, false, NULL, true);
@@ -1662,6 +1664,8 @@ static struct config_path_setting *populate_settings_path(
 #ifdef HAVE_OVERLAY
    SETTING_PATH("overlay_directory",
          settings->paths.directory_overlay, true, NULL, true);
+   SETTING_PATH("osk_overlay_directory",
+         settings->paths.directory_osk_overlay, true, NULL, true);
 #endif
    SETTING_PATH(
          "screenshot_directory",
@@ -2052,6 +2056,7 @@ static struct config_bool_setting *populate_settings_bool(
    SETTING_BOOL("input_overlay_show_mouse_cursor", &settings->bools.input_overlay_show_mouse_cursor, true, DEFAULT_OVERLAY_SHOW_MOUSE_CURSOR, false);
    SETTING_BOOL("input_overlay_auto_rotate",    &settings->bools.input_overlay_auto_rotate, true, DEFAULT_OVERLAY_AUTO_ROTATE, false);
    SETTING_BOOL("input_overlay_auto_scale",     &settings->bools.input_overlay_auto_scale, true, DEFAULT_INPUT_OVERLAY_AUTO_SCALE, false);
+   SETTING_BOOL("input_osk_overlay_auto_scale", &settings->bools.input_osk_overlay_auto_scale, true, DEFAULT_INPUT_OVERLAY_AUTO_SCALE, false);
 #endif
 #ifdef UDEV_TOUCH_SUPPORT
    SETTING_BOOL("input_touch_vmouse_pointer",   &settings->bools.input_touch_vmouse_pointer, true, DEFAULT_INPUT_TOUCH_VMOUSE_POINTER, false);
@@ -2201,6 +2206,7 @@ static struct config_float_setting *populate_settings_float(
 #endif
 #ifdef HAVE_OVERLAY
    SETTING_FLOAT("input_overlay_opacity",                 &settings->floats.input_overlay_opacity, true, DEFAULT_INPUT_OVERLAY_OPACITY, false);
+   SETTING_FLOAT("input_osk_overlay_opacity",             &settings->floats.input_osk_overlay_opacity, true, DEFAULT_INPUT_OVERLAY_OPACITY, false);
    SETTING_FLOAT("input_overlay_scale_landscape",         &settings->floats.input_overlay_scale_landscape, true, DEFAULT_INPUT_OVERLAY_SCALE_LANDSCAPE, false);
    SETTING_FLOAT("input_overlay_aspect_adjust_landscape", &settings->floats.input_overlay_aspect_adjust_landscape, true, DEFAULT_INPUT_OVERLAY_ASPECT_ADJUST_LANDSCAPE, false);
    SETTING_FLOAT("input_overlay_x_separation_landscape",  &settings->floats.input_overlay_x_separation_landscape, true, DEFAULT_INPUT_OVERLAY_X_SEPARATION_LANDSCAPE, false);
@@ -2932,6 +2938,7 @@ void config_set_defaults(void *data)
    *settings->paths.path_rgui_theme_preset = '\0';
    *settings->paths.path_content_database  = '\0';
    *settings->paths.path_overlay           = '\0';
+   *settings->paths.path_osk_overlay       = '\0';
    *settings->paths.path_record_config     = '\0';
    *settings->paths.path_stream_config     = '\0';
    *settings->paths.path_stream_url        = '\0';
@@ -3038,6 +3045,10 @@ void config_set_defaults(void *data)
                sizeof(settings->paths.path_overlay));
 #endif
    }
+   if (!string_is_empty(g_defaults.dirs[DEFAULT_DIR_OSK_OVERLAY]))
+      fill_pathname_expand_special(settings->paths.directory_osk_overlay,
+            g_defaults.dirs[DEFAULT_DIR_OSK_OVERLAY],
+            sizeof(settings->paths.directory_osk_overlay));
 #endif
 
 #ifdef HAVE_MENU
@@ -3924,6 +3935,8 @@ static bool config_load_file(global_t *global,
 #ifdef HAVE_OVERLAY
    if (string_is_equal(settings->paths.directory_overlay, "default"))
       *settings->paths.directory_overlay = '\0';
+   if (string_is_equal(settings->paths.directory_osk_overlay, "default"))
+      *settings->paths.directory_osk_overlay = '\0';
 #endif
    if (string_is_equal(settings->paths.directory_system, "default"))
       *settings->paths.directory_system = '\0';
@@ -4135,9 +4148,9 @@ bool config_load_override(void *data)
    char config_directory[PATH_MAX_LENGTH];
    bool should_append                     = false;
    bool show_notification                 = true;
-   rarch_system_info_t *system            = (rarch_system_info_t*)data;
-   const char *core_name                  = system ?
-      system->info.library_name : NULL;
+   rarch_system_info_t *sys_info          = (rarch_system_info_t*)data;
+   const char *core_name                  = sys_info
+      ? sys_info->info.library_name : NULL;
    const char *rarch_path_basename        = path_get(RARCH_PATH_BASENAME);
    const char *game_name                  = NULL;
    settings_t *settings                   = config_st;
@@ -4421,8 +4434,8 @@ bool config_load_remap(const char *directory_input_remapping,
    /* final path for content-dir-specific configuration (prefix+suffix) */
    char content_path[PATH_MAX_LENGTH];
    config_file_t *new_conf                = NULL;
-   rarch_system_info_t *system            = (rarch_system_info_t*)data;
-   const char *core_name                  = system ? system->info.library_name : NULL;
+   rarch_system_info_t *sys_info          = (rarch_system_info_t*)data;
+   const char *core_name                  = sys_info ? sys_info->info.library_name : NULL;
    const char *rarch_path_basename        = path_get(RARCH_PATH_BASENAME);
    const char *game_name                  = NULL;
    bool has_content                       = !string_is_empty(rarch_path_basename);
@@ -5244,8 +5257,8 @@ int8_t config_save_overrides(enum override_type type, void *data, bool remove)
    int size_settings_size                      = sizeof(settings->sizes)  / sizeof(settings->sizes.placeholder);
    int array_settings_size                     = sizeof(settings->arrays) / sizeof(settings->arrays.placeholder);
    int path_settings_size                      = sizeof(settings->paths)  / sizeof(settings->paths.placeholder);
-   rarch_system_info_t *system                 = (rarch_system_info_t*)data;
-   const char *core_name                       = system ? system->info.library_name : NULL;
+   rarch_system_info_t *sys_info               = (rarch_system_info_t*)data;
+   const char *core_name                       = sys_info ? sys_info->info.library_name : NULL;
    const char *rarch_path_basename             = path_get(RARCH_PATH_BASENAME);
    const char *game_name                       = NULL;
    bool has_content                            = !string_is_empty(rarch_path_basename);
@@ -5741,6 +5754,7 @@ bool input_remapping_load_file(void *data, const char *path)
  **/
 bool input_remapping_save_file(const char *path)
 {
+   size_t _len;
    bool ret;
    unsigned i, j;
    char remap_file_dir[PATH_MAX_LENGTH];
@@ -5758,12 +5772,12 @@ bool input_remapping_save_file(const char *path)
       return false;
 
    /* Create output directory, if required */
-   strlcpy(remap_file_dir, path, sizeof(remap_file_dir));
-   path_parent_dir(remap_file_dir, strlen(remap_file_dir));
+   _len = strlcpy(remap_file_dir, path, sizeof(remap_file_dir));
+   path_parent_dir(remap_file_dir, _len);
 
-   if (!string_is_empty(remap_file_dir) &&
-       !path_is_directory(remap_file_dir) &&
-       !path_mkdir(remap_file_dir))
+   if (   !string_is_empty(remap_file_dir)
+       && !path_is_directory(remap_file_dir)
+       && !path_mkdir(remap_file_dir))
       return false;
 
    /* Attempt to load file */

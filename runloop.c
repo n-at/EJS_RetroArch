@@ -405,8 +405,8 @@ static void runloop_perf_log(void)
 
 static bool runloop_environ_cb_get_system_info(unsigned cmd, void *data)
 {
-   runloop_state_t *runloop_st  = &runloop_state;
-   rarch_system_info_t *system  = &runloop_st->system;
+   runloop_state_t *runloop_st    = &runloop_state;
+   rarch_system_info_t *sys_info  = &runloop_st->system;
 
    switch (cmd)
    {
@@ -453,11 +453,11 @@ static bool runloop_environ_cb_get_system_info(unsigned cmd, void *data)
                RARCH_WARN("Subsystems exceed subsystem max, clamping to %d\n", SUBSYSTEM_MAX_SUBSYSTEMS);
          }
 
-         if (system)
+         if (sys_info)
          {
             for (i = 0; i < size && i < SUBSYSTEM_MAX_SUBSYSTEMS; i++)
             {
-               struct retro_subsystem_info *subsys_info = &runloop_st->subsystem_data[i];
+               struct retro_subsystem_info *subsys_info         = &runloop_st->subsystem_data[i];
                struct retro_subsystem_rom_info *subsys_rom_info = runloop_st->subsystem_data_roms[i];
                /* Nasty, but have to do it like this since
                 * the pointers are const char *
@@ -594,7 +594,7 @@ static dylib_t load_dynamic_core(const char *path, char *buf,
 }
 
 static dylib_t libretro_get_system_info_lib(const char *path,
-      struct retro_system_info *info, bool *load_no_content)
+      struct retro_system_info *sysinfo, bool *load_no_content)
 {
    dylib_t lib = dylib_load(path);
    void (*proc)(struct retro_system_info*);
@@ -611,7 +611,7 @@ static dylib_t libretro_get_system_info_lib(const char *path,
       return NULL;
    }
 
-   proc(info);
+   proc(sysinfo);
 
    if (load_no_content)
    {
@@ -1418,7 +1418,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
    runloop_state_t *runloop_st            = &runloop_state;
    recording_state_t *recording_st        = recording_state_get_ptr();
    settings_t         *settings           = config_get_ptr();
-   rarch_system_info_t *system            = &runloop_st->system;
+   rarch_system_info_t *sys_info          = &runloop_st->system;
    bool ignore_environment_cb             = runloop_st->flags &
       RUNLOOP_FLAG_IGNORE_ENVIRONMENT_CB;
 
@@ -1914,14 +1914,14 @@ bool runloop_environment_cb(unsigned cmd, void *data)
          bool video_allow_rotate = settings->bools.video_allow_rotate;
 
          RARCH_LOG("[Environ]: SET_ROTATION: %u\n", rotation);
-         if (system)
-            system->core_requested_rotation = rotation;
+         if (sys_info)
+            sys_info->core_requested_rotation = rotation;
 
          if (!video_allow_rotate)
             return false;
 
-         if (system)
-            system->rotation = rotation;
+         if (sys_info)
+            sys_info->rotation = rotation;
 
          if (!video_driver_set_rotation(rotation))
             return false;
@@ -1961,11 +1961,11 @@ bool runloop_environment_cb(unsigned cmd, void *data)
       }
 
       case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
-         if (system)
+         if (sys_info)
          {
-            system->performance_level = *(const unsigned*)data;
+            sys_info->performance_level = *(const unsigned*)data;
             RARCH_LOG("[Environ]: PERFORMANCE_LEVEL: %u.\n",
-                  system->performance_level);
+                  sys_info->performance_level);
          }
          break;
 
@@ -2062,12 +2062,12 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             "L", "R", "L2", "R2", "L3", "R3",
          };
 
-         if (system)
+         if (sys_info)
          {
             unsigned retro_id;
             const struct retro_input_descriptor *desc = NULL;
-            memset((void*)&system->input_desc_btn, 0,
-                  sizeof(system->input_desc_btn));
+            memset((void*)&sys_info->input_desc_btn, 0,
+                  sizeof(sys_info->input_desc_btn));
 
             desc = (const struct retro_input_descriptor*)data;
 
@@ -2086,7 +2086,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                switch (desc->device)
                {
                   case RETRO_DEVICE_JOYPAD:
-                     system->input_desc_btn[retro_port]
+                     sys_info->input_desc_btn[retro_port]
                         [retro_id] = desc->description;
                      break;
                   case RETRO_DEVICE_ANALOG:
@@ -2096,15 +2096,15 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                            switch (desc->index)
                            {
                               case RETRO_DEVICE_INDEX_ANALOG_LEFT:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_LEFT_X_PLUS]  = desc->description;
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_LEFT_X_MINUS] = desc->description;
                                  break;
                               case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_RIGHT_X_PLUS] = desc->description;
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_RIGHT_X_MINUS] = desc->description;
                                  break;
                            }
@@ -2113,15 +2113,15 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                            switch (desc->index)
                            {
                               case RETRO_DEVICE_INDEX_ANALOG_LEFT:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_LEFT_Y_PLUS] = desc->description;
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_LEFT_Y_MINUS] = desc->description;
                                  break;
                               case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_RIGHT_Y_PLUS] = desc->description;
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [RARCH_ANALOG_RIGHT_Y_MINUS] = desc->description;
                                  break;
                            }
@@ -2130,7 +2130,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                            switch (desc->index)
                            {
                               case RETRO_DEVICE_INDEX_ANALOG_BUTTON:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [retro_id] = desc->description;
                                  break;
                            }
@@ -2139,7 +2139,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                            switch (desc->index)
                            {
                               case RETRO_DEVICE_INDEX_ANALOG_BUTTON:
-                                 system->input_desc_btn[retro_port]
+                                 sys_info->input_desc_btn[retro_port]
                                     [retro_id] = desc->description;
                                  break;
                            }
@@ -2164,7 +2164,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
                      for (retro_id = 0; retro_id < RARCH_FIRST_CUSTOM_BIND; retro_id++)
                      {
-                        const char *description = system->input_desc_btn[mapped_port][retro_id];
+                        const char *description = sys_info->input_desc_btn[mapped_port][retro_id];
 
                         if (!description)
                            continue;
@@ -2217,10 +2217,10 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             const struct retro_disk_control_callback *control_cb =
                   (const struct retro_disk_control_callback*)data;
 
-            if (system)
+            if (sys_info)
             {
                RARCH_LOG("[Environ]: SET_DISK_CONTROL_INTERFACE.\n");
-               disk_control_set_callback(&system->disk_control, control_cb);
+               disk_control_set_callback(&sys_info->disk_control, control_cb);
             }
          }
          break;
@@ -2230,10 +2230,10 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             const struct retro_disk_control_ext_callback *control_cb =
                   (const struct retro_disk_control_ext_callback*)data;
 
-            if (system)
+            if (sys_info)
             {
                RARCH_LOG("[Environ]: SET_DISK_CONTROL_EXT_INTERFACE.\n");
-               disk_control_set_ext_callback(&system->disk_control, control_cb);
+               disk_control_set_ext_callback(&sys_info->disk_control, control_cb);
             }
          }
          break;
@@ -2578,8 +2578,8 @@ bool runloop_environment_cb(unsigned cmd, void *data)
          cb->get_position                = driver_location_get_position;
          cb->set_interval                = driver_location_set_interval;
 
-         if (system)
-            system->location_cb          = *cb;
+         if (sys_info)
+            sys_info->location_cb        = *cb;
 
          location_st->active             = false;
          break;
@@ -2753,12 +2753,12 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             }
          }
 
-         if (system)
+         if (sys_info)
          {
             struct retro_subsystem_info *info_ptr = NULL;
-            free(system->subsystem.data);
-            system->subsystem.data = NULL;
-            system->subsystem.size = 0;
+            free(sys_info->subsystem.data);
+            sys_info->subsystem.data = NULL;
+            sys_info->subsystem.size = 0;
 
             info_ptr = (struct retro_subsystem_info*)
                   malloc(i * sizeof(*info_ptr));
@@ -2766,11 +2766,11 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             if (!info_ptr)
                return false;
 
-            system->subsystem.data = info_ptr;
+            sys_info->subsystem.data = info_ptr;
 
-            memcpy(system->subsystem.data, info,
-                  i * sizeof(*system->subsystem.data));
-            system->subsystem.size                   = i;
+            memcpy(sys_info->subsystem.data, info,
+                  i * sizeof(*sys_info->subsystem.data));
+            sys_info->subsystem.size                 = i;
             runloop_st->current_core.flags          |=
                   RETRO_CORE_FLAG_HAS_SET_SUBSYSTEMS;
          }
@@ -2798,29 +2798,29 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                      info[i].types[j].id);
          }
 
-         if (system)
+         if (sys_info)
          {
             struct retro_controller_info *info_ptr = NULL;
 
-            free(system->ports.data);
-            system->ports.data = NULL;
-            system->ports.size = 0;
+            free(sys_info->ports.data);
+            sys_info->ports.data = NULL;
+            sys_info->ports.size = 0;
 
-            info_ptr = (struct retro_controller_info*)calloc(i, sizeof(*info_ptr));
-            if (!info_ptr)
+            if (!(info_ptr = (struct retro_controller_info*)
+                     calloc(i, sizeof(*info_ptr))))
                return false;
 
-            system->ports.data = info_ptr;
-            memcpy(system->ports.data, info,
-                  i * sizeof(*system->ports.data));
-            system->ports.size = i;
+            sys_info->ports.data = info_ptr;
+            memcpy(sys_info->ports.data, info,
+                  i * sizeof(*sys_info->ports.data));
+            sys_info->ports.size = i;
          }
          break;
       }
 
       case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
       {
-         if (system)
+         if (sys_info)
          {
             unsigned i;
             const struct retro_memory_map *mmaps   =
@@ -2830,20 +2830,19 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
             RARCH_LOG("[Environ]: SET_MEMORY_MAPS.\n");
 
-            free((void*)system->mmaps.descriptors);
-            system->mmaps.descriptors     = 0;
-            system->mmaps.num_descriptors = 0;
-            descriptors = (rarch_memory_descriptor_t*)calloc(mmaps->num_descriptors,
-                  sizeof(*descriptors));
+            free((void*)sys_info->mmaps.descriptors);
+            sys_info->mmaps.descriptors     = 0;
+            sys_info->mmaps.num_descriptors = 0;
 
-            if (!descriptors)
+            if (!(descriptors = (rarch_memory_descriptor_t*)calloc(mmaps->num_descriptors,
+                  sizeof(*descriptors))))
                return false;
 
-            system->mmaps.descriptors     = descriptors;
-            system->mmaps.num_descriptors = mmaps->num_descriptors;
+            sys_info->mmaps.descriptors     = descriptors;
+            sys_info->mmaps.num_descriptors = mmaps->num_descriptors;
 
             for (i = 0; i < mmaps->num_descriptors; i++)
-               system->mmaps.descriptors[i].core = mmaps->descriptors[i];
+               sys_info->mmaps.descriptors[i].core = mmaps->descriptors[i];
 
             mmap_preprocess_descriptors(descriptors, mmaps->num_descriptors);
 
@@ -2866,14 +2865,14 @@ bool runloop_environment_cb(unsigned cmd, void *data)
             else
                RARCH_DBG("           ndx flags  ptr          offset   start    select   disconn  len      addrspace\n");
 
-            for (i = 0; i < system->mmaps.num_descriptors; i++)
+            for (i = 0; i < sys_info->mmaps.num_descriptors; i++)
             {
-               const rarch_memory_descriptor_t *desc =
-                  &system->mmaps.descriptors[i];
                char flags[7];
+               const rarch_memory_descriptor_t *desc =
+                  &sys_info->mmaps.descriptors[i];
 
-               flags[0] = 'M';
-               if ((desc->core.flags & RETRO_MEMDESC_MINSIZE_8) == RETRO_MEMDESC_MINSIZE_8)
+               flags[0]    = 'M';
+               if (     (desc->core.flags & RETRO_MEMDESC_MINSIZE_8) == RETRO_MEMDESC_MINSIZE_8)
                   flags[1] = '8';
                else if ((desc->core.flags & RETRO_MEMDESC_MINSIZE_4) == RETRO_MEMDESC_MINSIZE_4)
                   flags[1] = '4';
@@ -2883,7 +2882,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                   flags[1] = '1';
 
                flags[2] = 'A';
-               if ((desc->core.flags & RETRO_MEMDESC_ALIGN_8) == RETRO_MEMDESC_ALIGN_8)
+               if (     (desc->core.flags & RETRO_MEMDESC_ALIGN_8) == RETRO_MEMDESC_ALIGN_8)
                   flags[3] = '8';
                else if ((desc->core.flags & RETRO_MEMDESC_ALIGN_4) == RETRO_MEMDESC_ALIGN_4)
                   flags[3] = '4';
@@ -2893,7 +2892,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                   flags[3] = '1';
 
                flags[4] = (desc->core.flags & RETRO_MEMDESC_BIGENDIAN) ? 'B' : 'b';
-               flags[5] = (desc->core.flags & RETRO_MEMDESC_CONST) ? 'C' : 'c';
+               flags[5] = (desc->core.flags & RETRO_MEMDESC_CONST)     ? 'C' : 'c';
                flags[6] = 0;
 
                RARCH_DBG("           %03u %s %p %08X %08X %08X %08X %08X %s\n",
@@ -3060,7 +3059,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
             vfs_iface_info->required_interface_version = supported_vfs_version;
             vfs_iface_info->iface                      = &vfs_iface;
-            system->supports_vfs = true;
+            sys_info->supports_vfs                     = true;
          }
          else
          {
@@ -3507,7 +3506,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
 bool libretro_get_system_info(
       const char *path,
-      struct retro_system_info *info,
+      struct retro_system_info *sysinfo,
       bool *load_no_content)
 {
    struct retro_system_info dummy_info;
@@ -3558,10 +3557,10 @@ bool libretro_get_system_info(
    retro_get_system_info(&dummy_info);
 #endif
 
-   memcpy(info, &dummy_info, sizeof(*info));
+   memcpy(sysinfo, &dummy_info, sizeof(*sysinfo));
 
-   runloop_st->current_library_name[0]    = '\0';
-   runloop_st->current_library_version[0] = '\0';
+   runloop_st->current_library_name[0]     = '\0';
+   runloop_st->current_library_version[0]  = '\0';
    runloop_st->current_valid_extensions[0] = '\0';
 
    if (!string_is_empty(dummy_info.library_name))
@@ -3578,9 +3577,9 @@ bool libretro_get_system_info(
             dummy_info.valid_extensions,
             sizeof(runloop_st->current_valid_extensions));
 
-   info->library_name     = runloop_st->current_library_name;
-   info->library_version  = runloop_st->current_library_version;
-   info->valid_extensions = runloop_st->current_valid_extensions;
+   sysinfo->library_name     = runloop_st->current_library_name;
+   sysinfo->library_version  = runloop_st->current_library_version;
+   sysinfo->valid_extensions = runloop_st->current_valid_extensions;
 
 #ifdef HAVE_DYNAMIC
    dylib_close(lib);
@@ -4054,23 +4053,24 @@ static bool runloop_path_init_subsystem(runloop_state_t *runloop_st)
 {
    unsigned i, j;
    const struct retro_subsystem_info *info = NULL;
-   rarch_system_info_t             *system = &runloop_st->system;
+   rarch_system_info_t           *sys_info = &runloop_st->system;
    bool subsystem_path_empty               = path_is_empty(RARCH_PATH_SUBSYSTEM);
    const char                *savefile_dir = runloop_st->savefile_dir;
 
-   if (!system || subsystem_path_empty)
+   if (!sys_info || subsystem_path_empty)
       return false;
 
    /* For subsystems, we know exactly which RAM types are supported. */
    /* We'll handle this error gracefully later. */
    if ((info = libretro_find_subsystem_info(
-         system->subsystem.data,
-         system->subsystem.size,
+         sys_info->subsystem.data,
+         sys_info->subsystem.size,
          path_get(RARCH_PATH_SUBSYSTEM))))
    {
       unsigned num_content = MIN(info->num_roms,
-            subsystem_path_empty ?
-            0 : (unsigned)runloop_st->subsystem_fullpaths->size);
+            subsystem_path_empty
+            ? 0 
+            : (unsigned)runloop_st->subsystem_fullpaths->size);
 
       for (i = 0; i < num_content; i++)
       {
@@ -5483,7 +5483,6 @@ static enum runloop_state_enum runloop_check_state(
 #ifdef HAVE_OVERLAY
    if (settings->bools.input_overlay_enable)
    {
-      static char prev_overlay_restore               = false;
       static unsigned last_width                     = 0;
       static unsigned last_height                    = 0;
       unsigned video_driver_width                    = video_st->width;
@@ -5502,7 +5501,7 @@ static enum runloop_state_enum runloop_check_state(
          if (controller_connected != last_controller_connected)
          {
             if (controller_connected)
-               input_overlay_deinit();
+               input_overlay_unload();
             else
                input_overlay_init();
 
@@ -5512,15 +5511,6 @@ static enum runloop_state_enum runloop_check_state(
 
       /* Check next overlay hotkey */
       HOTKEY_CHECK(RARCH_OVERLAY_NEXT, CMD_EVENT_OVERLAY_NEXT, true, &check_next_rotation);
-
-      /* Ensure overlay is restored after displaying OSK */
-      if (input_st->flags & INP_FLAG_KB_LINEFEED_ENABLE)
-         prev_overlay_restore = true;
-      else if (prev_overlay_restore)
-      {
-         input_overlay_init();
-         prev_overlay_restore = false;
-      }
 
       /* Check whether video aspect has changed */
       if ((video_driver_width  != last_width) ||
@@ -7636,12 +7626,12 @@ bool core_load_game(retro_ctx_load_content_info_t *load_info)
    return false;
 }
 
-bool core_get_system_info(struct retro_system_info *system)
+bool core_get_system_info(struct retro_system_info *sysinfo)
 {
    runloop_state_t *runloop_st  = &runloop_state;
-   if (!system)
+   if (!sysinfo)
       return false;
-   runloop_st->current_core.retro_get_system_info(system);
+   runloop_st->current_core.retro_get_system_info(sysinfo);
    return true;
 }
 
@@ -7884,7 +7874,7 @@ void runloop_path_set_redirect(settings_t *settings,
    char new_savefile_dir[PATH_MAX_LENGTH];
    char new_savestate_dir[PATH_MAX_LENGTH];
    runloop_state_t *runloop_st                 = &runloop_state;
-   struct retro_system_info *system            = &runloop_st->system.info;
+   struct retro_system_info *sysinfo           = &runloop_st->system.info;
    bool sort_savefiles_enable                  = settings->bools.sort_savefiles_enable;
    bool sort_savefiles_by_content_enable       = settings->bools.sort_savefiles_by_content_enable;
    bool sort_savestates_enable                 = settings->bools.sort_savestates_enable;
@@ -7908,10 +7898,10 @@ void runloop_path_set_redirect(settings_t *settings,
             runloop_st->runtime_content_path_basename,
             sizeof(content_dir_name));
 
-   if (system && !string_is_empty(system->library_name))
+   if (sysinfo && !string_is_empty(sysinfo->library_name))
    {
 #ifdef HAVE_MENU
-      if (!string_is_equal(system->library_name,
+      if (!string_is_equal(sysinfo->library_name,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_CORE)))
 #endif
       {
@@ -7933,7 +7923,7 @@ void runloop_path_set_redirect(settings_t *settings,
                fill_pathname_join(
                      new_savefile_dir,
                      new_savefile_dir,
-                     system->library_name,
+                     sysinfo->library_name,
                      sizeof(new_savefile_dir));
 
             /* If path doesn't exist, try to create it,
@@ -7966,7 +7956,7 @@ void runloop_path_set_redirect(settings_t *settings,
                fill_pathname_join(
                      new_savestate_dir,
                      new_savestate_dir,
-                     system->library_name,
+                     sysinfo->library_name,
                      sizeof(new_savestate_dir));
 
             /* If path doesn't exist, try to create it.
@@ -8028,7 +8018,7 @@ void runloop_path_set_redirect(settings_t *settings,
    }
 #endif
 
-   if (system && !string_is_empty(system->library_name))
+   if (sysinfo && !string_is_empty(sysinfo->library_name))
    {
       bool savefile_is_dir  = path_is_directory(new_savefile_dir);
       bool savestate_is_dir = path_is_directory(new_savestate_dir);
@@ -8053,7 +8043,7 @@ void runloop_path_set_redirect(settings_t *settings,
          fill_pathname_dir(runloop_st->name.savefile,
                !string_is_empty(runloop_st->runtime_content_path_basename)
                ? runloop_st->runtime_content_path_basename
-               : system->library_name,
+               : sysinfo->library_name,
                FILE_PATH_SRM_EXTENSION,
                sizeof(runloop_st->name.savefile));
          RARCH_LOG("[Overrides]: %s \"%s\".\n",
@@ -8066,13 +8056,13 @@ void runloop_path_set_redirect(settings_t *settings,
          fill_pathname_dir(runloop_st->name.savestate,
                !string_is_empty(runloop_st->runtime_content_path_basename)
                ? runloop_st->runtime_content_path_basename
-               : system->library_name,
+               : sysinfo->library_name,
                FILE_PATH_STATE_EXTENSION,
                sizeof(runloop_st->name.savestate));
          fill_pathname_dir(runloop_st->name.replay,
                !string_is_empty(runloop_st->runtime_content_path_basename)
                ? runloop_st->runtime_content_path_basename
-               : system->library_name,
+               : sysinfo->library_name,
                FILE_PATH_BSV_EXTENSION,
                sizeof(runloop_st->name.replay));
          RARCH_LOG("[Overrides]: %s \"%s\".\n",
@@ -8086,7 +8076,7 @@ void runloop_path_set_redirect(settings_t *settings,
          fill_pathname_dir(runloop_st->name.cheatfile,
                !string_is_empty(runloop_st->runtime_content_path_basename)
                ? runloop_st->runtime_content_path_basename
-               : system->library_name,
+               : sysinfo->library_name,
                FILE_PATH_CHT_EXTENSION,
                sizeof(runloop_st->name.cheatfile));
          RARCH_LOG("[Overrides]: %s \"%s\".\n",

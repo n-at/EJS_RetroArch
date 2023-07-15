@@ -1461,7 +1461,7 @@ void video_driver_free_internal(void)
    bool        is_threaded           = VIDEO_DRIVER_IS_THREADED_INTERNAL(video_st);
 #endif
 
-   command_event(CMD_EVENT_OVERLAY_DEINIT, NULL);
+   command_event(CMD_EVENT_OVERLAY_UNLOAD, NULL);
 
    if (!(video_st->flags & VIDEO_FLAG_CACHE_CONTEXT))
       video_driver_free_hw_context();
@@ -3178,7 +3178,7 @@ bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled)
          return false;
 
 #ifdef HAVE_OVERLAY
-   input_overlay_deinit();
+   input_overlay_unload();
    input_overlay_init();
 #endif
 
@@ -3224,6 +3224,10 @@ bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled)
          if (input_driver_grab_mouse())
             input_st->flags |= INP_FLAG_GRAB_MOUSE_STATE;
    }
+
+#ifdef HAVE_OVERLAY
+   input_overlay_check_mouse_cursor();
+#endif
 
    return true;
 }
@@ -3517,13 +3521,13 @@ void video_driver_frame(const void *data, unsigned width,
             status_text[++buf_pos  ] = '|';
             status_text[++buf_pos  ] = ' ';
             status_text[++buf_pos  ] = '\0';
-            buf_pos                 += strlcpy(
+            strlcpy(
                   status_text         + buf_pos,
                   runloop_st->core_status_msg.str,
                   sizeof(status_text) - buf_pos);
          }
          else
-            buf_pos                = strlcpy(status_text,
+            strlcpy(status_text,
                   runloop_st->core_status_msg.str,
                   sizeof(status_text));
       }

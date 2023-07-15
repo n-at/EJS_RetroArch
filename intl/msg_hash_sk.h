@@ -69,7 +69,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CORE_LIST,
-   "Vybrať jadro, ktoré chcete použiť."
+   "Vyberte jadro, ktoré chcete použiť."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_LIST,
@@ -143,7 +143,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_ONLINE_UPDATER,
-   "Stiahnite si doplnky, zložky a obsah pre RetroArch."
+   "Stiahnite si doplnky, súčasti a obsah pre RetroArch."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY,
@@ -168,6 +168,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INFORMATION_LIST_LIST,
    "Zobrazí systémové informácie."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CONFIGURATIONS_LIST,
+   "Súbor s nastaveniami"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_CONFIGURATIONS_LIST,
@@ -229,7 +233,7 @@ MSG_HASH( /* FIXME Maybe add a description? */
 
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_FAVORITES,
-   "Spustiť adresár"
+   "Hlavný adresár"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOADED_FILE_DETECT_CORE_LIST,
@@ -1016,12 +1020,24 @@ MSG_HASH(
    "Uložiť Aktuálne Nastavenia"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_CURRENT_CONFIG,
+   "Prepísať aktuálny súbor s nastaveniami."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVE_NEW_CONFIG,
    "Uložiť Nové Nastavenia"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_SAVE_NEW_CONFIG,
+   "Uložiť súčasné nastavenia do samostatného súboru."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RESET_TO_DEFAULT_CONFIG,
    "Resetovať do Predvolených Nastavení"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_RESET_TO_DEFAULT_CONFIG,
+   "Obnoviť súčasné nastavenie na predvolené hodnoty."
    )
 
 /* Main Menu > Help */
@@ -1081,6 +1097,10 @@ MSG_HASH(
    "Zvuk"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_AUDIO_SETTINGS,
+   "Zmena vstupno-výstupných nastavení."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS,
    "Vstup"
    )
@@ -1114,11 +1134,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVING_SETTINGS,
-   "Ukládanie"
+   "Ukladanie"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_SAVING_SETTINGS,
-   "Zmena nastavenia ukládania."
+   "Zmena nastavenia ukladania."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LOGGING_SETTINGS,
@@ -1138,11 +1158,15 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_FILE_BROWSER_CONFIG,
-   "Konfiguračný súbor."
+   "Súbor s nastaveniami."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_FILE_BROWSER_COMPRESSED_ARCHIVE,
    "Komprimovaný archívny súbor."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_FILE_BROWSER_RECORD_CONFIG,
+   "Súbor s nastaveniami nahrávania."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_FILE_BROWSER_CURSOR,
@@ -1150,7 +1174,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_FILE_CONFIG,
-   "Konfiguračný súbor."
+   "Súbor s nastaveniami."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_FILE_BROWSER_SHADER_PRESET,
@@ -1385,6 +1409,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_SUBLABEL_AUDIO_RESAMPLER_DRIVER,
    "Použiť ovládač vzorkovača zvuku."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_AUDIO_RESAMPLER_DRIVER_SINC,
+   "Implementácia Windowed Sinc."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_HELP_AUDIO_RESAMPLER_DRIVER_CC,
+   "Konvoluntná implementácia kosínusu."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CAMERA_DRIVER,
@@ -2514,8 +2546,16 @@ MSG_HASH(
    "Uložiť stav"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_META_STATE_SLOT_PLUS,
+   "Ďalší slot na uloženie stavu"
+   )
+MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_META_STATE_SLOT_PLUS,
    "Zvýši index aktuálne zvoleného slotu na ukladanie stavu."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_META_STATE_SLOT_MINUS,
+   "Predchádzajúci slot na uloženie stavu"
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_META_STATE_SLOT_MINUS,
@@ -2556,6 +2596,22 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_PLAY_REPLAY_KEY,
    "Prehrať opakovanie"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_META_REPLAY_SLOT_PLUS,
+   "Ďalší záznamový slot"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_META_REPLAY_SLOT_PLUS,
+   "Zvýši index aktuálne vybraného záznamového slotu."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_META_REPLAY_SLOT_MINUS,
+   "Predchádzajúci záznamový slot"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_META_REPLAY_SLOT_MINUS,
+   "Zníži index aktuálne vybraného záznamového slotu."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_META_FULLSCREEN_TOGGLE_KEY,
@@ -2720,6 +2776,22 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INPUT_LIGHTGUN_RELOAD,
    "Nabitie zbrane"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_LIGHTGUN_AUX_A,
+   "Pomocná zbraň A"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_LIGHTGUN_AUX_B,
+   "Pomocná zbraň B"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_LIGHTGUN_AUX_C,
+   "Pomocná zbraň C"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_INPUT_LIGHTGUN_START,
+   "Spustenie zbrane"
+   )
 
 /* Settings > Latency */
 
@@ -2778,6 +2850,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CONFIG_SAVE_ON_EXIT,
    "Uložiť nastavenie pri ukončení"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CONFIG_SAVE_ON_EXIT,
+   "Pri ukončení uložiť zmeny do súboru s nastaveniami."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_REMAP_SAVE_ON_EXIT,
@@ -2982,6 +3058,9 @@ MSG_HASH(
    "Prekrytie"
    )
 
+/* Settings > On-Screen Display > On-Screen Overlay > Keyboard Overlay */
+
+
 /* Settings > On-Screen Display > Video Layout */
 
 MSG_HASH(
@@ -3075,6 +3154,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MENU_SCREENSAVER_ANIMATION_STARFIELD,
    "Hviezdičkové pole"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_SCREENSAVER_ANIMATION_VORTEX,
+   "Vír"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MOUSE_ENABLE,
@@ -3672,6 +3755,10 @@ MSG_HASH(
    "Nepriehľadnosť pozadia"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MENU_FRAMEBUFFER_OPACITY,
+   "Nepriehľadnosť ponuky"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_THUMBNAILS,
    "Miniatúry"
    )
@@ -3800,8 +3887,24 @@ MSG_HASH(
    "Adresa servera"
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_IP_ADDRESS,
+   "Adresa hostiteľa pre pripojenie."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_MAX_PING,
+   "Maximálna latencia spojenia (ping), ktorý hostiteľ ešte akceptuje. Nastavte na 0 pre neobmedzenú."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETPLAY_PASSWORD,
    "Heslo servra"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_PASSWORD,
+   "Heslo používané klientami pri pripájaní k hostiteľovi."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_NETPLAY_SPECTATE_PASSWORD,
+   "Heslo používané klientami pri pripájaní k hostiteľovi ako divák."
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_NETPLAY_CHAT_COLOR_MSG,
@@ -4167,6 +4270,10 @@ MSG_HASH(
    MENU_ENUM_LABEL_VALUE_NETWORK_HOSTING_SETTINGS,
    "Hostiteľ"
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_NETPLAY_ENABLE_CLIENT,
+   "Prihlásiť sa k hostiteľovi sieťovej hry"
+   )
 
 /* Netplay > Host */
 
@@ -4346,6 +4453,10 @@ MSG_HASH(
    "Podľa pôvodu"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_EXPLORE_BY_FRANCHISE,
+   "Podľa franšízy"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_EXPLORE_BY_TAG,
    "Podľa značky"
    )
@@ -4395,6 +4506,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_INFORMATION,
    "Informácie"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INFORMATION,
+   "Zobraziť viac informácií o obsahu."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_DOWNLOAD_PL_ENTRY_THUMBNAILS,
@@ -4458,12 +4573,28 @@ MSG_HASH(
    "Urobiť screenshot"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_STATE_SLOT,
+   "Uložený stav"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_STATE_SLOT,
+   "Zmena aktuálne vybraného slotu so stavom."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SAVE_STATE,
    "Uložiť stav"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_LOAD_STATE,
    "Načítať stav"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_REPLAY_SLOT,
+   "Záznamový slot"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_REPLAY_SLOT,
+   "Zmena aktuálne vybraného slotu so stavom."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAY_REPLAY,
@@ -4814,6 +4945,10 @@ MSG_HASH(
    "Režim obrazu"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_AI_SERVICE_SPEECH_MODE,
+   "Režim reči"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_ENTRY_REMOVE_ENABLE_HIST_FAV,
    "História & Obľúbené"
    )
@@ -4968,6 +5103,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_SORT_MODE_OFF,
    "Žiadne"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_LABEL_DISPLAY_MODE_REMOVE_PARENS_AND_BRACKETS,
+   "Odstrániť () a []"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_LABEL_DISPLAY_MODE_KEEP_REGION,
@@ -5244,6 +5383,10 @@ MSG_HASH(
    "Elektrická modrá"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_APPLE_GREEN,
+   "Jablková zelená"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RGUI_MENU_COLOR_THEME_LAGOON,
    "Lagúna"
    )
@@ -5274,6 +5417,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_RGUI_PARTICLE_EFFECT_RAIN,
    "Dážď"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_RGUI_PARTICLE_EFFECT_VORTEX,
+   "Vír"
    )
 
 /* XMB: Settings > User Interface > Appearance */
@@ -5306,6 +5453,10 @@ MSG_HASH(
 /* XMB: Settings Options */
 
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SHADER_PIPELINE_RIBBON,
+   "Stuha"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SHADER_PIPELINE_SNOW,
    "Sneh"
    )
@@ -5324,6 +5475,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_AUTOMATIC,
    "Automaticky"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_APPLE_GREEN,
+   "Jablková zelená"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_DARK,
@@ -5350,6 +5505,10 @@ MSG_HASH(
    "Zlatý"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_LEGACY_RED,
+   "Klasická červená"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_MIDNIGHT_BLUE,
    "Polnočná modrá"
    )
@@ -5360,6 +5519,14 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_UNDERSEA,
    "Pod morom"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_LIME,
+   "Limetková zelená"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_FAMICOM_RED,
+   "Rodinná červená"
    )
 
 /* Ozone: Settings > User Interface > Appearance */
@@ -5473,6 +5640,10 @@ MSG_HASH(
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MATERIALUI_THUMBNAIL_VIEW_PORTRAIT_LIST_MEDIUM,
    "Zoznam (stredný)"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_MATERIALUI_THUMBNAIL_VIEW_PORTRAIT_DUAL_ICON,
+   "Duálna ikona"
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_MATERIALUI_THUMBNAIL_VIEW_LANDSCAPE_DISABLED,
@@ -6186,6 +6357,10 @@ MSG_HASH(
    "Schopnosti"
    )
 MSG_HASH(
+   MSG_CONNECTING_TO_NETPLAY_HOST,
+   "Prihlásiť sa k hostiteľovi sieťovej hry"
+   )
+MSG_HASH(
    MSG_CONNECTING_TO_PORT,
    "Pripájam na port"
    )
@@ -6258,6 +6433,10 @@ MSG_HASH(
    "Súbor nenájdený"
    )
 MSG_HASH(
+   MSG_FOUND_LAST_STATE_SLOT,
+   "Nájdený posledný slot so stavom"
+   )
+MSG_HASH(
    MSG_FRAMES,
    "Snímky"
    )
@@ -6280,6 +6459,10 @@ MSG_HASH(
 MSG_HASH(
    MSG_IN_GIGABYTES,
    "v gigabajtoch"
+   )
+MSG_HASH(
+   MSG_LOADED_STATE_FROM_SLOT,
+   "Načítaný stav zo slotu #%d."
    )
 MSG_HASH(
    MSG_LOADING,
@@ -6322,6 +6505,10 @@ MSG_HASH(
    "Pretočiť dopredu."
    )
 MSG_HASH(
+   MSG_REPLAY_SLOT,
+   "Prehrať slot"
+   )
+MSG_HASH(
    MSG_SCREENSHOT_SAVED,
    "Snímka uložená"
    )
@@ -6334,12 +6521,20 @@ MSG_HASH(
    "Prepnúť metadáta"
    )
 MSG_HASH(
+   MSG_PRESS_AGAIN_TO_QUIT,
+   "Stlačte znova pre ukončenie..."
+   )
+MSG_HASH(
    MSG_TO,
    "do"
    )
 MSG_HASH(
    MSG_UNKNOWN,
    "Neznáme"
+   )
+MSG_HASH(
+   MSG_UNPAUSED,
+   "Spustené"
    )
 MSG_HASH(
    MSG_VALUE_REBOOTING,

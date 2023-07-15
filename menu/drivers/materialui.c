@@ -3481,9 +3481,9 @@ static bool materialui_render_process_entry_playlist_desktop(
             _len += strlcpy(mui->status_bar.str + _len,
                     MUI_TICKER_SPACER,
                     sizeof(mui->status_bar.str) - _len);
-            _len += strlcpy(mui->status_bar.str + _len,
-                    last_played_str,
-                    sizeof(mui->status_bar.str) - _len);
+            strlcpy(mui->status_bar.str + _len,
+                  last_played_str,
+                  sizeof(mui->status_bar.str) - _len);
 
             /* All metadata is cached */
             mui->status_bar.cached = true;
@@ -9509,9 +9509,8 @@ static int materialui_list_push(void *data, void *userdata,
          break;
       case DISPLAYLIST_MAIN_MENU:
          {
-            settings_t   *settings      = config_get_ptr();
-            rarch_system_info_t *system = &runloop_state_get_ptr()->system;
-            uint32_t flags              = runloop_get_flags();
+            settings_t   *settings        = config_get_ptr();
+            uint32_t flags                = runloop_get_flags();
 
             /* If navigation bar is hidden, use default
              * main menu */
@@ -9533,7 +9532,8 @@ static int materialui_list_push(void *data, void *userdata,
             }
             else
             {
-               if (system && system->load_no_content)
+               rarch_system_info_t *sys_info = &runloop_state_get_ptr()->system;
+               if (sys_info && sys_info->load_no_content)
                {
                   MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(
                         info->list,
@@ -10882,6 +10882,7 @@ static void materialui_list_insert(
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_SETTINGS_VIEWS_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_MENU_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_ONSCREEN_OVERLAY_SETTINGS))
+                  || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_OSK_OVERLAY_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_ONSCREEN_NOTIFICATIONS_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_ONSCREEN_NOTIFICATIONS_VIEWS_SETTINGS))
                   || string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_ACCOUNTS_LIST))
@@ -11051,13 +11052,15 @@ static void materialui_set_thumbnail_system(void *userdata, char *s, size_t len)
             mui->thumbnail_path_data, s, playlist_get_cached());
 }
 
-static void materialui_get_thumbnail_system(void *userdata, char *s, size_t len)
+static size_t materialui_get_thumbnail_system(void *userdata, char *s, size_t len)
 {
    materialui_handle_t *mui = (materialui_handle_t*)userdata;
    const char *system       = NULL;
-   if (mui)
-      if (gfx_thumbnail_get_system(mui->thumbnail_path_data, &system))
-         strlcpy(s, system, len);
+   if (!mui)
+      return 0;
+   if (!gfx_thumbnail_get_system(mui->thumbnail_path_data, &system))
+      return 0;
+   return strlcpy(s, system, len);
 }
 
 static void materialui_refresh_thumbnail_image(void *userdata, unsigned i)

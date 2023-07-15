@@ -1893,6 +1893,8 @@ static uintptr_t ozone_entries_icon_get_texture(
       case MENU_ENUM_LABEL_ONSCREEN_OVERLAY_SETTINGS:
       case MENU_ENUM_LABEL_CONTENT_SHOW_OVERLAYS:
             return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_OVERLAY];
+      case MENU_ENUM_LABEL_OSK_OVERLAY_SETTINGS:
+         return ozone->icons_textures[OZONE_ENTRIES_ICONS_TEXTURE_SETTING];
       case MENU_ENUM_LABEL_UPDATE_CG_SHADERS:
       case MENU_ENUM_LABEL_UPDATE_GLSL_SHADERS:
       case MENU_ENUM_LABEL_UPDATE_SLANG_SHADERS:
@@ -9472,7 +9474,6 @@ static int ozone_list_push(void *data, void *userdata,
       case DISPLAYLIST_MAIN_MENU:
          {
             settings_t   *settings      = config_get_ptr();
-            rarch_system_info_t *system = &runloop_state_get_ptr()->system;
             uint32_t flags              = runloop_get_flags();
 
             menu_entries_clear(info->list);
@@ -9490,7 +9491,8 @@ static int ozone_list_push(void *data, void *userdata,
             }
             else
             {
-               if (system && system->load_no_content)
+               rarch_system_info_t *sys_info = &runloop_state_get_ptr()->system;
+               if (sys_info && sys_info->load_no_content)
                {
                   MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(
                         info->list,
@@ -11161,15 +11163,15 @@ static void ozone_set_thumbnail_system(void *data, char *s, size_t len)
          ozone->thumbnail_path_data, s, playlist_get_cached());
 }
 
-static void ozone_get_thumbnail_system(void *data, char *s, size_t len)
+static size_t ozone_get_thumbnail_system(void *data, char *s, size_t len)
 {
    ozone_handle_t *ozone = (ozone_handle_t*)data;
    const char *system    = NULL;
    if (!ozone)
-      return;
-
-   if (gfx_thumbnail_get_system(ozone->thumbnail_path_data, &system))
-      strlcpy(s, system, len);
+      return 0;
+   if (!gfx_thumbnail_get_system(ozone->thumbnail_path_data, &system))
+      return 0;
+   return strlcpy(s, system, len);
 }
 
 static void ozone_selection_changed(ozone_handle_t *ozone, bool allow_animation)

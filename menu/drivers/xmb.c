@@ -1346,15 +1346,15 @@ static void xmb_set_thumbnail_system(void *data, char*s, size_t len)
          xmb->thumbnail_path_data, s, playlist_get_cached());
 }
 
-static void xmb_get_thumbnail_system(void *data, char*s, size_t len)
+static size_t xmb_get_thumbnail_system(void *data, char*s, size_t len)
 {
    xmb_handle_t *xmb  = (xmb_handle_t*)data;
    const char *system = NULL;
    if (!xmb)
-      return;
-
-   if (gfx_thumbnail_get_system(xmb->thumbnail_path_data, &system))
-      strlcpy(s, system, len);
+      return 0;
+   if (!gfx_thumbnail_get_system(xmb->thumbnail_path_data, &system))
+      return 0;
+   return strlcpy(s, system, len);
 }
 
 static void xmb_unload_thumbnail_textures(void *data)
@@ -3047,6 +3047,8 @@ static uintptr_t xmb_icon_get_id(xmb_handle_t *xmb,
       case MENU_ENUM_LABEL_ONSCREEN_OVERLAY_SETTINGS:
       case MENU_ENUM_LABEL_CONTENT_SHOW_OVERLAYS:
          return xmb->textures.list[XMB_TEXTURE_OVERLAY];
+      case MENU_ENUM_LABEL_OSK_OVERLAY_SETTINGS:
+         return xmb->textures.list[XMB_TEXTURE_SETTING];
       case MENU_ENUM_LABEL_UPDATE_CG_SHADERS:
       case MENU_ENUM_LABEL_UPDATE_GLSL_SHADERS:
       case MENU_ENUM_LABEL_UPDATE_SLANG_SHADERS:
@@ -7914,7 +7916,6 @@ static int xmb_list_push(void *data, void *userdata,
          break;
       case DISPLAYLIST_MAIN_MENU:
          {
-            rarch_system_info_t *system = &runloop_state_get_ptr()->system;
             uint32_t flags              = runloop_get_flags();
 
             menu_entries_clear(info->list);
@@ -7932,7 +7933,8 @@ static int xmb_list_push(void *data, void *userdata,
             }
             else
             {
-               if (system && system->load_no_content)
+               rarch_system_info_t *sys_info = &runloop_state_get_ptr()->system;
+               if (sys_info && sys_info->load_no_content)
                {
                   MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(
                         info->list,

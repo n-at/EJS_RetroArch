@@ -47,6 +47,16 @@ HAVE_IBXM = 1
 HAVE_CORE_INFO_CACHE = 1
 HAVE_7ZIP = 1
 HAVE_BSV_MOVIE = 1
+HAVE_AL = 1
+
+
+# WARNING -- READ BEFORE ENABLING
+# The rwebaudio driver is known to have several audio bugs, such as
+#  minor crackling, or the entire page freezing/crashing.
+#  It works perfectly on chrome, but even firefox has really bad audio quality.
+#  I should also note, the driver on iOS is completely broken (crashes the page).
+#  You have been warned.
+HAVE_RWEBAUDIO = 0
 
 EMULATORJS = 1
 
@@ -111,9 +121,18 @@ LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_ME
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
            -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 \
            -s ALLOW_MEMORY_GROWTH=1 \
-           --js-library emscripten/library_rwebaudio.js \
            --js-library emscripten/library_rwebcam.js \
            --js-library emscripten/library_errno_codes.js
+
+ifeq ($(HAVE_RWEBAUDIO), 1)
+   LDFLAGS += --js-library emscripten/library_rwebaudio.js
+   DEFINES += -DHAVE_RWEBAUDIO
+endif
+ifeq ($(HAVE_AL), 1)
+   LDFLAGS += -lopenal
+   DEFINES += -DHAVE_AL
+endif
+
 
 ifeq ($(HAVE_OPENGLES), 1)
    ifeq ($(HAVE_OPENGLES3), 1)

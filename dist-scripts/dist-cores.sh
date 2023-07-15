@@ -210,6 +210,9 @@ for f in `ls -v *_${platform}.${EXT}`; do
    stack_mem=8388608
    heap_mem=268435456
 
+   if [ $PLATFORM = "emscripten" ]; then
+      async=1 #emscripten needs async to sleep
+   fi
    if [ $name = "nxengine" ] ; then
       echo "Applying whole archive linking..."
       whole_archive="WHOLE_ARCHIVE_LINK=1"
