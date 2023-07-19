@@ -1732,6 +1732,7 @@ void gfx_widgets_frame(void *data)
          widget->frame(data, p_dispwidget);
    }
 
+#ifndef EMULATORJS
    /* Draw all messages */
    if (p_dispwidget->current_msgs_size)
    {
@@ -1766,6 +1767,7 @@ void gfx_widgets_frame(void *data)
       slock_unlock(p_dispwidget->current_msgs_lock);
 #endif
    }
+#endif
 
    /* Ensure all text is flushed */
    gfx_widgets_flush_text(video_width, video_height,
