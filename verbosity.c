@@ -462,14 +462,12 @@ void rarch_log_file_init(
       time_t cur_time = time(NULL);
 
       rtime_localtime(&cur_time, &tm_);
-      strftime(timestamped_log_file_name, sizeof(timestamped_log_file_name), "retroarch__%Y_%m_%d__%H_%M_%S", &tm_);
-      strlcat(timestamped_log_file_name, ".log",
-            sizeof(timestamped_log_file_name));
+      strftime(timestamped_log_file_name, sizeof(timestamped_log_file_name), "retroarch__%Y_%m_%d__%H_%M_%S.log", &tm_);
    }
 
    /* If nothing has changed, do nothing */
-   if ((!log_to_file && !logging_to_file) ||
-       (log_to_file && logging_to_file))
+   if (  (!log_to_file && !logging_to_file)
+       || (log_to_file &&  logging_to_file))
       return;
 
    /* If we are currently logging to file and wish to stop,

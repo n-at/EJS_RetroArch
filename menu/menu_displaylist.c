@@ -1097,11 +1097,11 @@ static unsigned menu_displaylist_parse_core_information_steam(
    bool installed             = false;
    MistResult result          = steam_get_core_dlcs(&dlc_list, false);
    if (MIST_IS_ERROR(result))
-	   goto error;
+      goto error;
 
    /* Get the core dlc information */
    if (!(core_dlc = steam_get_core_dlc_by_name(dlc_list, info_path)))
-	   return 0;
+      return 0;
 
    /* Check if installed */
    result = mist_steam_apps_is_dlc_installed(core_dlc->app_id, &installed);
@@ -2181,7 +2181,6 @@ static int menu_displaylist_parse_playlist(
          strlcpy(label_spacer, PL_LABEL_SPACER_DEFAULT, sizeof(label_spacer));
    }
 
-   if (menu_st->driver_ctx && menu_st->driver_ctx->set_thumbnail_system)
    {
       /* Inform menu driver of current system name
        * > Note: history, favorites and images_history
@@ -2201,7 +2200,7 @@ static int menu_displaylist_parse_playlist(
       {
          char system_name[15];
          strlcpy(system_name, path_playlist, sizeof(system_name));
-         menu_st->driver_ctx->set_thumbnail_system(
+         menu_driver_set_thumbnail_system(
                menu_st->userdata, system_name, sizeof(system_name));
       }
       else if (!string_is_empty(info_path))
@@ -2209,7 +2208,7 @@ static int menu_displaylist_parse_playlist(
          char lpl_basename[256];
          fill_pathname_base(lpl_basename, info_path, sizeof(lpl_basename));
          path_remove_extension(lpl_basename);
-         menu_st->driver_ctx->set_thumbnail_system(
+         menu_driver_set_thumbnail_system(
                menu_st->userdata, lpl_basename, sizeof(lpl_basename));
       }
    }
@@ -2253,6 +2252,7 @@ static int menu_displaylist_parse_playlist(
 
       if (!string_is_empty(entry->path))
       {
+         size_t _len;
          /* Standard playlist entry
           * > Base menu entry label is always playlist label
           *   > If playlist label is NULL, fallback to playlist entry file name
@@ -2260,10 +2260,13 @@ static int menu_displaylist_parse_playlist(
           *   no further action is necessary */
 
          if (string_is_empty(entry->label))
-            fill_pathname(menu_entry_label,
-                  path_basename(entry->path), "", sizeof(menu_entry_label));
+            _len = fill_pathname(menu_entry_label,
+                  path_basename(entry->path), "",
+                  sizeof(menu_entry_label));
          else
-            strlcpy(menu_entry_label, entry->label, sizeof(menu_entry_label));
+            _len = strlcpy(menu_entry_label,
+                  entry->label,
+                  sizeof(menu_entry_label));
 
          if (sanitization)
             (*sanitization)(menu_entry_label);
@@ -2276,8 +2279,13 @@ static int menu_displaylist_parse_playlist(
                 && !string_is_empty(entry->core_path)
                 && !string_is_equal(entry->core_path, "DETECT"))
             {
-               strlcat(menu_entry_label, label_spacer, sizeof(menu_entry_label));
-               strlcat(menu_entry_label, entry->core_name, sizeof(menu_entry_label));
+               _len += strlcpy(
+                     menu_entry_label         + _len,
+                     label_spacer,
+                     sizeof(menu_entry_label) - _len);
+               strlcpy(menu_entry_label       + _len,
+                     entry->core_name,
+                     sizeof(menu_entry_label) - _len);
             }
          }
 
@@ -2342,8 +2350,8 @@ static int create_string_list_rdb_entry_string(
    char tmp[128];
    char *out_lbl     = NULL;
    size_t str_len    = (strlen(label) + 1)
-	              + (strlen(actual_string) + 1)
-	              + (path_len + 1);
+         + (strlen(actual_string) + 1)
+         + (path_len + 1);
 
    if (!(out_lbl = (char*)calloc(str_len, sizeof(char))))
       return -1;
@@ -2462,10 +2470,8 @@ static int menu_displaylist_parse_database_entry(menu_handle_t *menu,
          sizeof(path_base));
    path_remove_extension(path_base);
 
-   if (     menu_st->driver_ctx
-         && menu_st->driver_ctx->set_thumbnail_system)
-      menu_st->driver_ctx->set_thumbnail_system(
-            menu_st->userdata, path_base, sizeof(path_base));
+   menu_driver_set_thumbnail_system(
+         menu_st->userdata, path_base, sizeof(path_base));
 
    strlcat(path_base, ".lpl", sizeof(path_base));
 
@@ -3329,10 +3335,8 @@ static int menu_displaylist_parse_horizontal_list(
           * is loaded/cached */
          fill_pathname_base(lpl_basename, item->path, sizeof(lpl_basename));
          path_remove_extension(lpl_basename);
-         if (     menu_st->driver_ctx
-               && menu_st->driver_ctx->set_thumbnail_system)
-            menu_st->driver_ctx->set_thumbnail_system(
-                  menu_st->userdata, lpl_basename, sizeof(lpl_basename));
+         menu_driver_set_thumbnail_system(
+               menu_st->userdata, lpl_basename, sizeof(lpl_basename));
       }
 
       if ((playlist = playlist_get_cached()))
@@ -3798,15 +3802,10 @@ static int menu_displaylist_parse_horizontal_content_actions(
                break;
             case PLAYLIST_ENTRY_REMOVE_ENABLE_HIST_FAV:
                {
-                  size_t sys_len;
                   char sys_thumb[64];
                   struct menu_state *menu_st  = menu_state_get_ptr();
-                  sys_thumb[0] = '\0';
-
-                  if (     menu_st->driver_ctx
-                        && menu_st->driver_ctx->get_thumbnail_system)
-                     sys_len = menu_st->driver_ctx->get_thumbnail_system(
-                           menu_st->userdata, sys_thumb, sizeof(sys_thumb));
+                  size_t sys_len              = menu_driver_get_thumbnail_system(
+                        menu_st->userdata, sys_thumb, sizeof(sys_thumb));
 
                   if (!string_is_empty(sys_thumb))
                      remove_entry_enabled =
@@ -3876,21 +3875,17 @@ static int menu_displaylist_parse_horizontal_content_actions(
 
             if (download_enabled)
             {
-               size_t sys_len;
                char sys_thumb[64];
-               struct menu_state *menu_st  = menu_state_get_ptr();
-               sys_thumb[0] = '\0';
-
+               struct menu_state *menu_st = menu_state_get_ptr();
                /* Only show 'Download Thumbnails' on supported playlists */
-               download_enabled = false;
-               if (     menu_st->driver_ctx
-                     && menu_st->driver_ctx->get_thumbnail_system)
-                  sys_len = menu_st->driver_ctx->get_thumbnail_system(
-                        menu_st->userdata, sys_thumb, sizeof(sys_thumb));
+               size_t sys_len             = menu_driver_get_thumbnail_system(
+                     menu_st->userdata, sys_thumb, sizeof(sys_thumb));
 
                if (!string_is_empty(sys_thumb))
                   download_enabled = !string_ends_with_size(
                         sys_thumb, "_history", sys_len, STRLEN_CONST("_history"));
+               else
+                  download_enabled = false;
             }
 
             if (settings->bools.network_on_demand_thumbnails)
@@ -4508,24 +4503,6 @@ static bool menu_displaylist_parse_playlist_manager_settings(
          playlist_path, "_history.lpl", strlen(playlist_path),
          STRLEN_CONST("_history.lpl"));
 
-   /* Default core association
-    * > This is only shown for collection playlists
-    *   (i.e. it is not relevant for history/favourites) */
-   if (   !is_content_history
-       && !string_is_equal(playlist_file, FILE_PATH_CONTENT_FAVORITES))
-      menu_entries_append(list,
-            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_DEFAULT_CORE),
-            msg_hash_to_str(MENU_ENUM_LABEL_PLAYLIST_MANAGER_DEFAULT_CORE),
-            MENU_ENUM_LABEL_PLAYLIST_MANAGER_DEFAULT_CORE,
-            MENU_SETTING_PLAYLIST_MANAGER_DEFAULT_CORE, 0, 0, NULL);
-
-   /* Reset core associations */
-   menu_entries_append(list,
-         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_RESET_CORES),
-         msg_hash_to_str(MENU_ENUM_LABEL_PLAYLIST_MANAGER_RESET_CORES),
-         MENU_ENUM_LABEL_PLAYLIST_MANAGER_RESET_CORES,
-         MENU_SETTING_ACTION_PLAYLIST_MANAGER_RESET_CORES, 0, 0, NULL);
-
    /* Label display mode */
    menu_entries_append(list,
          msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_LABEL_DISPLAY_MODE),
@@ -4582,6 +4559,24 @@ static bool menu_displaylist_parse_playlist_manager_settings(
             msg_hash_to_str(MENU_ENUM_LABEL_PLAYLIST_MANAGER_SORT_MODE),
             MENU_ENUM_LABEL_PLAYLIST_MANAGER_SORT_MODE,
             MENU_SETTING_PLAYLIST_MANAGER_SORT_MODE, 0, 0, NULL);
+
+   /* Default core association
+    * > This is only shown for collection playlists
+    *   (i.e. it is not relevant for history/favourites) */
+   if (   !is_content_history
+       && !string_is_equal(playlist_file, FILE_PATH_CONTENT_FAVORITES))
+      menu_entries_append(list,
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_DEFAULT_CORE),
+            msg_hash_to_str(MENU_ENUM_LABEL_PLAYLIST_MANAGER_DEFAULT_CORE),
+            MENU_ENUM_LABEL_PLAYLIST_MANAGER_DEFAULT_CORE,
+            MENU_SETTING_PLAYLIST_MANAGER_DEFAULT_CORE, 0, 0, NULL);
+
+   /* Reset core associations */
+   menu_entries_append(list,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PLAYLIST_MANAGER_RESET_CORES),
+         msg_hash_to_str(MENU_ENUM_LABEL_PLAYLIST_MANAGER_RESET_CORES),
+         MENU_ENUM_LABEL_PLAYLIST_MANAGER_RESET_CORES,
+         MENU_SETTING_ACTION_PLAYLIST_MANAGER_RESET_CORES, 0, 0, NULL);
 
    /* Refresh playlist */
    if (playlist_scan_refresh_enabled(playlist))
@@ -6607,27 +6602,6 @@ unsigned menu_displaylist_build_list(
                   MENU_ENUM_LABEL_OVERRIDE_UNLOAD,
                   MENU_SETTING_ACTION, 0, 0, NULL))
                count++;
-         }
-         break;
-      case DISPLAYLIST_ARCHIVE_ACTION:
-         {
-            menu_displaylist_build_info_selective_t build_list[] = {
-#ifdef HAVE_COMPRESSION
-               {MENU_ENUM_LABEL_OPEN_ARCHIVE, PARSE_ACTION, true},
-#endif
-               {MENU_ENUM_LABEL_LOAD_ARCHIVE, PARSE_ACTION, true},
-            };
-
-            for (i = 0; i < ARRAY_SIZE(build_list); i++)
-            {
-               if (!build_list[i].checked && !include_everything)
-                  continue;
-
-               if (MENU_DISPLAYLIST_PARSE_SETTINGS_ENUM(list,
-                        build_list[i].enum_idx,  build_list[i].parse_type,
-                        false) == 0)
-                  count++;
-            }
          }
          break;
       case DISPLAYLIST_SUBSYSTEM_SETTINGS_LIST:
@@ -11345,7 +11319,6 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
 {
    struct menu_state   *menu_st   = menu_state_get_ptr();
    menu_dialog_t        *p_dialog = &menu_st->dialog_st;
-   static bool core_selected      = false;
    bool push_list                 = (menu_st->driver_ctx->list_push
          && menu_st->driver_ctx->list_push(menu_st->driver_data,
             menu_st->userdata, info, type) == 0);
@@ -12882,6 +12855,7 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                         MENU_INFO_MESSAGE, 0, 0, NULL))
                      count++;
                   info->flags       &= ~MD_FLAG_NEED_PUSH_NO_PLAYLIST_ENTRIES;
+                  ret                = 0;
                }
 
                ret                   = 0;
@@ -13021,7 +12995,36 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             info->flags       &= ~MD_FLAG_NEED_SORT;
             info->flags       |=  MD_FLAG_NEED_REFRESH
                                |  MD_FLAG_NEED_PUSH;
-            core_selected      = true;
+
+            /* Pre-select current associated core */
+            if (menu)
+            {
+               size_t idx                         = menu->rpl_entry_selection_ptr;
+               playlist_t *cached_playlist        = playlist_get_cached();
+               const struct playlist_entry *entry = NULL;
+               const core_info_t* core_info       = NULL;
+
+               if (cached_playlist)
+                  playlist_get_index(cached_playlist, idx, &entry);
+
+               if (!entry)
+                  break;
+
+               core_info                          = playlist_entry_get_core_info(entry);
+
+               if (     core_info
+                     && !string_is_empty(core_info->display_name))
+               {
+                  size_t selection_idx            = 0;
+
+                  if (menu_entries_list_search(core_info->display_name, &selection_idx))
+                  {
+                     menu_st->selection_ptr       = selection_idx;
+                     if (menu_st->driver_ctx->navigation_set)
+                        menu_st->driver_ctx->navigation_set(menu_st->userdata, false);
+                  }
+               }
+            }
             break;
          case DISPLAYLIST_CORE_INFO:
             {
@@ -13429,6 +13432,25 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
                info->flags                   |= MD_FLAG_NEED_PUSH;
             }
             break;
+         case DISPLAYLIST_ARCHIVE_ACTION:
+	    menu_entries_clear(info->list);
+#ifdef HAVE_COMPRESSION
+            if (menu_entries_append(info->list,
+                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OPEN_ARCHIVE),
+                     msg_hash_to_str(MENU_ENUM_LABEL_OPEN_ARCHIVE),
+                     MENU_ENUM_LABEL_OPEN_ARCHIVE,
+                     0, 0, 0, NULL))
+               count++;
+#endif
+            if (menu_entries_append(info->list,
+                     msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LOAD_ARCHIVE),
+                     msg_hash_to_str(MENU_ENUM_LABEL_LOAD_ARCHIVE),
+                     MENU_ENUM_LABEL_LOAD_ARCHIVE,
+                     0, 0, 0, NULL))
+               count++;
+
+            info->flags    |= MD_FLAG_NEED_PUSH;
+            break;
          case DISPLAYLIST_ARCHIVE_ACTION_DETECT_CORE:
             menu_entries_clear(info->list);
 #ifdef HAVE_COMPRESSION
@@ -13713,7 +13735,6 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
 #ifdef HAVE_MIST
          case DISPLAYLIST_STEAM_SETTINGS_LIST:
 #endif
-         case DISPLAYLIST_ARCHIVE_ACTION:
          case DISPLAYLIST_OPTIONS_OVERRIDES:
             menu_entries_clear(info->list);
             count = menu_displaylist_build_list(info->list, settings, type, false);
@@ -13820,16 +13841,9 @@ bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type,
             break;
          case DISPLAYLIST_HORIZONTAL_CONTENT_ACTIONS:
             menu_entries_clear(info->list);
-            ret                = menu_displaylist_parse_horizontal_content_actions
-               (menu, settings, info->list);
+            ret = menu_displaylist_parse_horizontal_content_actions(menu, settings, info->list);
             info->flags       |=  MD_FLAG_NEED_REFRESH
                                |  MD_FLAG_NEED_PUSH;
-
-            if (core_selected)
-            {
-               info->flags     |=  MD_FLAG_NEED_CLEAR;
-               core_selected    = false;
-            }
             break;
          case DISPLAYLIST_OPTIONS:
             menu_entries_clear(info->list);
