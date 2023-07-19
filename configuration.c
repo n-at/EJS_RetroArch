@@ -1700,6 +1700,7 @@ static struct config_bool_setting *populate_settings_bool(
    struct config_bool_setting  *tmp    = (struct config_bool_setting*)calloc(1, (*size + 1) * sizeof(struct config_bool_setting));
    unsigned count                      = 0;
 
+   SETTING_BOOL("video_top_portrait_viewport",   &settings->bools.video_top_portrait_viewport, true, DEFAULT_TOP_PORTRAIT_VIEWPORT, false);
    SETTING_BOOL("accessibility_enable",          &settings->bools.accessibility_enable, true, DEFAULT_ACCESSIBILITY_ENABLE, false);
    SETTING_BOOL("driver_switch_enable",          &settings->bools.driver_switch_enable, true, DEFAULT_DRIVER_SWITCH_ENABLE, false);
    SETTING_BOOL("frame_time_counter_reset_after_fastforwarding", &settings->bools.frame_time_counter_reset_after_fastforwarding, true, false, false);
