@@ -245,13 +245,23 @@ for f in `ls -v *_${platform}.${EXT}`; do
       if [ $wasm = 0 ]; then
         continue;
       fi
-   elif [ $name = "mednafen_psx_hw" ] ; then
-      gles3=1
+   elif [ $name = "picodrive" ] ; then
+      heap_mem=536870912
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "pcsx_rearmed" ] ; then
       heap_mem=536870912
       if [ $wasm = 0 ]; then
         continue;
       fi
    elif [ $name = "mednafen_psx" ] ; then
+      gles3=1
+      heap_mem=536870912
+      if [ $wasm = 0 ]; then
+        continue;
+      fi
+   elif [ $name = "mednafen_psx_hw" ] ; then
       gles3=1
       heap_mem=536870912
       if [ $wasm = 0 ]; then
@@ -265,12 +275,11 @@ for f in `ls -v *_${platform}.${EXT}`; do
    elif [ $name = "parallel_n64" ] ; then
       gles3=1
       async=1
-#   elif [ $name = "ppsspp" ] ; then
-#      gles3=1
-#      async=1
       heap_mem=536870912
-    elif [ $name = "dosbox" ] ; then
+   elif [ $name = "ppsspp" ] ; then
+      gles3=1
       async=1
+      heap_mem=536870912
    elif [ $name = "scummvm" ] ; then
       async=1
       pthread=0
