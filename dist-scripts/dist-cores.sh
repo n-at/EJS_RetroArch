@@ -229,49 +229,13 @@ for f in `ls -v *_${platform}.${EXT}`; do
       if [ $wasm = 0 ]; then
         continue;
       fi
-   elif [ $name = "snes9x" ] ; then
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "mame2003" ] ; then
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "fbalpha2012_cps1" ] ; then
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "fbalpha2012_cps2" ] ; then
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "picodrive" ] ; then
+   elif [ $name = "picodrive" ] || [ $name = "pcsx_rearmed" ] || [ $name = "genesis_plus_gx" ]; then
       heap_mem=536870912
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "pcsx_rearmed" ] ; then
-      heap_mem=536870912
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "mednafen_psx" ] ; then
+   elif [ $name = "mednafen_psx" ] || [ $name = "mednafen_psx_hw" ]; then
       gles3=1
       heap_mem=536870912
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
-   elif [ $name = "mednafen_psx_hw" ] ; then
-      gles3=1
-      heap_mem=536870912
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
    elif [ $name = "melonds" ] ; then
       pthread=0
-      if [ $wasm = 0 ]; then
-        continue;
-      fi
    elif [ $name = "parallel_n64" ] ; then
       gles3=1
       async=1
