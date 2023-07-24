@@ -241,8 +241,7 @@ for f in `ls -v *_${platform}.${EXT}`; do
       async=1
       heap_mem=536870912
    elif [ $name = "ppsspp" ] ; then
-      gles3=1
-      async=1
+      pthread=12
       heap_mem=536870912
    elif [ $name = "scummvm" ] ; then
       async=1
@@ -364,14 +363,17 @@ for f in `ls -v *_${platform}.${EXT}`; do
          core=${name}
       fi
       
-      if [ $wasm = 0 ]; then
-        7z a ${out_dir}/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
-        rm ../${name}_libretro.js.mem
+      if [ $pthread != 0 ] ; then
+         7z a ${out_dir}/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js ../${name}_libretro.worker.js
       else
-        7z a ${out_dir}/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
-        rm ../${name}_libretro.wasm
+         if [ $wasm = 0 ]; then
+           7z a ${out_dir}/${core}-asmjs.data ../${name}_libretro.js.mem ../${name}_libretro.js
+           rm ../${name}_libretro.js.mem
+         else
+           7z a ${out_dir}/${core}-wasm.data ../${name}_libretro.wasm ../${name}_libretro.js
+           rm ../${name}_libretro.wasm
+         fi
       fi
-      
       rm ../${name}_libretro.js
       
       

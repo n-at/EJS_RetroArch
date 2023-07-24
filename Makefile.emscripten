@@ -163,7 +163,7 @@ endif
 ifneq ($(PTHREAD), 0)
    LDFLAGS += -s WASM_MEM_MAX=1073741824 -pthread -s PTHREAD_POOL_SIZE=$(PTHREAD)
    CFLAGS += -pthread
-   HAVE_THREADS=1
+   HAVE_THREADS=0
 else
    HAVE_THREADS=0
 endif
