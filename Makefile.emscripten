@@ -80,6 +80,8 @@ GL_DEBUG ?= 0 # help diagnose GLSL problems (can cause errors in normal operatio
 GENERATE_SOURCEMAP ?= 0
 FS_DEBUG = 0
 
+MEMORY_PADDING ?= 0
+
 # default value: 5242880  (5 MiB)
 STACK_MEMORY ?= 8388608
 # default value: 16777216 (16 MiB)
@@ -95,6 +97,7 @@ HEAP_MEMORY ?= 536870912
 # 1073741824 -- 1 GiB
 # 1610612736 -- 1.5 GiB
 # 2147483648 -- 2 GiB
+# 4294967296 -- 4 GiB
 
 ifeq ($(LIBRETRO), tyrquake)
    LTO = 0
@@ -115,7 +118,7 @@ ifeq ($(HAVE_SDL2), 1)
 endif
 
 LIBS    := -s USE_ZLIB=1
-LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=0 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue', 'FS']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
+LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_MEMORY=$(HEAP_MEMORY) -s NO_EXIT_RUNTIME=1 -s EXPORTED_RUNTIME_METHODS="['callMain', 'cwrap', 'getValue', 'FS']" -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS) \
            -s EXPORTED_FUNCTIONS=['_main','_malloc','_load_state','_set_volume','_set_variable','_simulate_input','_shader_enable','_get_state_info','_save_state_info','_set_cheat','_cmd_take_screenshot','_system_restart','_cmd_savefiles','_get_core_options','_cmd_save_state','_supports_states','_reset_cheat','_toggleMainLoop','_save_file_path','_get_disk_count','_set_current_disk','_get_current_disk','_refresh_save_files'] \
            -lidbfs.js \
            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
@@ -123,6 +126,10 @@ LDFLAGS := -L. --no-heap-copy $(LIBS) -s TOTAL_STACK=$(STACK_MEMORY) -s TOTAL_ME
            -s ALLOW_MEMORY_GROWTH=1 \
            --js-library emscripten/library_rwebcam.js \
            --js-library emscripten/library_errno_codes.js
+
+ifneq ($(MEMORY_PADDING), 0)
+   LDFLAGS += -s GLOBAL_BASE=$(MEMORY_PADDING)mb
+endif
 
 ifeq ($(HAVE_RWEBAUDIO), 1)
    LDFLAGS += --js-library emscripten/library_rwebaudio.js
@@ -161,7 +168,7 @@ endif
 
 
 ifneq ($(PTHREAD), 0)
-   LDFLAGS += -s WASM_MEM_MAX=1073741824 -pthread -s PTHREAD_POOL_SIZE=$(PTHREAD)
+   LDFLAGS += -s WASM_MEM_MAX=4294967296 -pthread -s PTHREAD_POOL_SIZE=$(PTHREAD)
    CFLAGS += -pthread
    HAVE_THREADS=0
 else
