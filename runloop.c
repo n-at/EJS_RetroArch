@@ -4535,6 +4535,12 @@ static bool runloop_event_load_core(runloop_state_t *runloop_st,
          ((video_st->av_info.timing.fps > 0.0) ?
                video_st->av_info.timing.fps : 60.0);
 
+   RARCH_LOG("[Core]: Geometry: %ux%u, Aspect: %.3f, FPS: %.2f, Sample rate: %.2f Hz.\n",
+         video_st->av_info.geometry.base_width, video_st->av_info.geometry.base_height,
+         video_st->av_info.geometry.aspect_ratio,
+         video_st->av_info.timing.fps,
+         video_st->av_info.timing.sample_rate);
+
    return true;
 }
 
@@ -4593,16 +4599,24 @@ bool runloop_event_init_core(
          video_st->title_buf,
          msg_hash_to_str(MSG_PROGRAM),
          sizeof(video_st->title_buf));
-   video_st->title_buf[  len] = ' ';
-   video_st->title_buf[++len] = '\0';
-   len += strlcpy(video_st->title_buf + len,
-         sys_info->info.library_name,
-         sizeof(video_st->title_buf)  - len);
-   video_st->title_buf[  len] = ' ';
-   video_st->title_buf[++len] = '\0';
-   strlcpy(video_st->title_buf        + len,
-         sys_info->info.library_version,
-         sizeof(video_st->title_buf)  - len);
+
+   if (!string_is_empty(sys_info->info.library_name))
+   {
+      video_st->title_buf[  len] = ' ';
+      video_st->title_buf[++len] = '\0';
+      len += strlcpy(video_st->title_buf + len,
+            sys_info->info.library_name,
+            sizeof(video_st->title_buf)  - len);
+   }
+
+   if (!string_is_empty(sys_info->info.library_version))
+   {
+      video_st->title_buf[  len] = ' ';
+      video_st->title_buf[++len] = '\0';
+      strlcpy(video_st->title_buf        + len,
+            sys_info->info.library_version,
+            sizeof(video_st->title_buf)  - len);
+   }
 
    strlcpy(sys_info->valid_extensions,
          sys_info->info.valid_extensions ?
@@ -4695,11 +4709,11 @@ void runloop_pause_checks(void)
 #ifdef HAVE_PRESENCE
    presence_userdata_t userdata;
 #endif
+   video_driver_state_t *video_st = video_state_get_ptr();
    runloop_state_t *runloop_st    = &runloop_state;
    bool is_paused                 = runloop_st->flags & RUNLOOP_FLAG_PAUSED;
    bool is_idle                   = runloop_st->flags & RUNLOOP_FLAG_IDLE;
 #if defined(HAVE_GFX_WIDGETS)
-   video_driver_state_t *video_st = video_state_get_ptr();
    dispgfx_widget_t *p_dispwidget = dispwidget_get_ptr();
    bool widgets_active            = p_dispwidget->active;
    if (widgets_active)
@@ -4722,6 +4736,8 @@ void runloop_pause_checks(void)
 
       if (!is_idle)
          video_driver_cached_frame();
+
+      midi_driver_set_all_sounds_off();
 
 #ifdef HAVE_PRESENCE
       userdata.status = PRESENCE_GAME_PAUSED;
@@ -4750,6 +4766,9 @@ void runloop_pause_checks(void)
 
    /* Signal/reset paused rewind to take the initial step */
    runloop_st->run_frames_and_pause = -1;
+
+   /* Ignore frame delay target temporarily */
+   video_st->frame_delay_pause      = true;
 }
 
 struct string_list *path_get_subsystem_list(void)

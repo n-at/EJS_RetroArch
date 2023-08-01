@@ -3036,7 +3036,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_RETROPAD_BINDS,
-   "Ändert, wie das virtuelle Retropad einem physischen Eingabegerät zugeordnet wird. Wenn ein Eingabegerät korrekt erkannt und automatisch konfiguriert wird, brauchen Benutzer dieses Menü wahrscheinlich nicht zu verwenden.\nHinweis: Für Core-spezifische Eingabeänderungen bitte stattdessen das Untermenü „Steuerung“ des Schnellmenüs verwenden."
+   "Ändert, wie das virtuelle RetroPad einem physischen Eingabegerät zugeordnet wird. Wenn ein Eingabegerät korrekt erkannt und automatisch konfiguriert wird, brauchen Benutzer dieses Menü wahrscheinlich nicht zu verwenden.\nHinweis: Für Core-spezifische Eingabeänderungen bitte stattdessen das Untermenü „Steuerung“ des Schnellmenüs verwenden."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_INPUT_RETROPAD_BINDS,
@@ -3048,7 +3048,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_USER_BINDS,
-   "Ändert, wie das virtuelle Retropad dem physischen Eingabegerät für diesen virtuellen Anschluss zugewiesen wird."
+   "Ändert, wie das virtuelle RetroPad dem physischen Eingabegerät für diesen virtuellen Anschluss zugewiesen wird."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_USER_REMAPS,
+   "Core-spezifische Eingabezuordnungen ändern."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,

@@ -2971,7 +2971,6 @@ bool command_event(enum event_command cmd, void *data)
 #endif
          break;
       case CMD_EVENT_AUDIO_STOP:
-         midi_driver_set_all_sounds_off();
 #if defined(HAVE_AUDIOMIXER) && defined(HAVE_MENU)
          if (     settings->bools.audio_enable_menu
                && menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE)
@@ -3503,7 +3502,7 @@ bool command_event(enum event_command cmd, void *data)
                runloop_msg_queue_push(
                      msg_hash_to_str(MSG_ADD_TO_FAVORITES_FAILED), 1, 180, true, NULL,
                      MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
-               return false;
+               return true;
             }
 
             if (str_list)
@@ -3533,11 +3532,12 @@ bool command_event(enum event_command cmd, void *data)
                         playlist_qsort(g_defaults.content_favorites);
 
                      playlist_write_file(g_defaults.content_favorites);
-                     runloop_msg_queue_push(msg_hash_to_str(MSG_ADDED_TO_FAVORITES), 1, 180, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+                     runloop_msg_queue_push(
+                           msg_hash_to_str(MSG_ADDED_TO_FAVORITES), 1, 180, true, NULL,
+                           MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
                   }
                }
             }
-
             break;
          }
       case CMD_EVENT_RESET_CORE_ASSOCIATION:
@@ -3567,7 +3567,9 @@ bool command_event(enum event_command cmd, void *data)
                      menu_st->userdata, i);
 #endif
 
-            runloop_msg_queue_push(msg_hash_to_str(MSG_RESET_CORE_ASSOCIATION), 1, 180, true, NULL, MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+            runloop_msg_queue_push(
+                  msg_hash_to_str(MSG_RESET_CORE_ASSOCIATION), 1, 180, true, NULL,
+                  MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
             break;
          }
       case CMD_EVENT_RESTART_RETROARCH:
@@ -3699,7 +3701,6 @@ bool command_event(enum event_command cmd, void *data)
          break;
       case CMD_EVENT_MENU_PAUSE_LIBRETRO:
 #ifdef HAVE_MENU
-         if (menu_st->flags & MENU_ST_FLAG_ALIVE)
          {
 #ifdef HAVE_NETWORKING
             bool menu_pause_libretro  = settings->bools.menu_pause_libretro
@@ -3708,30 +3709,17 @@ bool command_event(enum event_command cmd, void *data)
             bool menu_pause_libretro  = settings->bools.menu_pause_libretro;
 #endif
             if (menu_pause_libretro)
-            { /* If entering the menu pauses the game... */
-               command_event(CMD_EVENT_AUDIO_STOP, NULL);
+            {
 #ifdef HAVE_MICROPHONE
                command_event(CMD_EVENT_MICROPHONE_STOP, NULL);
 #endif
             }
             else
             {
-               command_event(CMD_EVENT_AUDIO_START, NULL);
 #ifdef HAVE_MICROPHONE
                command_event(CMD_EVENT_MICROPHONE_START, NULL);
 #endif
             }
-         }
-         else
-         {
-#ifdef HAVE_NETWORKING
-            bool menu_pause_libretro  = settings->bools.menu_pause_libretro
-               && netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_PAUSE, NULL);
-#else
-            bool menu_pause_libretro  = settings->bools.menu_pause_libretro;
-#endif
-            if (menu_pause_libretro)
-               command_event(CMD_EVENT_AUDIO_START, NULL);
          }
 #endif
          break;
@@ -6282,7 +6270,7 @@ static bool retroarch_parse_input_and_config(
                   const char *directory_playlist = settings->paths.directory_playlist;
                   const char *path_content_db    = settings->paths.path_content_database;
                   int reinit_flags               = DRIVERS_CMD_ALL &
-                        ~(DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK | DRIVER_INPUT_MASK | DRIVER_MIDI_MASK);
+                        ~(DRIVER_VIDEO_MASK | DRIVER_AUDIO_MASK | DRIVER_MICROPHONE_MASK | DRIVER_INPUT_MASK | DRIVER_MIDI_MASK);
 
                   drivers_init(settings, reinit_flags, 0, false);
                   retroarch_init_task_queue();

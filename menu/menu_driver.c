@@ -3991,6 +3991,18 @@ void get_current_menu_value(struct menu_state *menu_st,
    strlcpy(s, entry_label, len);
 }
 
+static void get_current_menu_type(struct menu_state *menu_st,
+      uint8_t *setting_type)
+{
+   menu_entry_t     entry;
+
+   MENU_ENTRY_INITIALIZE(entry);
+   entry.flags    = MENU_ENTRY_FLAG_VALUE_ENABLED;
+   menu_entry_get(&entry, 0, menu_st->selection_ptr, NULL, true);
+
+   *setting_type  = entry.setting_type;
+}
+
 #ifdef HAVE_ACCESSIBILITY
 static void menu_driver_get_current_menu_label(struct menu_state *menu_st,
       char *s, size_t len)
@@ -5407,6 +5419,39 @@ unsigned menu_event(
    }
    else
    {
+      static uint8_t switch_old = 0;
+      uint8_t switch_current    = BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_LEFT)
+                                | BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_RIGHT);
+      uint8_t switch_trigger    = switch_current & ~switch_old;
+
+      switch_old                = switch_current;
+
+      /* Prevent holding down left/right with boolean settings */
+      if (switch_current)
+      {
+         uint8_t setting_type   = 0;
+
+         get_current_menu_type(menu_st, &setting_type);
+
+         if (setting_type == ST_BOOL)
+         {
+            char value[8];
+
+            get_current_menu_value(menu_st, value, sizeof(value));
+
+            /* Ignore direction if switch is already in that position */
+            if (     (  string_is_equal(value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON))
+                     && BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+                  || (  string_is_equal(value, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF))
+                     && BIT256_GET_PTR(p_input, RETRO_DEVICE_ID_JOYPAD_LEFT))
+               )
+               switch_trigger   = 0;
+         }
+         else
+            /* Always allow repeat direction */
+            switch_trigger      = 1;
+      }
+
       if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_UP))
       {
          if (navigation_initial == (1 << RETRO_DEVICE_ID_JOYPAD_UP))
@@ -5417,12 +5462,14 @@ unsigned menu_event(
          if (navigation_initial == (1 << RETRO_DEVICE_ID_JOYPAD_DOWN))
             ret = MENU_ACTION_DOWN;
       }
-      if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_LEFT))
+      if (     BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_LEFT)
+            && switch_trigger)
       {
          if (navigation_initial == (1 << RETRO_DEVICE_ID_JOYPAD_LEFT))
             ret = MENU_ACTION_LEFT;
       }
-      else if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+      else if (BIT256_GET_PTR(p_trigger_input, RETRO_DEVICE_ID_JOYPAD_RIGHT)
+            && switch_trigger)
       {
          if (navigation_initial == (1 << RETRO_DEVICE_ID_JOYPAD_RIGHT))
             ret = MENU_ACTION_RIGHT;
@@ -6107,7 +6154,6 @@ void menu_driver_toggle(
     */
    video_driver_t *current_video      = (video_driver_t*)curr_video_data;
    bool pause_libretro                = false;
-   bool audio_enable_menu             = false;
    runloop_state_t *runloop_st        = runloop_state_get_ptr();
    struct menu_state *menu_st         = &menu_driver_state;
    bool runloop_shutdown_initiated    = runloop_st->flags &
@@ -6125,9 +6171,6 @@ void menu_driver_toggle(
          netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_PAUSE, NULL);
 #else
       pause_libretro                  = settings->bools.menu_pause_libretro;
-#endif
-#ifdef HAVE_AUDIOMIXER
-      audio_enable_menu               = settings->bools.audio_enable_menu;
 #endif
 #ifdef HAVE_OVERLAY
       input_overlay_hide_in_menu      = settings->bools.input_overlay_hide_in_menu;
@@ -6197,13 +6240,10 @@ void menu_driver_toggle(
       command_event(CMD_EVENT_RUMBLE_STOP, NULL);
 
       if (pause_libretro)
-      { /* If the menu pauses the game... */
+      {
 #ifdef HAVE_MICROPHONE
          command_event(CMD_EVENT_MICROPHONE_STOP, NULL);
 #endif
-
-         if (!audio_enable_menu) /* If the menu shouldn't have audio... */
-            command_event(CMD_EVENT_AUDIO_STOP, NULL);
       }
 
       /* Override keyboard callback to redirect to menu instead.
@@ -6230,15 +6270,9 @@ void menu_driver_toggle(
          driver_set_nonblock_state();
 
       if (pause_libretro)
-      { /* If the menu pauses the game... */
-
-         if (!audio_enable_menu) /* ...and the menu doesn't have audio... */
-            command_event(CMD_EVENT_AUDIO_START, NULL);
-            /* ...then re-enable the audio driver (which we shut off earlier) */
-
+      {
 #ifdef HAVE_MICROPHONE
          command_event(CMD_EVENT_MICROPHONE_START, NULL);
-         /* Start the microphone, if it was paused beforehand */
 #endif
       }
 

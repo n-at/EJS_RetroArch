@@ -3076,7 +3076,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_RETROPAD_BINDS,
-   "Cambia come la retropad virtuale viene mappata a un dispositivo di input fisico. Se un dispositivo di input è riconosciuto e auto-configurato correttamente, probabilmente gli utenti non hanno bisogno di usare questo menu.\nNota: per le modifiche di input specifiche al core, utilizza il sottomenu 'Controlli'."
+   "Cambia come il RetroPad virtuale viene mappato su un dispositivo di input fisico. Se un dispositivo di input è riconosciuto e auto-configurato correttamente, probabilmente gli utenti non hanno bisogno di usare questo menu.\nNota: per le modifiche di input specifiche del core, utilizza invece il sottomenu 'Controlli'."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_INPUT_RETROPAD_BINDS,
@@ -3088,7 +3088,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_USER_BINDS,
-   "Cambia come la retropad virtuale viene mappata sul tuo dispositivo di ingresso fisico per questa porta virtuale."
+   "Cambia come il RetroPad virtuale viene mappato sul tuo dispositivo di ingresso fisico per questa porta virtuale."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_USER_REMAPS,
+   "Cambia mappature di input specifiche per il core."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,

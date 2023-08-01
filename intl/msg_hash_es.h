@@ -3151,6 +3151,10 @@ MSG_HASH(
    "Cambia las asignaciones entre el RetroPad virtual y tu dispositivo de entrada físico para este puerto virtual."
    )
 MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_USER_REMAPS,
+   "Cambia las asignaciones de entrada específicas para el núcleo."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,
    "Corrección para las desconexiones en Android"
    )

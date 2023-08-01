@@ -3136,7 +3136,7 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_RETROPAD_BINDS,
-   "Sanal retropad ile fiziksel bir giriş cihazının nasıl eşlendiğini değiştirin. Bir giriş cihazı doğru bir şekilde tanınır ve otomatik olarak yapılandırılırsa, kullanıcıların bu menüyü kullanması gerekmez.\nNot: çekirdeğe özel giriş değişiklikleri için bunun yerine Hızlı Menü 'Kontrolcüler' alt menüsünü kullanın."
+   "Sanal RetroPad ile fiziksel bir giriş cihazının nasıl eşlendiğini değiştirin. Bir giriş cihazı doğru bir şekilde tanınır ve otomatik olarak yapılandırılırsa, kullanıcıların bu menüyü kullanması gerekmez.\nNot: çekirdeğe özel giriş değişiklikleri için bunun yerine Hızlı Menü 'Kontrolcüler' alt menüsünü kullanın."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_HELP_INPUT_RETROPAD_BINDS,
@@ -3148,7 +3148,11 @@ MSG_HASH(
    )
 MSG_HASH(
    MENU_ENUM_SUBLABEL_INPUT_USER_BINDS,
-   "Bu sanal bağlantı noktası için sanal retropad ile fiziksel giriş cihazının nasıl eşlendiğini değiştirin."
+   "Bu sanal bağlantı noktası için sanal RetroPad ile fiziksel giriş cihazının nasıl eşlendiğini değiştirin."
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_INPUT_USER_REMAPS,
+   "Çekirdeğe özgü giriş eşlemelerini değiştirin."
    )
 MSG_HASH(
    MENU_ENUM_LABEL_VALUE_ANDROID_INPUT_DISCONNECT_WORKAROUND,
