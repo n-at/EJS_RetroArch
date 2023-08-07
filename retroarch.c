@@ -5060,7 +5060,19 @@ int get_current_disk(void)
     
     return (&sys_info->disk_control)->cb.get_image_index();
 }
-
+bool FF_ACTIVE;
+void toggle_fastforward(bool enabled)
+{
+    FF_ACTIVE = enabled;
+}
+bool EJS_IS_FASTFORWARD()
+{
+   return FF_ACTIVE;
+}
+void set_ff_ratio(float ratio) {
+    settings_t *settings = config_get_ptr();
+    settings->floats.fastforward_ratio = ratio;
+}
 #endif
 
 #endif

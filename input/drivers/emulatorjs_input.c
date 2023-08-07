@@ -318,8 +318,8 @@ static EM_BOOL rwebinput_touch_cb(int event_type,
    }
    if (event_type == EMSCRIPTEN_EVENT_TOUCHMOVE && touch_handler->last_touchdown_id == changed_touch.identifier) {
       long u = touch_handler->last_touchdown_location - (changed_touch.canvasX + changed_touch.canvasY);
-      //15 may be too much of an offset...
-      if (((u<0)?-u:u) > 15) {
+      //25 may be too much of an offset...
+      if (((u<0)?-u:u) > 25) {
          touch_handler->last_touchdown_id = -1;
       }
    }

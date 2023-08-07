@@ -5356,6 +5356,10 @@ static void runloop_pause_toggle(
       command_event(CMD_EVENT_PAUSE, NULL);
 }
 
+#ifdef EMULATORJS
+bool EJS_IS_FASTFORWARD();
+#endif
+
 static enum runloop_state_enum runloop_check_state(
       bool error_on_init,
       settings_t *settings,
@@ -6325,10 +6329,15 @@ static enum runloop_state_enum runloop_check_state(
    {
       static bool old_button_state            = false;
       static bool old_hold_button_state       = false;
+#ifdef EMULATORJS
+      bool new_button_state = EJS_IS_FASTFORWARD();
+      bool new_hold_button_state = EJS_IS_FASTFORWARD();
+#else
       bool new_button_state                   = BIT256_GET(
             current_bits, RARCH_FAST_FORWARD_KEY);
       bool new_hold_button_state              = BIT256_GET(
             current_bits, RARCH_FAST_FORWARD_HOLD_KEY);
+#endif
       bool check2                             = new_button_state 
          && !old_button_state;
 
@@ -8201,7 +8210,7 @@ void set_variable(char key[], char value[])
    size_t opt_idx;
    size_t val_idx;
     if (!core_option_manager_get_idx(runloop_st->core_options, key, &opt_idx)) {
-       printf("invalid core option %s\n", key);
+       printf("invalid core option %s. This is not an error.\n", key);
        return;
     }
     if (!core_option_manager_get_val_idx(runloop_st->core_options, opt_idx, value, &val_idx)) {
