@@ -6053,7 +6053,11 @@ static enum runloop_state_enum runloop_check_state(
          char s[128];
          bool rewinding      = false;
          static bool old_rewind_pressed = false;
+#ifdef EMULATORJS
+         bool rewind_pressed = EJS_IS_REWIND();
+#else
          bool rewind_pressed = BIT256_GET(current_bits, RARCH_REWIND);
+#endif
          unsigned t          = 0;
 
          s[0]                = '\0';
