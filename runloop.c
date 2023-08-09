@@ -5358,6 +5358,7 @@ static void runloop_pause_toggle(
 
 #ifdef EMULATORJS
 bool EJS_IS_FASTFORWARD();
+bool EJS_IS_REWIND();
 #endif
 
 static enum runloop_state_enum runloop_check_state(
