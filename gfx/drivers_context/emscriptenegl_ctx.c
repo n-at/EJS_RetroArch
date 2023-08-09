@@ -46,7 +46,7 @@ typedef struct
 
 static void gfx_ctx_emscripten_swap_interval(void *data, int interval)
 {
-   emscripten_set_main_loop_timing(EM_TIMING_SETIMMEDIATE, 0);
+   emscripten_set_main_loop_timing(EM_TIMING_RAF, 1);
 }
 
 static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
@@ -135,7 +135,7 @@ static void gfx_ctx_emscripten_check_window(void *data, bool *quit,
 static void gfx_ctx_emscripten_swap_buffers(void *data)
 {
 #ifdef HAVE_EGL
-   /* Doesn't really do anything in WebGL, but it might 
+   /* Doesn't really do anything in WebGL, but it might
     * if we use WebGL workers in the future */
    emscripten_ctx_data_t *emscripten = (emscripten_ctx_data_t*)data;
    egl_swap_buffers(&emscripten->egl);
