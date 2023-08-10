@@ -6178,7 +6178,10 @@ static enum runloop_state_enum runloop_check_state(
       bool pause_pressed            = BIT256_GET(current_bits, RARCH_PAUSE_TOGGLE);
 
 #ifdef EMULATORJS
-      pause_pressed = EJS_IS_PAUSE();
+      static bool ejs_old_pause_pressed = false;
+      if (ejs_old_pause_pressed != EJS_IS_PAUSE()) {
+         pause_pressed = true;
+      }
 #endif
 
       /* Reset frameadvance pause when triggering pause */
@@ -6234,6 +6237,9 @@ static enum runloop_state_enum runloop_check_state(
       old_focus           = focused;
       old_pause_pressed   = pause_pressed;
       old_frameadvance    = frameadvance_pressed;
+#ifdef EMULATORJS
+      ejs_old_pause_pressed = pause_pressed;
+#endif
 
       if (runloop_st->flags & RUNLOOP_FLAG_PAUSED)
       {

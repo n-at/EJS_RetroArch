@@ -46,7 +46,7 @@ typedef struct
 
 static void gfx_ctx_emscripten_swap_interval(void *data, int interval)
 {
-   emscripten_set_main_loop_timing(EM_TIMING_RAF, 1);
+   emscripten_set_main_loop_timing(EM_TIMING_SETIMMEDIATE, 0);
 }
 
 static void gfx_ctx_emscripten_get_canvas_size(int *width, int *height)
