@@ -5359,6 +5359,7 @@ static void runloop_pause_toggle(
 #ifdef EMULATORJS
 bool EJS_IS_FASTFORWARD();
 bool EJS_IS_REWIND();
+bool EJS_IS_PAUSE();
 #endif
 
 static enum runloop_state_enum runloop_check_state(
@@ -6175,6 +6176,10 @@ static enum runloop_state_enum runloop_check_state(
       bool frameadvance_pressed     = false;
       bool frameadvance_trigger     = false;
       bool pause_pressed            = BIT256_GET(current_bits, RARCH_PAUSE_TOGGLE);
+
+#ifdef EMULATORJS
+      pause_pressed = EJS_IS_PAUSE();
+#endif
 
       /* Reset frameadvance pause when triggering pause */
       if (pause_pressed)

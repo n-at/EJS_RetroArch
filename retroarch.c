@@ -5060,6 +5060,7 @@ int get_current_disk(void)
     
     return (&sys_info->disk_control)->cb.get_image_index();
 }
+
 bool FF_ACTIVE;
 void toggle_fastforward(bool enabled)
 {
@@ -5087,6 +5088,14 @@ void set_rewind_granularity(uint granularity)
 {
    settings_t *settings = config_get_ptr();
    settings->uints.rewind_granularity = granularity;
+}
+
+bool PAUSE_ACTIVE;
+void toggle_pause(bool enabled) {
+   PAUSE_ACTIVE = enabled;
+}
+void EJS_IS_PAUSE() {
+   return PAUSE_ACTIVE;
 }
 #endif
 
