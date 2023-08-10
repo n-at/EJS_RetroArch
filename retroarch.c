@@ -5094,7 +5094,7 @@ bool PAUSE_ACTIVE;
 void toggle_pause(bool enabled) {
    PAUSE_ACTIVE = enabled;
 }
-void EJS_IS_PAUSE() {
+bool EJS_IS_PAUSE() {
    return PAUSE_ACTIVE;
 }
 #endif
