@@ -6238,7 +6238,7 @@ static enum runloop_state_enum runloop_check_state(
       old_pause_pressed   = pause_pressed;
       old_frameadvance    = frameadvance_pressed;
 #ifdef EMULATORJS
-      ejs_old_pause_pressed = pause_pressed;
+      ejs_old_pause_pressed = EJS_IS_PAUSE();
 #endif
 
       if (runloop_st->flags & RUNLOOP_FLAG_PAUSED)
