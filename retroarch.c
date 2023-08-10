@@ -4924,9 +4924,18 @@ int rarch_main(int argc, char *argv[], void *data)
 #ifdef HAVE_RWEBAUDIO
 void RWebAudioRecalibrateTime(void);
 #endif
+#ifdef EMULATORJS
+bool EJS_PAUSED = false;
+bool EJS_MAINLOOP_PAUSED = false;
+#endif
 
 void emscripten_mainloop(void)
 {
+   if (EJS_PAUSED && !EJS_MAINLOOP_PAUSED) {
+      emscripten_pause_main_loop();
+      EJS_MAINLOOP_PAUSED = true;
+      return;
+   }
    int ret;
    static unsigned emscripten_frame_count = 0;
    video_driver_state_t *video_st         = video_state_get_ptr();
@@ -4982,12 +4991,11 @@ char* save_file_path() {
 }
 
 void toggleMainLoop(int running) {
-    runloop_state_t *runloop_st     = runloop_state_get_ptr();
-    if (running == 0) {
-        runloop_st->flags |=  RUNLOOP_FLAG_PAUSED;
-    } else {
-        runloop_st->flags &=  ~RUNLOOP_FLAG_PAUSED;
+    if (running == 1 && EJS_MAINLOOP_PAUSED) {
+        emscripten_resume_main_loop();
+        EJS_MAINLOOP_PAUSED = false;
     }
+    EJS_PAUSED = (running == 0);
 }
 
 void cmd_load_state(void)
