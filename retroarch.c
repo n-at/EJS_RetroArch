@@ -5081,6 +5081,21 @@ void set_ff_ratio(float ratio) {
     settings_t *settings = config_get_ptr();
     settings->floats.fastforward_ratio = ratio;
 }
+
+bool REWIND_ACTIVE;
+void toggle_rewind(bool enabled)
+{
+   REWIND_ACTIVE = enabled;
+}
+bool EJS_IS_REWIND()
+{
+   return REWIND_ACTIVE;
+}
+void set_rewind_granularity(uint granularity)
+{
+   settings_t *settings = config_get_ptr();
+   settings->uints.rewind_granularity = granularity;
+}
 #endif
 
 #endif
