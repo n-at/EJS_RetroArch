@@ -5091,6 +5091,11 @@ bool EJS_IS_REWIND()
 {
    return REWIND_ACTIVE;
 }
+void enable_rewind(bool enabled)
+{
+   settings_t *settings = config_get_ptr();
+   settings->bools.rewind_enable = enabled;
+}
 void set_rewind_granularity(uint granularity)
 {
    settings_t *settings = config_get_ptr();
